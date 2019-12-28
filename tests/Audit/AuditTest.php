@@ -61,11 +61,6 @@ class AuditTest extends TestCase
         $this->audit = null;
     }
 
-    public function testNamespace()
-    {
-        $this->assertEquals($this->audit->getNamespace(), 'namespace');
-    }
-
     public function testLog()
     {
         var_dump($this->audit->log('update', 'document/document-1', ['key1' => 'value1','key2' => 'value2']));
