@@ -25,7 +25,7 @@ class MySQL extends Adapter
      *
      * Add specific event log
      *
-     * @param int    $userId
+     * @param string $userId
      * @param int    $userType
      * @param string $event
      * @param string $resource
@@ -38,7 +38,7 @@ class MySQL extends Adapter
      *
      * @throws \Exception
      */
-    public function log($userId, $userType, $event, $resource, $userAgent, $ip, $location, $data)
+    public function log($userId, $userType, $event, $resource, $userAgent, $ip, $location, $data):bool
     {
         $st = $this->getPDO()->prepare('INSERT INTO `'.$this->getNamespace().'.audit.audit`
             SET userId = :userId, userType = :userType, event= :event, resource= :resource, userAgent = :userAgent, ip = :ip, location = :location, time = "'.date('Y-m-d H:i:s').'", data = :data

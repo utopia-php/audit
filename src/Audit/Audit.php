@@ -36,7 +36,7 @@ class Audit
 
     /**
      * @param Adapter $adapter
-     * @param int     $userId
+     * @param string  $userId
      * @param int     $userType
      * @param string  $userAgent
      * @param string  $ip
