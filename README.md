@@ -49,7 +49,7 @@ $adapter
 $audit = new Audit($adapter);
 ```
 
-**Log Action**
+**Create Log**
 
 A simple example for logging a user action in the audit DB.
 
