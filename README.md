@@ -15,33 +15,57 @@ Install using composer:
 composer require utopia-php/audit
 ```
 
-**Log Action**
-
-A simple example for logging a user action in the audit DB.
+Init the audit object:
 
 ```php
 <?php
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 
-use Utopia\Abuse\Abuse;
-use Utopia\Abuse\Adapters\TimeLimit;
+use PDO;
+use Utopia\Audit\Audit;
+use Utopia\Audit\Adapters\MySQL;
 
-// Limit login attempts to 10 time in 5 minutes time frame
-$adapter    = new TimeLimit('login-attempt-from-{{ip}}', 10, (60 * 5), function () {/* init and return PDO connection... */});
+$dbHost = '127.0.0.1';
+$dbUser = 'travis';
+$dbPass = '';
+$dbName = 'audit';
+
+$pdo = new PDO("mysql:host={$dbHost};dbname={$dbName}", $dbUser, $dbPass, array(
+    PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8',
+    PDO::ATTR_TIMEOUT => 5 // Seconds
+));
+
+// Connection settings
+$pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);   // Return arrays
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);        // Handle all errors with exceptions
+
+$adapter = new MySQL($pdo);
 
 $adapter
     ->setNamespace('namespace') // DB table namespace
-    ->setParam('{{ip}}', '127.0.0.1')
 ;
 
-$abuse      = new Abuse($adapter);
+$userId = 'user-unique-id';
+$userType = 1; // Distinguish users by a number ID, any valid integer is OK
+$userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36'; // Set user-agent
+$ip = '127.0.0.1'; // User IP
+$location = 'US'; // Country name or code
 
-// Use vars to resolve adapter key
+$this->audit = new Audit($adapter, $userId, $userType, $userAgent, $ip, $location);
+```
 
-if(!$abuse->check()) {
-    throw new Exception('Service was abused!'); // throw error and return X-Rate limit headers here
-}
+**Log Action**
+
+A simple example for logging a user action in the audit DB.
+
+```php
+<?php
+$this->audit->log(
+    'deleted', // Log specific action name
+    'database/document-1', // Resource unique ID (good fo filtering specific logs)
+    ['key1' => 'value1','key2' => 'value2'] // Any key-value pair you need to log
+)
 ```
 
 **Get Logs By User**
@@ -50,19 +74,10 @@ Fetch all logs by given user ID
 
 ```php
 <?php
-
-require_once __DIR__ . '/../../vendor/autoload.php';
-
-use Utopia\Abuse\Abuse;
-use Utopia\Abuse\Adapters\ReCaptcha;
-
-// Limit login attempts to 10 time in 5 minutes time frame
-$adapter    = new ReCaptcha('secret-api-key', $_POST['g-recaptcha-response'], $_SERVER['REMOTE_ADDR']);
-$abuse      = new Abuse($adapter);
-
-if(!$abuse->check()) {
-    throw new Exception('Service was abused!'); // throw error and return X-Rate limit headers here
-}
+$logs = $this->audit->getLogsByUser(
+    'userId', // User unique ID
+    1 // User type integer
+); // Returns an array of all logs for specific user
 ```
 
 **Get Logs By User and Action**
@@ -71,19 +86,11 @@ Fetch all logs by given user ID and a specific action name
 
 ```php
 <?php
-
-require_once __DIR__ . '/../../vendor/autoload.php';
-
-use Utopia\Abuse\Abuse;
-use Utopia\Abuse\Adapters\ReCaptcha;
-
-// Limit login attempts to 10 time in 5 minutes time frame
-$adapter    = new ReCaptcha('secret-api-key', $_POST['g-recaptcha-response'], $_SERVER['REMOTE_ADDR']);
-$abuse      = new Abuse($adapter);
-
-if(!$abuse->check()) {
-    throw new Exception('Service was abused!'); // throw error and return X-Rate limit headers here
-}
+$logs = $this->audit->getLogsByUserAndActions(
+    'userId', // User unique ID
+    1, // User type integer
+    ['update', 'delete'] // List of selected action to fetch
+); // Returns an array of all logs for specific user filtered by given actions
 ```
 
 ## System Requirements

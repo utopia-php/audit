@@ -63,14 +63,15 @@ class AuditTest extends TestCase
 
     public function testLog()
     {
-        $this->assertEquals($this->audit->log('update', 'document/document-1', ['key1' => 'value1','key2' => 'value2']), true);
-        $this->assertEquals($this->audit->log('update', 'document/document-2', ['key1' => 'value1','key2' => 'value2']), true);
-        $this->assertEquals($this->audit->log('delete', 'document/document-2', ['key1' => 'value1','key2' => 'value2']), true);
+        $this->assertEquals($this->audit->log('update', 'database/document-1', ['key1' => 'value1','key2' => 'value2']), true);
+        $this->assertEquals($this->audit->log('update', 'database/document-2', ['key1' => 'value1','key2' => 'value2']), true);
+        $this->assertEquals($this->audit->log('delete', 'database/document-2', ['key1' => 'value1','key2' => 'value2']), true);
     }
 
     public function testGetLogsByUser()
     {
         $logs = $this->audit->getLogsByUser('userId', 1);
+
         $this->assertEquals(3, \count($logs));
     }
     
@@ -78,7 +79,7 @@ class AuditTest extends TestCase
     {
         $logs1 = $this->audit->getLogsByUserAndActions('userId', 1, ['update']);
         $logs2 = $this->audit->getLogsByUserAndActions('userId', 1, ['update', 'delete']);
-        
+
         $this->assertEquals(2, \count($logs1));
         $this->assertEquals(3, \count($logs2));
     }
