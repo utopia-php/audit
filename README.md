@@ -58,7 +58,7 @@ A simple example for logging a user action in the audit DB.
 
 $userId = 'user-unique-id';
 $event = 'deleted'; // Log specific action name
-$resource = 'database/document-1'; // Resource unique ID (good fo filtering specific logs)
+$resource = 'database/document-1'; // Resource unique ID (great for filtering specific logs)
 $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36'; // Set user-agent
 $ip = '127.0.0.1'; // User IP
 $location = 'US'; // Country name or code
