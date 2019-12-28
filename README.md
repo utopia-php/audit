@@ -47,12 +47,11 @@ $adapter
 ;
 
 $userId = 'user-unique-id';
-$userType = 1; // Distinguish users by a number ID, any valid integer is OK
 $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36'; // Set user-agent
 $ip = '127.0.0.1'; // User IP
 $location = 'US'; // Country name or code
 
-$this->audit = new Audit($adapter, $userId, $userType, $userAgent, $ip, $location);
+$this->audit = new Audit($adapter, $userId, $userAgent, $ip, $location);
 ```
 
 **Log Action**
@@ -75,8 +74,7 @@ Fetch all logs by given user ID
 ```php
 <?php
 $logs = $this->audit->getLogsByUser(
-    'userId', // User unique ID
-    1 // User type integer
+    'userId' // User unique ID
 ); // Returns an array of all logs for specific user
 ```
 
@@ -88,7 +86,6 @@ Fetch all logs by given user ID and a specific action name
 <?php
 $logs = $this->audit->getLogsByUserAndActions(
     'userId', // User unique ID
-    1, // User type integer
     ['update', 'delete'] // List of selected action to fetch
 ); // Returns an array of all logs for specific user filtered by given actions
 ```

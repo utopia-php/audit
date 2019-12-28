@@ -48,12 +48,11 @@ class AuditTest extends TestCase
         ;
 
         $userId = 'userId';
-        $userType = 1;
         $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36';
         $ip = '127.0.0.1';
         $location = 'US';
 
-        $this->audit = new Audit($adapter, $userId, $userType, $userAgent, $ip, $location);
+        $this->audit = new Audit($adapter, $userId, $userAgent, $ip, $location);
     }
 
     public function tearDown()
@@ -70,15 +69,15 @@ class AuditTest extends TestCase
 
     public function testGetLogsByUser()
     {
-        $logs = $this->audit->getLogsByUser('userId', 1);
+        $logs = $this->audit->getLogsByUser('userId');
 
         $this->assertEquals(3, \count($logs));
     }
     
     public function testGetLogsByUserAndAction()
     {
-        $logs1 = $this->audit->getLogsByUserAndActions('userId', 1, ['update']);
-        $logs2 = $this->audit->getLogsByUserAndActions('userId', 1, ['update', 'delete']);
+        $logs1 = $this->audit->getLogsByUserAndActions('userId', ['update']);
+        $logs2 = $this->audit->getLogsByUserAndActions('userId', ['update', 'delete']);
 
         $this->assertEquals(2, \count($logs1));
         $this->assertEquals(3, \count($logs2));

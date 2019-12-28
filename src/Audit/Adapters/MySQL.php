@@ -26,7 +26,6 @@ class MySQL extends Adapter
      * Add specific event log
      *
      * @param string $userId
-     * @param int    $userType
      * @param string $event
      * @param string $resource
      * @param string $userAgent
@@ -38,16 +37,15 @@ class MySQL extends Adapter
      *
      * @throws \Exception
      */
-    public function log(string $userId, int $userType, string $event, string $resource, string $userAgent, string $ip, string $location, array $data):bool
+    public function log(string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data):bool
     {
         $st = $this->getPDO()->prepare('INSERT INTO `'.$this->getNamespace().'.audit.audit`
-            SET userId = :userId, userType = :userType, event= :event, resource= :resource, userAgent = :userAgent, ip = :ip, location = :location, time = "'.date('Y-m-d H:i:s').'", data = :data
+            SET userId = :userId, event= :event, resource= :resource, userAgent = :userAgent, ip = :ip, location = :location, time = "'.date('Y-m-d H:i:s').'", data = :data
 		');
 
         $data = mb_strcut(json_encode($data), 0, 64000, 'UTF-8'); // Limit data to MySQL 64kb limit
 
         $st->bindValue(':userId', $userId, PDO::PARAM_STR);
-        $st->bindValue(':userType', $userType, PDO::PARAM_INT);
         $st->bindValue(':event', $event, PDO::PARAM_STR);
         $st->bindValue(':resource', $resource, PDO::PARAM_STR);
         $st->bindValue(':userAgent', $userAgent, PDO::PARAM_STR);
@@ -60,24 +58,22 @@ class MySQL extends Adapter
         return ('00000' == $st->errorCode()) ? true : false;
     }
 
-    public function getLogsByUser(string $userId, int $userType):array
+    public function getLogsByUser(string $userId):array
     {
         $st = $this->getPDO()->prepare('SELECT *
         FROM `'.$this->getNamespace().'.audit.audit`
             WHERE userId = :userId
-                AND userType = :userType
             ORDER BY `time` DESC LIMIT 10
         ');
 
         $st->bindValue(':userId', $userId, PDO::PARAM_STR);
-        $st->bindValue(':userType', $userType, PDO::PARAM_INT);
 
         $st->execute();
 
         return $st->fetchAll();
     }
 
-    public function getLogsByUserAndActions(string $userId, int $userType, array $actions):array
+    public function getLogsByUserAndActions(string $userId, array $actions):array
     {
         $query = [];
 
@@ -91,12 +87,10 @@ class MySQL extends Adapter
         FROM `'.$this->getNamespace().'.audit.audit`
             WHERE `event` IN ('.$query.')
                 AND userId = :userId
-                AND userType = :userType
             ORDER BY `time` DESC LIMIT 10
         ');
 
         $st->bindValue(':userId', $userId, PDO::PARAM_STR);
-        $st->bindValue(':userType', $userType, PDO::PARAM_INT);
 
         foreach ($actions as $k => $id) {
             $st->bindValue(':action_'.$k, $id);

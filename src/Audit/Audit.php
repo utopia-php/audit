@@ -10,14 +10,9 @@ class Audit
     private $adapter;
 
     /**
-     * @var int
+     * @var string
      */
     private $userId;
-
-    /**
-     * @var int
-     */
-    private $userType;
 
     /**
      * @var string
@@ -37,16 +32,14 @@ class Audit
     /**
      * @param Adapter $adapter
      * @param string  $userId
-     * @param int     $userType
      * @param string  $userAgent
      * @param string  $ip
      * @param string  $location
      */
-    public function __construct(Adapter $adapter, $userId, $userType, $userAgent, $ip, $location)
+    public function __construct(Adapter $adapter, $userId, $userAgent, $ip, $location)
     {
         $this->adapter = $adapter;
         $this->userId = $userId;
-        $this->userType = $userType;
         $this->userAgent = $userAgent;
         $this->ip = $ip;
         $this->location = $location;
@@ -65,7 +58,7 @@ class Audit
      */
     public function log($event, $resource = '', array $data = []):bool
     {
-        return $this->adapter->log($this->userId, $this->userType, $event, $resource, $this->userAgent, $this->ip, $this->location, $data);
+        return $this->adapter->log($this->userId, $event, $resource, $this->userAgent, $this->ip, $this->location, $data);
     }
 
     /**
@@ -74,13 +67,12 @@ class Audit
      * Get all user logs logs by given action names
      *
      * @param int $userId
-     * @param int $userType
      *
      * @return array
      */
-    public function getLogsByUser($userId, $userType):array
+    public function getLogsByUser($userId):array
     {
-        return $this->adapter->getLogsByUser($userId, $userType);
+        return $this->adapter->getLogsByUser($userId);
     }
 
     /**
@@ -89,13 +81,12 @@ class Audit
      * Get all user logs logs by given action names
      *
      * @param int   $userId
-     * @param int   $userType
      * @param array $actions
      *
      * @return array
      */
-    public function getLogsByUserAndActions($userId, $userType, array $actions):array
+    public function getLogsByUserAndActions($userId, array $actions):array
     {
-        return $this->adapter->getLogsByUserAndActions($userId, $userType, $actions);
+        return $this->adapter->getLogsByUserAndActions($userId, $actions);
     }
 }

@@ -54,7 +54,6 @@ abstract class Adapter
      * Add specific event log
      *
      * @param string $userId
-     * @param int    $userType
      * @param string $event
      * @param string $resource
      * @param string $userAgent
@@ -64,7 +63,7 @@ abstract class Adapter
      *
      * @return
      */
-    abstract public function log(string $userId, int $userType, string $event, string $resource, string $userAgent, string $ip, string $location, array $data):bool;
+    abstract public function log(string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data):bool;
 
     /**
      * Get All Logs By User.
@@ -72,11 +71,10 @@ abstract class Adapter
      * Get all user logs
      *
      * @param string $userId
-     * @param int $userType
      *
      * @return array
      */
-    abstract public function getLogsByUser(string $userId, int $userType):array;
+    abstract public function getLogsByUser(string $userId):array;
 
     /**
      * Get All Logs By User and Actions.
@@ -84,10 +82,9 @@ abstract class Adapter
      * Get all user logs by given action names
      *
      * @param string $userId
-     * @param int    $userType
      * @param array  $actions
      *
      * @return array
      */
-    abstract public function getLogsByUserAndActions(string $userId, int $userType, array $actions):array;
+    abstract public function getLogsByUserAndActions(string $userId, array $actions):array;
 }
