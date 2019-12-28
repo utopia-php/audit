@@ -61,9 +61,9 @@ class Audit
      * @param string $resource
      * @param array  $data
      *
-     * @return mixed
+     * @return bool
      */
-    public function log($event, $resource = '', array $data = [])
+    public function log($event, $resource = '', array $data = []):bool
     {
         return $this->adapter->log($this->userId, $this->userType, $event, $resource, $this->userAgent, $this->ip, $this->location, $data);
     }
@@ -76,9 +76,9 @@ class Audit
      * @param int $userId
      * @param int $userType
      *
-     * @return mixed
+     * @return array
      */
-    public function getLogsByUser($userId, $userType)
+    public function getLogsByUser($userId, $userType):array
     {
         return $this->adapter->getLogsByUser($userId, $userType);
     }
@@ -92,9 +92,9 @@ class Audit
      * @param int   $userType
      * @param array $actions
      *
-     * @return mixed
+     * @return array
      */
-    public function getLogsByUserAndActions($userId, $userType, array $actions)
+    public function getLogsByUserAndActions($userId, $userType, array $actions):array
     {
         return $this->adapter->getLogsByUserAndActions($userId, $userType, $actions);
     }

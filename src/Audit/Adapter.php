@@ -19,7 +19,7 @@ abstract class Adapter
      *
      * @return bool
      */
-    public function setNamespace($namespace)
+    public function setNamespace($namespace):bool
     {
         if (empty($namespace)) {
             throw new Exception('Missing namespace');
@@ -39,7 +39,7 @@ abstract class Adapter
      *
      * @return string
      */
-    public function getNamespace()
+    public function getNamespace():string
     {
         if (empty($this->namespace)) {
             throw new Exception('Missing namespace');
@@ -64,7 +64,7 @@ abstract class Adapter
      *
      * @return
      */
-    abstract public function log($userId, $userType, $event, $resource, $userAgent, $ip, $location, $data):bool;
+    abstract public function log(string $userId, int $userType, string $event, stirng $resource, string $userAgent, string $ip, string $location, array $data):bool;
 
     /**
      * Get All Logs By User.
@@ -76,7 +76,7 @@ abstract class Adapter
      *
      * @return array
      */
-    abstract public function getLogsByUser($userId, $userType):array;
+    abstract public function getLogsByUser(string $userId, int $userType):array;
 
     /**
      * Get All Logs By User and Actions.
@@ -89,5 +89,5 @@ abstract class Adapter
      *
      * @return array
      */
-    abstract public function getLogsByUserAndActions($userId, $userType, array $actions):array;
+    abstract public function getLogsByUserAndActions(string $userId, int $userType, array $actions):array;
 }

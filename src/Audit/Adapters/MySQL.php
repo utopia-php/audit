@@ -38,7 +38,7 @@ class MySQL extends Adapter
      *
      * @throws \Exception
      */
-    public function log($userId, $userType, $event, $resource, $userAgent, $ip, $location, $data):bool
+    public function log(string $userId, int $userType, string $event, string $resource, string $userAgent, string $ip, string $location, array $data):bool
     {
         $st = $this->getPDO()->prepare('INSERT INTO `'.$this->getNamespace().'.audit.audit`
             SET userId = :userId, userType = :userType, event= :event, resource= :resource, userAgent = :userAgent, ip = :ip, location = :location, time = "'.date('Y-m-d H:i:s').'", data = :data
@@ -60,7 +60,7 @@ class MySQL extends Adapter
         return ('00000' == $st->errorCode()) ? true : false;
     }
 
-    public function getLogsByUser($userId, $userType)
+    public function getLogsByUser(string $userId, int $userType):array
     {
         $st = $this->getPDO()->prepare('SELECT *
         FROM `'.$this->getNamespace().'.audit.audit`
@@ -77,7 +77,7 @@ class MySQL extends Adapter
         return $st->fetchAll();
     }
 
-    public function getLogsByUserAndActions($userId, $userType, array $actions)
+    public function getLogsByUserAndActions(string $userId, int $userType, array $actions):array
     {
         $query = [];
 
