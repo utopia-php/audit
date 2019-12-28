@@ -64,7 +64,7 @@ abstract class Adapter
      *
      * @return
      */
-    abstract public function log(string $userId, int $userType, string $event, stirng $resource, string $userAgent, string $ip, string $location, array $data):bool;
+    abstract public function log(string $userId, int $userType, string $event, string $resource, string $userAgent, string $ip, string $location, array $data):bool;
 
     /**
      * Get All Logs By User.
