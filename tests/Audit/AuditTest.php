@@ -70,14 +70,16 @@ class AuditTest extends TestCase
 
     public function testGetLogsByUser()
     {
-        var_dump($this->audit->getLogsByUser('userId', 1));
-        $this->assertEquals($this->audit->getLogsByUser('userId', 1), true);
+        $logs = $this->audit->getLogsByUser('userId', 1);
+        $this->assertEquals(3, \count($logs));
     }
-
+    
     public function testGetLogsByUserAndAction()
     {
-        var_dump($this->audit->getLogsByUserAndActions('userId', 1, ['update']));
-        var_dump($this->audit->getLogsByUserAndActions('userId', 1, ['update', 'delete']));
-        $this->assertEquals($this->audit->getLogsByUser('userId', 1), true);
+        $logs1 = $this->audit->getLogsByUserAndActions('userId', 1, ['update']);
+        $logs2 = $this->audit->getLogsByUserAndActions('userId', 1, ['update', 'delete']);
+        
+        $this->assertEquals(2, \count($logs1));
+        $this->assertEquals(3, \count($logs2));
     }
 }
