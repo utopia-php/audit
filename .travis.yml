@@ -1,0 +1,22 @@
+language: php
+
+php:
+- 7.1
+- 7.2
+- 7.3
+- 7.4
+
+services:
+- mysql
+
+notifications:
+  email:
+  - team@appwrite.io
+
+before_install:
+- mysql < data/schema.sql
+
+before_script: composer install
+
+script:
+- vendor/bin/phpunit --configuration phpunit.xml
