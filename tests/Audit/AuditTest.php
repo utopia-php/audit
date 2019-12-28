@@ -48,7 +48,7 @@ class AuditTest extends TestCase
         ;
 
         $userId = 'userId';
-        $userType = 'userType';
+        $userType = 1;
         $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36';
         $ip = '127.0.0.1';
         $location = 'US';
@@ -63,7 +63,14 @@ class AuditTest extends TestCase
 
     public function testLog()
     {
-        var_dump($this->audit->log('update', 'document/document-1', ['key1' => 'value1','key2' => 'value2']));
         $this->assertEquals($this->audit->log('update', 'document/document-1', ['key1' => 'value1','key2' => 'value2']), true);
+        $this->assertEquals($this->audit->log('update', 'document/document-2', ['key1' => 'value1','key2' => 'value2']), true);
+        $this->assertEquals($this->audit->log('delete', 'document/document-2', ['key1' => 'value1','key2' => 'value2']), true);
+    }
+
+    public function testGetLogs()
+    {
+        var_dump($this->audit->getLogsByUser('userId', 1));
+        $this->assertEquals($this->audit->getLogsByUser('userId', 1), true);
     }
 }
