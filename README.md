@@ -46,12 +46,7 @@ $adapter
     ->setNamespace('namespace') // DB table namespace
 ;
 
-$userId = 'user-unique-id';
-$userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36'; // Set user-agent
-$ip = '127.0.0.1'; // User IP
-$location = 'US'; // Country name or code
-
-$this->audit = new Audit($adapter, $userId, $userAgent, $ip, $location);
+$audit = new Audit($adapter);
 ```
 
 **Log Action**
@@ -60,11 +55,16 @@ A simple example for logging a user action in the audit DB.
 
 ```php
 <?php
-$this->audit->log(
-    'deleted', // Log specific action name
-    'database/document-1', // Resource unique ID (good fo filtering specific logs)
-    ['key1' => 'value1','key2' => 'value2'] // Any key-value pair you need to log
-)
+
+$userId = 'user-unique-id';
+$event = 'deleted'; // Log specific action name
+$resource = 'database/document-1'; // Resource unique ID (good fo filtering specific logs)
+$userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36'; // Set user-agent
+$ip = '127.0.0.1'; // User IP
+$location = 'US'; // Country name or code
+$data = ['key1' => 'value1','key2' => 'value2']; // Any key-value pair you need to log
+
+$audit->log($userId, $event, $resource, $userAgent, $ip, $location, $data);
 ```
 
 **Get Logs By User**

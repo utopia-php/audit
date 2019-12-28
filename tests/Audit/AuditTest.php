@@ -61,10 +61,11 @@ class AuditTest extends TestCase
         $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36';
         $ip = '127.0.0.1';
         $location = 'US';
+        $data = ['key1' => 'value1','key2' => 'value2'];
 
-        $this->assertEquals($this->audit->log($userId, 'update', 'database/document-1', $userAgent, $ip, $location, ['key1' => 'value1','key2' => 'value2']), true);
-        $this->assertEquals($this->audit->log($userId, 'update', 'database/document-2', $userAgent, $ip, $location, ['key1' => 'value1','key2' => 'value2']), true);
-        $this->assertEquals($this->audit->log($userId, 'delete', 'database/document-2', $userAgent, $ip, $location, ['key1' => 'value1','key2' => 'value2']), true);
+        $this->assertEquals($this->audit->log($userId, 'update', 'database/document-1', $userAgent, $ip, $location, $data), true);
+        $this->assertEquals($this->audit->log($userId, 'update', 'database/document-2', $userAgent, $ip, $location, $data), true);
+        $this->assertEquals($this->audit->log($userId, 'delete', 'database/document-2', $userAgent, $ip, $location, $data), true);
     }
 
     public function testGetLogsByUser()
