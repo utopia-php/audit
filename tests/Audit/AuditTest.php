@@ -47,12 +47,7 @@ class AuditTest extends TestCase
             ->setNamespace('namespace') // DB table namespace
         ;
 
-        $userId = 'userId';
-        $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36';
-        $ip = '127.0.0.1';
-        $location = 'US';
-
-        $this->audit = new Audit($adapter, $userId, $userAgent, $ip, $location);
+        $this->audit = new Audit($adapter);
     }
 
     public function tearDown()
@@ -62,9 +57,14 @@ class AuditTest extends TestCase
 
     public function testLog()
     {
-        $this->assertEquals($this->audit->log('update', 'database/document-1', ['key1' => 'value1','key2' => 'value2']), true);
-        $this->assertEquals($this->audit->log('update', 'database/document-2', ['key1' => 'value1','key2' => 'value2']), true);
-        $this->assertEquals($this->audit->log('delete', 'database/document-2', ['key1' => 'value1','key2' => 'value2']), true);
+        $userId = 'userId';
+        $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36';
+        $ip = '127.0.0.1';
+        $location = 'US';
+
+        $this->assertEquals($this->audit->log($userId, 'update', 'database/document-1', $userAgent, $ip, $location, ['key1' => 'value1','key2' => 'value2']), true);
+        $this->assertEquals($this->audit->log($userId, 'update', 'database/document-2', $userAgent, $ip, $location, ['key1' => 'value1','key2' => 'value2']), true);
+        $this->assertEquals($this->audit->log($userId, 'delete', 'database/document-2', $userAgent, $ip, $location, ['key1' => 'value1','key2' => 'value2']), true);
     }
 
     public function testGetLogsByUser()
