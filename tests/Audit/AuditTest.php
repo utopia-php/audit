@@ -66,12 +66,9 @@ class AuditTest extends TestCase
         $this->assertEquals($this->audit->getNamespace(), 'namespace');
     }
 
-    public function testIsValid()
+    public function testLog()
     {
-        // Use vars to resolve adapter key
-        $this->assertEquals($this->audit->check(), false);
-        $this->assertEquals($this->abuse->check(), false);
-        $this->assertEquals($this->abuse->check(), false);
-        $this->assertEquals($this->abuse->check(), true);
+        var_dump($this->audit->log('update', 'document/document-1', ['key1' => 'value1','key2' => 'value2']));
+        $this->assertEquals($this->audit->log('update', 'document/document-1', ['key1' => 'value1','key2' => 'value2']), true);
     }
 }
