@@ -70,7 +70,7 @@ $audit->log($userId, $event, $resource, $userAgent, $ip, $location, $data);
 Fetch all logs by given user ID
 
 ```php
-$logs = $this->audit->getLogsByUser(
+$logs = $audit->getLogsByUser(
     'userId' // User unique ID
 ); // Returns an array of all logs for specific user
 ```
@@ -80,7 +80,7 @@ $logs = $this->audit->getLogsByUser(
 Fetch all logs by given user ID and a specific action name
 
 ```php
-$logs = $this->audit->getLogsByUserAndActions(
+$logs = $audit->getLogsByUserAndActions(
     'userId', // User unique ID
     ['update', 'delete'] // List of selected action to fetch
 ); // Returns an array of all logs for specific user filtered by given actions
