@@ -54,8 +54,6 @@ $audit = new Audit($adapter);
 A simple example for logging a user action in the audit DB.
 
 ```php
-<?php
-
 $userId = 'user-unique-id';
 $event = 'deleted'; // Log specific action name
 $resource = 'database/document-1'; // Resource unique ID (great for filtering specific logs)
@@ -72,8 +70,6 @@ $audit->log($userId, $event, $resource, $userAgent, $ip, $location, $data);
 Fetch all logs by given user ID
 
 ```php
-<?php
-
 $logs = $this->audit->getLogsByUser(
     'userId' // User unique ID
 ); // Returns an array of all logs for specific user
@@ -84,8 +80,6 @@ $logs = $this->audit->getLogsByUser(
 Fetch all logs by given user ID and a specific action name
 
 ```php
-<?php
-
 $logs = $this->audit->getLogsByUserAndActions(
     'userId', // User unique ID
     ['update', 'delete'] // List of selected action to fetch
