@@ -81,7 +81,7 @@ class MySQL extends Adapter
             ORDER BY `time` DESC LIMIT 10
         ');
 
-        $st->bindValue(':resourceId', $resource, PDO::PARAM_STR);
+        $st->bindValue(':resource', $resource, PDO::PARAM_STR);
 
         $st->execute();
 
