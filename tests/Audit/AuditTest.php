@@ -63,9 +63,9 @@ class AuditTest extends TestCase
         $location = 'US';
         $data = ['key1' => 'value1','key2' => 'value2'];
 
-        $this->assertEquals($this->audit->log($userId, 'update', 'database/document-1', $userAgent, $ip, $location, $data), true);
-        $this->assertEquals($this->audit->log($userId, 'update', 'database/document-2', $userAgent, $ip, $location, $data), true);
-        $this->assertEquals($this->audit->log($userId, 'delete', 'database/document-2', $userAgent, $ip, $location, $data), true);
+        $this->assertEquals($this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data), true);
+        $this->assertEquals($this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data), true);
+        $this->assertEquals($this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data), true);
     }
 
     public function testGetLogsByUser()
@@ -82,5 +82,14 @@ class AuditTest extends TestCase
 
         $this->assertEquals(2, \count($logs1));
         $this->assertEquals(3, \count($logs2));
+    }
+    
+    public function testGetLogsByResource()
+    {
+        $logs1 = $this->audit->getLogsByResource('database/document/1');
+        $logs2 = $this->audit->getLogsByResource('database/document/2');
+
+        $this->assertEquals(1, \count($logs1));
+        $this->assertEquals(2, \count($logs2));
     }
 }

@@ -77,6 +77,15 @@ abstract class Adapter
     abstract public function getLogsByUser(string $userId):array;
 
     /**
+     * Get All Logs By Resource.
+     *
+     * @param string $resource
+     *
+     * @return array
+     */
+    abstract public function getLogsByResource(string $resource):array;
+
+    /**
      * Get All Logs By User and Actions.
      *
      * Get all user logs by given action names

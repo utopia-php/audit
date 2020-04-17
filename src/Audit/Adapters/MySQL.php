@@ -73,6 +73,21 @@ class MySQL extends Adapter
         return $st->fetchAll();
     }
 
+    public function getLogsByResource(string $resource): array
+    {
+        $st = $this->getPDO()->prepare('SELECT *
+        FROM `'.$this->getNamespace().'.audit.audit`
+            WHERE resource = :resource
+            ORDER BY `time` DESC LIMIT 10
+        ');
+
+        $st->bindValue(':resourceId', $resource, PDO::PARAM_STR);
+
+        $st->execute();
+
+        return $st->fetchAll();
+    }
+
     public function getLogsByUserAndActions(string $userId, array $actions):array
     {
         $query = [];

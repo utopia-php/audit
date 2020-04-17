@@ -38,9 +38,7 @@ class Audit
     }
 
     /**
-     * Get All Logs By User and Actions.
-     *
-     * Get all user logs logs by given action names
+     * Get All Logs By User ID.
      *
      * @param int $userId
      *
@@ -49,6 +47,18 @@ class Audit
     public function getLogsByUser(string $userId):array
     {
         return $this->adapter->getLogsByUser($userId);
+    }
+
+    /**
+     * Get All Logs By Resource.
+     *
+     * @param string $resource
+     *
+     * @return array
+     */
+    public function getLogsByResource(string $resource):array
+    {
+        return $this->adapter->getLogsByResource($resource);
     }
 
     /**
