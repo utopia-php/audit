@@ -86,6 +86,16 @@ $logs = $audit->getLogsByUserAndActions(
 ); // Returns an array of all logs for specific user filtered by given actions
 ```
 
+**Get Logs By Resource**
+
+Fetch all logs by a given resource name
+
+```php
+$logs = $audit->getLogsByResource(
+    'resource-name', // Resource Name
+); // Returns an array of all logs for the specific resource
+```
+
 ## System Requirements
 
 Utopia Framework requires PHP 7.0 or later. We recommend using the latest PHP version whenever possible.
