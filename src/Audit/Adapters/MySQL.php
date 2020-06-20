@@ -40,10 +40,10 @@ class MySQL extends Adapter
     public function log(string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data):bool
     {
         $st = $this->getPDO()->prepare('INSERT INTO `'.$this->getNamespace().'.audit.audit`
-            SET userId = :userId, event= :event, resource= :resource, userAgent = :userAgent, ip = :ip, location = :location, time = "'.date('Y-m-d H:i:s').'", data = :data
+            SET userId = :userId, event= :event, resource= :resource, userAgent = :userAgent, ip = :ip, location = :location, time = "'.\date('Y-m-d H:i:s').'", data = :data
 		');
 
-        $data = mb_strcut(json_encode($data), 0, 64000, 'UTF-8'); // Limit data to MySQL 64kb limit
+        $data = \mb_strcut(\json_encode($data), 0, 64000, 'UTF-8'); // Limit data to MySQL 64kb limit
 
         $st->bindValue(':userId', $userId, PDO::PARAM_STR);
         $st->bindValue(':event', $event, PDO::PARAM_STR);
@@ -96,7 +96,7 @@ class MySQL extends Adapter
             $query[] = ':action_'.$k;
         }
 
-        $query = implode(',', $query);
+        $query = \implode(',', $query);
 
         $st = $this->getPDO()->prepare('SELECT *
         FROM `'.$this->getNamespace().'.audit.audit`
