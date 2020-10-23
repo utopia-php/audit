@@ -6,6 +6,9 @@ use Exception;
 
 abstract class Adapter
 {
+    /**
+     * @var string
+     */
     protected $namespace = '';
 
     /**
@@ -19,7 +22,7 @@ abstract class Adapter
      *
      * @return bool
      */
-    public function setNamespace($namespace):bool
+    public function setNamespace(string $namespace): bool
     {
         if (empty($namespace)) {
             throw new Exception('Missing namespace');
@@ -39,7 +42,7 @@ abstract class Adapter
      *
      * @return string
      */
-    public function getNamespace():string
+    public function getNamespace(): string
     {
         if (empty($this->namespace)) {
             throw new Exception('Missing namespace');
@@ -61,9 +64,9 @@ abstract class Adapter
      * @param string $location
      * @param array  $data
      *
-     * @return
+     * @return bool
      */
-    abstract public function log(string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data):bool;
+    abstract public function log(string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data): bool;
 
     /**
      * Get All Logs By User.
@@ -74,7 +77,7 @@ abstract class Adapter
      *
      * @return array
      */
-    abstract public function getLogsByUser(string $userId):array;
+    abstract public function getLogsByUser(string $userId): array;
 
     /**
      * Get All Logs By Resource.
@@ -83,7 +86,7 @@ abstract class Adapter
      *
      * @return array
      */
-    abstract public function getLogsByResource(string $resource):array;
+    abstract public function getLogsByResource(string $resource): array;
 
     /**
      * Get All Logs By User and Actions.
@@ -95,5 +98,5 @@ abstract class Adapter
      *
      * @return array
      */
-    abstract public function getLogsByUserAndActions(string $userId, array $actions):array;
+    abstract public function getLogsByUserAndActions(string $userId, array $actions): array;
 }

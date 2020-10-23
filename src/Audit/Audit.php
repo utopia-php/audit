@@ -32,7 +32,7 @@ class Audit
      *
      * @return bool
      */
-    public function log(string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []):bool
+    public function log(string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): bool
     {
         return $this->adapter->log($userId, $event, $resource, $userAgent, $ip, $location, $data);
     }
@@ -40,11 +40,11 @@ class Audit
     /**
      * Get All Logs By User ID.
      *
-     * @param int $userId
+     * @param string $userId
      *
      * @return array
      */
-    public function getLogsByUser(string $userId):array
+    public function getLogsByUser(string $userId): array
     {
         return $this->adapter->getLogsByUser($userId);
     }
@@ -56,7 +56,7 @@ class Audit
      *
      * @return array
      */
-    public function getLogsByResource(string $resource):array
+    public function getLogsByResource(string $resource): array
     {
         return $this->adapter->getLogsByResource($resource);
     }
@@ -66,12 +66,12 @@ class Audit
      *
      * Get all user logs logs by given action names
      *
-     * @param int   $userId
+     * @param string $userId
      * @param array $actions
      *
      * @return array
      */
-    public function getLogsByUserAndActions(string $userId, array $actions):array
+    public function getLogsByUserAndActions(string $userId, array $actions): array
     {
         return $this->adapter->getLogsByUserAndActions($userId, $actions);
     }

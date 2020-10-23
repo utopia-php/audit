@@ -25,7 +25,7 @@ class AuditTest extends TestCase
      */
     protected $audit = null;
 
-    public function setUp()
+    public function setUp(): void
     {
         $dbHost = '127.0.0.1';
         $dbUser = 'travis';
@@ -50,7 +50,7 @@ class AuditTest extends TestCase
         $this->audit = new Audit($adapter);
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         $this->audit = null;
     }
