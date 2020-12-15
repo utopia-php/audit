@@ -116,12 +116,17 @@ class MySQL extends Adapter
         return $st->fetchAll();
     }
 
-    public function deleteLogsOlderThan(int $time)
+    /**
+     * Delete logs older than $days Days 
+     * 
+     * @param int $days  
+     */
+    public function deleteLogsOlderThan(int $days)
     {
         $st = $this->getPDO()->prepare('SELECT *
         FROM `'.$this->getNamespace().'.audit.audit`
-            WHERE DATEDIFF(day, `time`, getDate()) > :time');
-        $st->bindValue(':time', $time, PDO::PARAM_STR);
+            WHERE DATEDIFF(day, `time`, getDate()) > :days');
+        $st->bindValue(':days', $days, PDO::PARAM_STR);
         $st->execute();
     }
 
