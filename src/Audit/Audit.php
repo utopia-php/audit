@@ -75,4 +75,19 @@ class Audit
     {
         return $this->adapter->getLogsByUserAndActions($userId, $actions);
     }
+
+    /**
+     * Get All Logs By User and Actions.
+     *
+     * Get all user logs logs by given action names
+     *
+     * @param string $userId
+     * @param array $actions
+     *
+     * @return array
+     */
+    public function deleteLogsOlderThan(int $days): bool
+    {
+        return $this->adapter->deleteLogsOlderThan($days);
+    }
 }

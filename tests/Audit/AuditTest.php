@@ -92,4 +92,8 @@ class AuditTest extends TestCase
         $this->assertEquals(1, \count($logs1));
         $this->assertEquals(2, \count($logs2));
     }
+
+    public function testDeleteLogsOlderThan() {
+        $logs1 = $this->audit->deleteLogsOlderThan(1);
+    }
 }
