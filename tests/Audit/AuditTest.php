@@ -97,6 +97,10 @@ class AuditTest extends TestCase
         // First delete all the logs
         $status = $this->audit->deleteLogsOlderThan(1);
         $this->assertEquals($status, true);
+
+        // Check that all logs have been deleted 
+        $logs = $this->audit->getLogsByUser('userId');
+        $this->assertEquals(0, \count($logs));
         
         // Add three sample logs 
         $userId = 'userId';
