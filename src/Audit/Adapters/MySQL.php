@@ -125,11 +125,13 @@ class MySQL extends Adapter
      */
     public function deleteLogsOlderThan(int $seconds):bool
     {
-        $st = $this->getPDO()->prepare('DELETE
+        $st = $this->getPDO()->prepare('DELETE * 
         FROM `'.$this->getNamespace().'.audit.audit`
             WHERE (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(`time`)) >  :seconds');
         $st->bindValue(':seconds', $seconds, PDO::PARAM_INT);
         $st->execute();
+
+        var_dump("*******************", $st);
 
         return ('00000' == $st->errorCode()) ? true : false;
     }
