@@ -94,6 +94,10 @@ class AuditTest extends TestCase
     }
 
     public function testDeleteLogsOlderThan() {
+        // First delete all the logs
+        $status = $this->audit->deleteLogsOlderThan(0);
+        $this->assertEquals($status, true);
+        
         // Add three sample logs 
         $userId = 'userId';
         $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36';
