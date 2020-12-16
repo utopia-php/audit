@@ -94,6 +94,7 @@ class AuditTest extends TestCase
     }
 
     public function testDeleteLogsOlderThan() {
+        sleep(3);
         // First delete all the logs
         $status = $this->audit->deleteLogsOlderThan(1);
         $this->assertEquals($status, true);
