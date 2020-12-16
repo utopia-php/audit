@@ -130,11 +130,7 @@ class MySQL extends Adapter
             WHERE (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(`time`)) >  :seconds');
         $st->bindValue(':seconds', $seconds, PDO::PARAM_INT);
         $st->execute();
-
-        var_dump("************* ST **************");
-        var_dump($st);
-        exit();
-
+        
         return ('00000' == $st->errorCode()) ? true : false;
     }
 
