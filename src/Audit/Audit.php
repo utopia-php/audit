@@ -75,4 +75,16 @@ class Audit
     {
         return $this->adapter->getLogsByUserAndActions($userId, $actions);
     }
+
+    /**
+     * Delete all logs older than $seconds seconds
+     *
+     * @param int $seconds
+     * 
+     * @return bool
+     */
+    public function deleteLogsOlderThan(int $seconds): bool
+    {
+        return $this->adapter->deleteLogsOlderThan($seconds);
+    }
 }

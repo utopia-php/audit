@@ -99,4 +99,13 @@ abstract class Adapter
      * @return array
      */
     abstract public function getLogsByUserAndActions(string $userId, array $actions): array;
+
+    /**
+     * Delete all logs older than $seconds seconds
+     *
+     * @param int $seconds
+     * 
+     * @return bool
+     */
+    abstract public function deleteLogsOlderThan(int $seconds): bool;
 }
