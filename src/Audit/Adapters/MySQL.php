@@ -132,8 +132,6 @@ class MySQL extends Adapter
         $st->bindValue(':seconds', $seconds, PDO::PARAM_INT);
         $st->execute();
 
-        var_dump("*******************", $st);
-
         return ('00000' == $st->errorCode()) ? true : false;
     }
 
