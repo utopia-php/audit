@@ -77,14 +77,11 @@ class Audit
     }
 
     /**
-     * Get All Logs By User and Actions.
+     * Delete all logs older than $days days
      *
-     * Get all user logs logs by given action names
-     *
-     * @param string $userId
-     * @param array $actions
-     *
-     * @return array
+     * @param int $days
+     * 
+     * @return bool
      */
     public function deleteLogsOlderThan(int $days): bool
     {
