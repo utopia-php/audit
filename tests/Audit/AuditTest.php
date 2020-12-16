@@ -94,6 +94,7 @@ class AuditTest extends TestCase
     }
 
     public function testDeleteLogsOlderThan() {
+        // DELETE logs older than 10*24*60*60 10 days
         $logs1 = $this->audit->deleteLogsOlderThan(1);
     }
 }

@@ -77,14 +77,14 @@ class Audit
     }
 
     /**
-     * Delete all logs older than $days days
+     * Delete all logs older than $seconds seconds
      *
-     * @param int $days
+     * @param int $seconds
      * 
      * @return bool
      */
-    public function deleteLogsOlderThan(int $days): bool
+    public function deleteLogsOlderThan(int $seconds): bool
     {
-        return $this->adapter->deleteLogsOlderThan($days);
+        return $this->adapter->deleteLogsOlderThan($seconds);
     }
 }
