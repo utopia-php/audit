@@ -121,8 +121,8 @@ class AuditTest extends TestCase
         $status = $this->audit->deleteLogsOlderThan(10);
         $this->assertEquals($status, true);
 
-        // // Check if 1 log has been deleted
-        // $logs = $this->audit->getLogsByUser('userId');
-        // $this->assertEquals(2, \count($logs));
+        // Check if 1 log has been deleted
+        $logs = $this->audit->getLogsByUser('userId');
+        $this->assertEquals(2, \count($logs));
     }
 }
