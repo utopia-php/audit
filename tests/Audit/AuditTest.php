@@ -94,7 +94,26 @@ class AuditTest extends TestCase
     }
 
     public function testDeleteLogsOlderThan() {
-        // DELETE logs older than 10*24*60*60 10 days
-        $logs1 = $this->audit->deleteLogsOlderThan(1);
+        // Add three sample logs 
+        $userId = 'userId';
+        $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36';
+        $ip = '127.0.0.1';
+        $location = 'US';
+        $data = ['key1' => 'value1','key2' => 'value2'];
+
+        $this->assertEquals($this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data), true);
+        sleep(10);
+        $this->assertEquals($this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data), true);
+        sleep(10);
+        $this->assertEquals($this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data), true);
+        sleep(10);
+
+        // DELETE logs older than 10 seconds and check that status is true
+        $status = $this->audit->deleteLogsOlderThan(20);
+        $this->assertEquals($status, true);
+
+        // Check if 1 log has been deleted
+        $logs = $this->audit->getLogsByUser('userId');
+        $this->assertEquals(2, \count($logs));
     }
 }

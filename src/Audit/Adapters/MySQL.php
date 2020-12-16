@@ -127,7 +127,7 @@ class MySQL extends Adapter
     {
         $st = $this->getPDO()->prepare('SELECT *
         FROM `'.$this->getNamespace().'.audit.audit`
-            WHERE (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(`time`)) >=  :seconds');
+            WHERE (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(`time`)) >  :seconds');
         $st->bindValue(':seconds', $seconds, PDO::PARAM_INT);
         $st->execute();
 
