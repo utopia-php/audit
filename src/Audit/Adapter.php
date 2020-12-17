@@ -107,5 +107,5 @@ abstract class Adapter
      * 
      * @return bool
      */
-    abstract public function deleteLogsOlderThan(int $seconds): bool;
+    abstract public function cleanup(int $seconds): bool;
 }
