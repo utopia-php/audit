@@ -96,7 +96,7 @@ class AuditTest extends TestCase
     public function testCleanup() {
         sleep(3);
         // First delete all the logs
-        $status = $this->audit->cleanup(1);
+        $status = $this->audit->cleanup(time());
         $this->assertEquals($status, true);
 
         // Check that all logs have been deleted 
@@ -118,7 +118,7 @@ class AuditTest extends TestCase
         sleep(5);
 
         // DELETE logs older than 10 seconds and check that status is true
-        $status = $this->audit->cleanup(10);
+        $status = $this->audit->cleanup(time()-10);
         $this->assertEquals($status, true);
 
         // Check if 1 log has been deleted

@@ -117,19 +117,19 @@ class MySQL extends Adapter
     }
 
     /**
-     * Delete logs older than $seconds seconds
+     * Delete logs older than $timestamp seconds
      * 
-     * @param int $seconds 
+     * @param int $timestamp 
      * 
      * @return bool   
      */
-    public function cleanup(int $seconds):bool
+    public function cleanup(int $timestamp):bool
     {
         $st = $this->getPDO()->prepare('DELETE 
         FROM `'.$this->getNamespace().'.audit.audit`
-            WHERE (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(`time`)) >  :seconds');
+            WHERE UNIX_TIMESTAMP(`time`) < :timestamp');
 
-        $st->bindValue(':seconds', $seconds, PDO::PARAM_INT);
+        $st->bindValue(':timestamp', $timestamp, PDO::PARAM_INT);
         $response = $st->execute();
 
         return $response == true;

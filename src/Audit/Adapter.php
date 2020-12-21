@@ -101,11 +101,11 @@ abstract class Adapter
     abstract public function getLogsByUserAndActions(string $userId, array $actions): array;
 
     /**
-     * Delete all logs older than $seconds seconds
+     * Delete all logs older than $timestamp seconds
      *
-     * @param int $seconds
+     * @param int $timestamp
      * 
      * @return bool
      */
-    abstract public function cleanup(int $seconds): bool;
+    abstract public function cleanup(int $timestamp): bool;
 }
