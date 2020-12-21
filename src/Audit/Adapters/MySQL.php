@@ -53,9 +53,9 @@ class MySQL extends Adapter
         $st->bindValue(':location', $location, PDO::PARAM_STR);
         $st->bindValue(':data', $data, PDO::PARAM_STR);
 
-        $st->execute();
+        $response = $st->execute();
 
-        return ('00000' == $st->errorCode()) ? true : false;
+        return $response == true ;
     }
 
     public function getLogsByUser(string $userId):array
@@ -130,9 +130,9 @@ class MySQL extends Adapter
             WHERE (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(`time`)) >  :seconds');
 
         $st->bindValue(':seconds', $seconds, PDO::PARAM_INT);
-        $st->execute();
+        $response = $st->execute();
 
-        return ('00000' == $st->errorCode()) ? true : false;
+        return $response == true;
     }
 
     /**
