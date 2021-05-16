@@ -21,10 +21,10 @@ class Audit
     public function __construct(Database $db)
     {
         $this->db = $db;
-        $this->init();
+        $this->setup();
     }
 
-    private function init(): void
+    private function setup(): void
     {
         if (!$this->db->exists()) {
             $this->db->create();
@@ -36,11 +36,12 @@ class Audit
             $this->db->createAttribute(Audit::COLLECTION, 'ip', Database::VAR_STRING, 45, true);
             $this->db->createAttribute(Audit::COLLECTION, 'location', Database::VAR_STRING, 45, false);
             $this->db->createAttribute(Audit::COLLECTION, 'time', Database::VAR_INTEGER, 0, true, false);
-            $this->db->createAttribute(Audit::COLLECTION, 'data', Database::VAR_STRING, 16777216, false,true,false,['json']);
+            $this->db->createAttribute(Audit::COLLECTION, 'data', Database::VAR_STRING, 16777216, false, true, false, ['json']);
 
             $this->db->createIndex(Audit::COLLECTION, 'index_1', Database::INDEX_KEY, ['userId']);
             $this->db->createIndex(Audit::COLLECTION, 'index_2', Database::INDEX_KEY, ['event']);
             $this->db->createIndex(Audit::COLLECTION, 'index_3', Database::INDEX_KEY, ['resource']);
+            $this->db->createIndex(Audit::COLLECTION, 'index_4', Database::INDEX_KEY, ['userId', 'event']);
 
         }
     }
@@ -73,8 +74,9 @@ class Audit
             'ip' => $ip,
             'location' => $location,
             'data' => $data,
-            'time' => \time()
+            'time' => \time(),
         ]));
+        Authorization::reset();
         return true;
     }
 
@@ -118,16 +120,16 @@ class Audit
      * Get all user logs logs by given action names
      *
      * @param string $userId
-     * @param array $actions
+     * @param array $events
      *
      * @return array
      */
-    public function getLogsByUserAndActions(string $userId, array $actions): array
+    public function getLogsByUserAndActions(string $userId, array $events): array
     {
         Authorization::disable();
         $results = $this->db->find(Audit::COLLECTION, [
             new Query('userId', Query::TYPE_EQUAL, [$userId]),
-            new Query('event', Query::TYPE_EQUAL, $actions),
+            new Query('event', Query::TYPE_EQUAL, $events),
         ]);
         Authorization::reset();
         return $results;
