@@ -21,10 +21,9 @@ class Audit
     public function __construct(Database $db)
     {
         $this->db = $db;
-        $this->setup();
     }
 
-    private function setup(): void
+    public function setup(): void
     {
         if (!$this->db->exists()) {
             $this->db->create();
