@@ -39,8 +39,8 @@ class Audit
             $this->db->createAttribute(Audit::COLLECTION, 'data', Database::VAR_STRING, 0, false);
 
             $this->db->createIndex(Audit::COLLECTION, 'index_1', Database::INDEX_KEY, ['userId']);
-            $this->db->createIndex(Audit::COLLECTION, 'index_1', Database::INDEX_KEY, ['event']);
-            $this->db->createIndex(Audit::COLLECTION, 'index_1', Database::INDEX_KEY, ['resource']);
+            $this->db->createIndex(Audit::COLLECTION, 'index_2', Database::INDEX_KEY, ['event']);
+            $this->db->createIndex(Audit::COLLECTION, 'index_3', Database::INDEX_KEY, ['resource']);
 
         }
     }
@@ -73,8 +73,8 @@ class Audit
             'ip' => $ip,
             'location' => $location,
             'data' => $data,
+            'time' => \time()
         ]));
-        Authorization::reset();
         return true;
     }
 
