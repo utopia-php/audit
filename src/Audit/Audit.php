@@ -9,7 +9,7 @@ use Utopia\Database\Validator\Authorization;
 
 class Audit
 {
-    const COLLECTION = "abuse.abuse";
+    const COLLECTION = "abuse";
     /**
      * @var Database
      */
