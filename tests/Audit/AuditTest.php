@@ -20,7 +20,6 @@ use Utopia\Cache\Cache;
 use Utopia\Cache\Adapter\None as NoCache;
 use Utopia\Database\Adapter\MySQL;
 use Utopia\Database\Database;
-use Utopia\Database\Validator\Authorization;
 
 class AuditTest extends TestCase
 {
@@ -43,8 +42,7 @@ class AuditTest extends TestCase
         
         // Connection settings
         $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);   // Return arrays
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);        // Handle all errors with exceptions
-        
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);        // Handle all errors with exceptions 
         
         $cache = new Cache(new NoCache());
         
@@ -52,6 +50,7 @@ class AuditTest extends TestCase
         $database->setNamespace('namespace');
         
         $this->audit = new Audit($database);
+        $this->audit->setup();
     }
 
     public function tearDown(): void
