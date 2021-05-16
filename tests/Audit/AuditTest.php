@@ -20,6 +20,7 @@ use Utopia\Cache\Cache;
 use Utopia\Cache\Adapter\None as NoCache;
 use Utopia\Database\Adapter\MySQL;
 use Utopia\Database\Database;
+use Utopia\Database\Validator\Authorization;
 
 class AuditTest extends TestCase
 {
@@ -51,10 +52,12 @@ class AuditTest extends TestCase
         $database->setNamespace('namespace');
         
         $this->audit = new Audit($database);
+        Authorization::disable();
     }
 
     public function tearDown(): void
     {
+        Authorization::reset();
         $this->audit = null;
     }
 
@@ -65,7 +68,6 @@ class AuditTest extends TestCase
         $ip = '127.0.0.1';
         $location = 'US';
         $data = ['key1' => 'value1','key2' => 'value2'];
-
         $this->assertEquals($this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data), true);
         $this->assertEquals($this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data), true);
         $this->assertEquals($this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data), true);
