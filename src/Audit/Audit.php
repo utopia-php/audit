@@ -1,9 +1,11 @@
 <?php
 
 namespace Utopia\Audit;
+
 use Utopia\Database\Database;
 use Utopia\Database\Document;
 use Utopia\Database\Query;
+use Utopia\Database\Validator\Authorization;
 
 class Audit
 {
@@ -22,23 +24,23 @@ class Audit
         $this->init();
     }
 
-    private function init() : void {
-        if(!$this->db->exists()) {
+    private function init(): void
+    {
+        if (!$this->db->exists()) {
             $this->db->create();
             $this->db->createCollection(Audit::COLLECTION);
             $this->db->createAttribute(Audit::COLLECTION, 'userId', Database::VAR_STRING, 45, true);
-            $this->db->createAttribute(Audit::COLLECTION,'event',Database::VAR_STRING,45,true);
-            $this->db->createAttribute(Audit::COLLECTION,'resource',Database::VAR_STRING,45,false);
-            $this->db->createAttribute(Audit::COLLECTION,'userAgent',Database::VAR_STRING,65534,true);
-            $this->db->createAttribute(Audit::COLLECTION,'ip',Database::VAR_STRING,45,true);
-            $this->db->createAttribute(Audit::COLLECTION,'location',Database::VAR_STRING,45,false);
-            $this->db->createAttribute(Audit::COLLECTION,'time',Database::VAR_INTEGER,0,true,false);
-            $this->db->createAttribute(Audit::COLLECTION,'data',Database::VAR_STRING,0,false);
+            $this->db->createAttribute(Audit::COLLECTION, 'event', Database::VAR_STRING, 45, true);
+            $this->db->createAttribute(Audit::COLLECTION, 'resource', Database::VAR_STRING, 45, false);
+            $this->db->createAttribute(Audit::COLLECTION, 'userAgent', Database::VAR_STRING, 65534, true);
+            $this->db->createAttribute(Audit::COLLECTION, 'ip', Database::VAR_STRING, 45, true);
+            $this->db->createAttribute(Audit::COLLECTION, 'location', Database::VAR_STRING, 45, false);
+            $this->db->createAttribute(Audit::COLLECTION, 'time', Database::VAR_INTEGER, 0, true, false);
+            $this->db->createAttribute(Audit::COLLECTION, 'data', Database::VAR_STRING, 0, false);
 
             $this->db->createIndex(Audit::COLLECTION, 'index_1', Database::INDEX_KEY, ['userId']);
             $this->db->createIndex(Audit::COLLECTION, 'index_1', Database::INDEX_KEY, ['event']);
             $this->db->createIndex(Audit::COLLECTION, 'index_1', Database::INDEX_KEY, ['resource']);
-            
 
         }
     }
@@ -60,6 +62,7 @@ class Audit
      */
     public function log(string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): bool
     {
+        Authorization::disable();
         $this->db->createDocument(Audit::COLLECTION, new Document([
             '$read' => [],
             '$write' => [],
@@ -69,8 +72,9 @@ class Audit
             'userAgent' => $userAgent,
             'ip' => $ip,
             'location' => $location,
-            'data' => $data
+            'data' => $data,
         ]));
+        Authorization::reset();
         return true;
     }
 
@@ -83,9 +87,12 @@ class Audit
      */
     public function getLogsByUser(string $userId): array
     {
-        return $this->db->find(Audit::COLLECTION, [
-            new Query('userId', Query::TYPE_EQUAL, [$userId])
+        Authorization::disable();
+        $result = $this->db->find(Audit::COLLECTION, [
+            new Query('userId', Query::TYPE_EQUAL, [$userId]),
         ]);
+        Authorization::reset();
+        return $result;
     }
 
     /**
@@ -97,9 +104,12 @@ class Audit
      */
     public function getLogsByResource(string $resource): array
     {
-        return $this->db->find(Audit::COLLECTION, [
-            new Query('resource', Query::TYPE_EQUAL, [$resource])
+        Authorization::disable();
+        $results = $this->db->find(Audit::COLLECTION, [
+            new Query('resource', Query::TYPE_EQUAL, [$resource]),
         ]);
+        Authorization::reset();
+        return $results;
     }
 
     /**
@@ -114,28 +124,33 @@ class Audit
      */
     public function getLogsByUserAndActions(string $userId, array $actions): array
     {
-        return $this->db->find(Audit::COLLECTION, [
+        Authorization::disable();
+        $results = $this->db->find(Audit::COLLECTION, [
             new Query('userId', Query::TYPE_EQUAL, [$userId]),
-            new Query('event',Query::TYPE_EQUAL, $actions)
+            new Query('event', Query::TYPE_EQUAL, $actions),
         ]);
+        Authorization::reset();
+        return $results;
     }
 
     /**
      * Delete all logs older than $timestamp seconds
      *
      * @param int $timestamp
-     * 
+     *
      * @return bool
      */
     public function cleanup(int $timestamp): bool
     {
+        Authorization::disable();
         $documents = $this->db->find(Audit::COLLECTION, [
-            new Query('time', Query::TYPE_LESSER, [$timestamp])
+            new Query('time', Query::TYPE_LESSER, [$timestamp]),
         ]);
-        
+
         foreach ($documents as $document) {
-            $this->db->deleteDocument(Audit::COLLECTION,$document['$id']);
+            $this->db->deleteDocument(Audit::COLLECTION, $document['$id']);
         }
+        Authorization::reset();
         return true;
     }
 }

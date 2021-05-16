@@ -51,13 +51,11 @@ class AuditTest extends TestCase
         $database = new Database(new MySQL($pdo),$cache);
         $database->setNamespace('namespace');
         
-        Authorization::disable();
         $this->audit = new Audit($database);
     }
 
     public function tearDown(): void
     {
-        Authorization::reset();
         $this->audit = null;
     }
 
