@@ -15,8 +15,11 @@ namespace Utopia\Tests;
 
 use PDO;
 use Utopia\Audit\Audit;
-use Utopia\Audit\Adapters\MySQL;
 use PHPUnit\Framework\TestCase;
+use Utopia\Cache\Cache;
+use Utopia\Cache\Adapter\None as NoCache;
+use Utopia\Database\Adapter\MySQL;
+use Utopia\Database\Database;
 
 class AuditTest extends TestCase
 {
@@ -41,13 +44,13 @@ class AuditTest extends TestCase
         $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);   // Return arrays
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);        // Handle all errors with exceptions
 
-        $adapter = new MySQL($pdo);
+        
+        $cache = new Cache(new NoCache());
 
-        $adapter
-            ->setNamespace('namespace') // DB table namespace
-        ;
-
-        $this->audit = new Audit($adapter);
+        $database = new Database(new MySQL($pdo),$cache);
+        $database->setNamespace('namespace');
+        
+        $this->audit = new Audit($database);
     }
 
     public function tearDown(): void
