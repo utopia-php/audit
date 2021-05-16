@@ -22,7 +22,7 @@ class Audit
         $this->init();
     }
 
-    private function init() {
+    private function init() : void {
         if(!$this->db->exists()) {
             $this->db->create();
             $this->db->createCollection(Audit::COLLECTION);
