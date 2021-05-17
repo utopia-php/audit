@@ -25,7 +25,6 @@ require_once __DIR__ . '/../../vendor/autoload.php';
 use PDO;
 use PDO;
 use Utopia\Audit\Audit;
-use PHPUnit\Framework\TestCase;
 use Utopia\Cache\Cache;
 use Utopia\Cache\Adapter\None as NoCache;
 use Utopia\Database\Adapter\MySQL;
@@ -50,8 +49,8 @@ $cache = new Cache(new NoCache());
 $database = new Database(new MySQL($pdo),$cache);
 $database->setNamespace('namespace');
 
-$this->audit = new Audit($database);
-$this->audit->setup();
+$audit = new Audit($database);
+$audit->setup();
 ```
 
 **Create Log**
