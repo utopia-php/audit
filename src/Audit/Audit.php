@@ -10,6 +10,7 @@ use Utopia\Database\Validator\Authorization;
 class Audit
 {
     const COLLECTION = "audit";
+
     /**
      * @var Database
      */
