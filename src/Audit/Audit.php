@@ -28,22 +28,22 @@ class Audit
     {
         if (!$this->db->exists()) {
             $this->db->create();
-            $this->db->createCollection(Audit::COLLECTION);
-            $this->db->createAttribute(Audit::COLLECTION, 'userId', Database::VAR_STRING, Database::LENGTH_KEY, true);
-            $this->db->createAttribute(Audit::COLLECTION, 'event', Database::VAR_STRING, 255, true);
-            $this->db->createAttribute(Audit::COLLECTION, 'resource', Database::VAR_STRING, 255, false);
-            $this->db->createAttribute(Audit::COLLECTION, 'userAgent', Database::VAR_STRING, 65534, true);
-            $this->db->createAttribute(Audit::COLLECTION, 'ip', Database::VAR_STRING, 45, true);
-            $this->db->createAttribute(Audit::COLLECTION, 'location', Database::VAR_STRING, 45, false);
-            $this->db->createAttribute(Audit::COLLECTION, 'time', Database::VAR_INTEGER, 0, true, false);
-            $this->db->createAttribute(Audit::COLLECTION, 'data', Database::VAR_STRING, 16777216, false, true, false, ['json']);
-
-            $this->db->createIndex(Audit::COLLECTION, 'index_1', Database::INDEX_KEY, ['userId']);
-            $this->db->createIndex(Audit::COLLECTION, 'index_2', Database::INDEX_KEY, ['event']);
-            $this->db->createIndex(Audit::COLLECTION, 'index_3', Database::INDEX_KEY, ['resource']);
-            $this->db->createIndex(Audit::COLLECTION, 'index_4', Database::INDEX_KEY, ['userId', 'event']);
-
         }
+        $this->db->createCollection(Audit::COLLECTION);
+        $this->db->createAttribute(Audit::COLLECTION, 'userId', Database::VAR_STRING, Database::LENGTH_KEY, true);
+        $this->db->createAttribute(Audit::COLLECTION, 'event', Database::VAR_STRING, 255, true);
+        $this->db->createAttribute(Audit::COLLECTION, 'resource', Database::VAR_STRING, 255, false);
+        $this->db->createAttribute(Audit::COLLECTION, 'userAgent', Database::VAR_STRING, 65534, true);
+        $this->db->createAttribute(Audit::COLLECTION, 'ip', Database::VAR_STRING, 45, true);
+        $this->db->createAttribute(Audit::COLLECTION, 'location', Database::VAR_STRING, 45, false);
+        $this->db->createAttribute(Audit::COLLECTION, 'time', Database::VAR_INTEGER, 0, true, false);
+        $this->db->createAttribute(Audit::COLLECTION, 'data', Database::VAR_STRING, 16777216, false, true, false, ['json']);
+
+        $this->db->createIndex(Audit::COLLECTION, 'index_1', Database::INDEX_KEY, ['userId']);
+        $this->db->createIndex(Audit::COLLECTION, 'index_2', Database::INDEX_KEY, ['event']);
+        $this->db->createIndex(Audit::COLLECTION, 'index_3', Database::INDEX_KEY, ['resource']);
+        $this->db->createIndex(Audit::COLLECTION, 'index_4', Database::INDEX_KEY, ['userId', 'event']);
+
     }
 
     /**
