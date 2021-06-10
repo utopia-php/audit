@@ -39,16 +39,16 @@ class AuditTest extends TestCase
             PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8',
             PDO::ATTR_TIMEOUT => 5 // Seconds
         ));
-        
+
         // Connection settings
         $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);   // Return arrays
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);        // Handle all errors with exceptions 
-        
+
         $cache = new Cache(new NoCache());
-        
+
         $database = new Database(new MySQL($pdo),$cache);
         $database->setNamespace('namespace');
-        
+
         $this->audit = new Audit($database);
         if(!$this->initialized) {
             $database->create();
