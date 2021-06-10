@@ -146,13 +146,15 @@ class Audit
     public function cleanup(int $timestamp): bool
     {
         Authorization::disable();
-        $documents = $this->db->find(Audit::COLLECTION, [
-            new Query('time', Query::TYPE_LESSER, [$timestamp]),
-        ]);
-
-        foreach ($documents as $document) {
-            $this->db->deleteDocument(Audit::COLLECTION, $document['$id']);
-        }
+        do {
+            $documents = $this->db->find(Audit::COLLECTION, [
+                new Query('time', Query::TYPE_LESSER, [$timestamp]),
+            ]);
+    
+            foreach ($documents as $document) {
+                $this->db->deleteDocument(Audit::COLLECTION, $document['$id']);
+            }
+        } while(\count($documents) > 0);
         Authorization::reset();
         return true;
     }
