@@ -50,10 +50,9 @@ class AuditTest extends TestCase
         $database->setNamespace('namespace');
 
         $this->audit = new Audit($database);
-        if(!$this->initialized) {
+        if(!$database->exists()) {
             $database->create();
             $this->audit->setup();
-            $this->initialized = true;
         }
     }
 

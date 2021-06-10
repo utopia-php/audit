@@ -40,10 +40,10 @@ class Audit
         $this->db->createAttribute(Audit::COLLECTION, 'time', Database::VAR_INTEGER, 0, true, false);
         $this->db->createAttribute(Audit::COLLECTION, 'data', Database::VAR_STRING, 16777216, false, true, false, ['json']);
 
-        $this->db->createIndex(Audit::COLLECTION, 'index_1', Database::INDEX_KEY, ['userId']);
-        $this->db->createIndex(Audit::COLLECTION, 'index_2', Database::INDEX_KEY, ['event']);
-        $this->db->createIndex(Audit::COLLECTION, 'index_3', Database::INDEX_KEY, ['resource']);
-        $this->db->createIndex(Audit::COLLECTION, 'index_4', Database::INDEX_KEY, ['userId', 'event']);
+        $this->db->createIndex(Audit::COLLECTION, 'index1', Database::INDEX_KEY, ['userId']);
+        $this->db->createIndex(Audit::COLLECTION, 'index2', Database::INDEX_KEY, ['event']);
+        $this->db->createIndex(Audit::COLLECTION, 'index3', Database::INDEX_KEY, ['resource']);
+        $this->db->createIndex(Audit::COLLECTION, 'index4', Database::INDEX_KEY, ['userId', 'event']);
 
     }
 
