@@ -154,7 +154,7 @@ class Audit
             foreach ($documents as $document) {
                 $this->db->deleteDocument(Audit::COLLECTION, $document['$id']);
             }
-        } while(\count($documents) > 0);
+        } while(!empty($documents));
         Authorization::reset();
         return true;
     }
