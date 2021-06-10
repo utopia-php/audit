@@ -6,6 +6,7 @@ use Utopia\Database\Database;
 use Utopia\Database\Document;
 use Utopia\Database\Query;
 use Utopia\Database\Validator\Authorization;
+use Utopia\Exception;
 
 class Audit
 {
@@ -27,8 +28,8 @@ class Audit
     public function setup(): void
     {
         if (!$this->db->exists()) {
-            $this->db->create();
-        }
+            throw new Exception("You need to create the databse before running Audit setup");
+        }        
         $this->db->createCollection(Audit::COLLECTION);
         $this->db->createAttribute(Audit::COLLECTION, 'userId', Database::VAR_STRING, Database::LENGTH_KEY, true);
         $this->db->createAttribute(Audit::COLLECTION, 'event', Database::VAR_STRING, 255, true);

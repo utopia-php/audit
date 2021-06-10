@@ -27,6 +27,7 @@ class AuditTest extends TestCase
      * @var Audit
      */
     protected $audit = null;
+    protected $initialized = false;
 
     public function setUp(): void
     {
@@ -49,7 +50,11 @@ class AuditTest extends TestCase
         $database->setNamespace('namespace');
         
         $this->audit = new Audit($database);
-        $this->audit->setup();
+        if(!$this->initialized) {
+            $database->create();
+            $this->audit->setup();
+            $this->initialized = true;
+        }
     }
 
     public function tearDown(): void
