@@ -93,7 +93,7 @@ class Audit
         Authorization::disable();
         $result = $this->db->find(Audit::COLLECTION, [
             new Query('userId', Query::TYPE_EQUAL, [$userId]),
-        ]);
+        ], 25, 0, ['_id'], ['DESC']);
         Authorization::reset();
         return $result;
     }
@@ -110,7 +110,7 @@ class Audit
         Authorization::disable();
         $results = $this->db->find(Audit::COLLECTION, [
             new Query('resource', Query::TYPE_EQUAL, [$resource]),
-        ]);
+        ], 25, 0, ['_id'], ['DESC']);
         Authorization::reset();
         return $results;
     }
@@ -131,7 +131,7 @@ class Audit
         $results = $this->db->find(Audit::COLLECTION, [
             new Query('userId', Query::TYPE_EQUAL, [$userId]),
             new Query('event', Query::TYPE_EQUAL, $events),
-        ]);
+        ], 25, 0, ['_id'], ['DESC']);
         Authorization::reset();
         return $results;
     }
