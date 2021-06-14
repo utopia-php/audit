@@ -82,8 +82,8 @@ class AuditTest extends TestCase
     
     public function testGetLogsByUserAndAction()
     {
-        $logs1 = $this->audit->getLogsByUserAndActions('userId', ['update']);
-        $logs2 = $this->audit->getLogsByUserAndActions('userId', ['update', 'delete']);
+        $logs1 = $this->audit->getLogsByUserAndEvents('userId', ['update']);
+        $logs2 = $this->audit->getLogsByUserAndEvents('userId', ['update', 'delete']);
 
         $this->assertEquals(2, \count($logs1));
         $this->assertEquals(3, \count($logs2));

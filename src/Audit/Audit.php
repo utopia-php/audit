@@ -125,7 +125,7 @@ class Audit
      *
      * @return array
      */
-    public function getLogsByUserAndActions(string $userId, array $events): array
+    public function getLogsByUserAndEvents(string $userId, array $events): array
     {
         Authorization::disable();
         $results = $this->db->find(Audit::COLLECTION, [
