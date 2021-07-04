@@ -87,15 +87,6 @@ class Audit
                 'filters' => [],
             ]),
             new Document([
-                '$id' => 'location',
-                'type' => Database::VAR_STRING,
-                'size' => 45,
-                'required' => false,
-                'signed' => true,
-                'array' => false,
-                'filters' => [],
-            ]),
-            new Document([
                 '$id' => 'time',
                 'type' => Database::VAR_INTEGER,
                 'size' => 0,
