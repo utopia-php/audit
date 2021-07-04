@@ -29,21 +29,124 @@ class Audit
     {
         if (!$this->db->exists()) {
             throw new Exception("You need to create the databse before running Audit setup");
-        }        
-        $this->db->createCollection(Audit::COLLECTION);
-        $this->db->createAttribute(Audit::COLLECTION, 'userId', Database::VAR_STRING, Database::LENGTH_KEY, true);
-        $this->db->createAttribute(Audit::COLLECTION, 'event', Database::VAR_STRING, 255, true);
-        $this->db->createAttribute(Audit::COLLECTION, 'resource', Database::VAR_STRING, 255, false);
-        $this->db->createAttribute(Audit::COLLECTION, 'userAgent', Database::VAR_STRING, 65534, true);
-        $this->db->createAttribute(Audit::COLLECTION, 'ip', Database::VAR_STRING, 45, true);
-        $this->db->createAttribute(Audit::COLLECTION, 'location', Database::VAR_STRING, 45, false);
-        $this->db->createAttribute(Audit::COLLECTION, 'time', Database::VAR_INTEGER, 0, true, false);
-        $this->db->createAttribute(Audit::COLLECTION, 'data', Database::VAR_STRING, 16777216, false, true, false, ['json']);
+        }
 
-        $this->db->createIndex(Audit::COLLECTION, 'index1', Database::INDEX_KEY, ['userId']);
-        $this->db->createIndex(Audit::COLLECTION, 'index2', Database::INDEX_KEY, ['event']);
-        $this->db->createIndex(Audit::COLLECTION, 'index3', Database::INDEX_KEY, ['resource']);
-        $this->db->createIndex(Audit::COLLECTION, 'index4', Database::INDEX_KEY, ['userId', 'event']);
+        $attributes = [
+            new Document([
+                '$id' => 'userId',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => true,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ]),
+            new Document([
+                '$id' => 'event',
+                'type' => Database::VAR_STRING,
+                'size' => 255,
+                'required' => true,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ]),
+            new Document([
+                '$id' => 'resource',
+                'type' => Database::VAR_STRING,
+                'size' => 255,
+                'required' => false,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ]),
+            new Document([
+                '$id' => 'userAgent',
+                'type' => Database::VAR_STRING,
+                'size' => 65534,
+                'required' => true,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ]),
+            new Document([
+                '$id' => 'ip',
+                'type' => Database::VAR_STRING,
+                'size' => 45,
+                'required' => true,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ]),
+            new Document([
+                '$id' => 'location',
+                'type' => Database::VAR_STRING,
+                'size' => 45,
+                'required' => false,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ]),
+            new Document([
+                '$id' => 'location',
+                'type' => Database::VAR_STRING,
+                'size' => 45,
+                'required' => false,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ]),
+            new Document([
+                '$id' => 'time',
+                'type' => Database::VAR_INTEGER,
+                'size' => 0,
+                'required' => false,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ]),
+            new Document([
+                '$id' => 'data',
+                'type' => Database::VAR_STRING,
+                'size' => 16777216,
+                'required' => false,
+                'signed' => true,
+                'array' => false,
+                'filters' => ['json'],
+            ]),
+        ];
+
+        $indexes = [
+            new Document([
+                '$id' => 'index1',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['userId'],
+                'lengths' => [],
+                'orders' => [],
+            ]),
+            new Document([
+                '$id' => 'index2',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['event'],
+                'lengths' => [],
+                'orders' => [],
+            ]),
+            new Document([
+                '$id' => 'index3',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['resource'],
+                'lengths' => [],
+                'orders' => [],
+            ]),
+            new Document([
+                '$id' => 'index4',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['userId', 'event'],
+                'lengths' => [],
+                'orders' => [],
+            ]),
+        ];
+
+        $this->db->createCollection(Audit::COLLECTION, $attributes, $indexes);
 
     }
 
