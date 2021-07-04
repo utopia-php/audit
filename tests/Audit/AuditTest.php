@@ -15,8 +15,11 @@ namespace Utopia\Tests;
 
 use PDO;
 use Utopia\Audit\Audit;
-use Utopia\Audit\Adapters\MySQL;
 use PHPUnit\Framework\TestCase;
+use Utopia\Cache\Cache;
+use Utopia\Cache\Adapter\None as NoCache;
+use Utopia\Database\Adapter\MySQL;
+use Utopia\Database\Database;
 
 class AuditTest extends TestCase
 {
@@ -24,34 +27,41 @@ class AuditTest extends TestCase
      * @var Audit
      */
     protected $audit = null;
+    protected $initialized = false;
 
     public function setUp(): void
     {
-        $dbHost = '127.0.0.1';
-        $dbUser = 'travis';
-        $dbPass = '';
-        $dbName = 'audit';
+        $dbHost = 'mysql';
+        $dbUser = 'root';
+        $dbPort = '3306';
+        $dbUser = 'root';
+        $dbPass = 'password';
 
-        $pdo = new PDO("mysql:host={$dbHost};dbname={$dbName}", $dbUser, $dbPass, array(
-            PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8',
-            PDO::ATTR_TIMEOUT => 5 // Seconds
+        $pdo = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $dbPass, array(
+            PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8mb4',
+            PDO::ATTR_TIMEOUT => 3, // Seconds
+            PDO::ATTR_PERSISTENT => true
         ));
 
         // Connection settings
         $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);   // Return arrays
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);        // Handle all errors with exceptions
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);        // Handle all errors with exceptions 
 
-        $adapter = new MySQL($pdo);
+        $cache = new Cache(new NoCache());
 
-        $adapter
-            ->setNamespace('namespace') // DB table namespace
-        ;
+        $database = new Database(new MySQL($pdo),$cache);
+        $database->setNamespace('namespace');
 
-        $this->audit = new Audit($adapter);
+        $this->audit = new Audit($database);
+        if(!$database->exists()) {
+            $database->create();
+            $this->audit->setup();
+        }
     }
 
     public function tearDown(): void
     {
+        $this->audit->cleanup(time());
         $this->audit = null;
     }
 
@@ -62,7 +72,6 @@ class AuditTest extends TestCase
         $ip = '127.0.0.1';
         $location = 'US';
         $data = ['key1' => 'value1','key2' => 'value2'];
-
         $this->assertEquals($this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data), true);
         $this->assertEquals($this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data), true);
         $this->assertEquals($this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data), true);
@@ -77,8 +86,8 @@ class AuditTest extends TestCase
     
     public function testGetLogsByUserAndAction()
     {
-        $logs1 = $this->audit->getLogsByUserAndActions('userId', ['update']);
-        $logs2 = $this->audit->getLogsByUserAndActions('userId', ['update', 'delete']);
+        $logs1 = $this->audit->getLogsByUserAndEvents('userId', ['update']);
+        $logs2 = $this->audit->getLogsByUserAndEvents('userId', ['update', 'delete']);
 
         $this->assertEquals(2, \count($logs1));
         $this->assertEquals(3, \count($logs2));

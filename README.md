@@ -23,30 +23,34 @@ Init the audit object:
 require_once __DIR__ . '/../../vendor/autoload.php';
 
 use PDO;
+use PDO;
 use Utopia\Audit\Audit;
-use Utopia\Audit\Adapters\MySQL;
+use Utopia\Cache\Cache;
+use Utopia\Cache\Adapter\None as NoCache;
+use Utopia\Database\Adapter\MySQL;
+use Utopia\Database\Database;
+
 
 $dbHost = '127.0.0.1';
 $dbUser = 'travis';
 $dbPass = '';
-$dbName = 'audit';
 
-$pdo = new PDO("mysql:host={$dbHost};dbname={$dbName}", $dbUser, $dbPass, array(
+$pdo = new PDO("mysql:host={$dbHost}", $dbUser, $dbPass, array(
     PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8',
     PDO::ATTR_TIMEOUT => 5 // Seconds
 ));
 
 // Connection settings
 $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);   // Return arrays
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);        // Handle all errors with exceptions
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);        // Handle all errors with exceptions 
 
-$adapter = new MySQL($pdo);
+$cache = new Cache(new NoCache());
 
-$adapter
-    ->setNamespace('namespace') // DB table namespace
-;
+$database = new Database(new MySQL($pdo),$cache);
+$database->setNamespace('namespace');
 
-$audit = new Audit($adapter);
+$audit = new Audit($database);
+$audit->setup();
 ```
 
 **Create Log**
