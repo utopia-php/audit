@@ -179,15 +179,18 @@ class Audit
      * Get All Logs By User ID.
      *
      * @param string $userId
+     * @param int $limit
+     * @param int $offset
+     * @param Document|null $orderAfter
      *
      * @return array
      */
-    public function getLogsByUser(string $userId): array
+    public function getLogsByUser(string $userId, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
         Authorization::disable();
         $result = $this->db->find(Audit::COLLECTION, [
             new Query('userId', Query::TYPE_EQUAL, [$userId]),
-        ], 25, 0, ['_id'], ['DESC']);
+        ], $limit, $offset, ['_id'], ['DESC']);
         Authorization::reset();
         return $result;
     }
@@ -196,15 +199,18 @@ class Audit
      * Get All Logs By Resource.
      *
      * @param string $resource
-     *
+     * @param int $limit
+     * @param int $offset
+     * @param Document|null $orderAfter
+     * 
      * @return array
      */
-    public function getLogsByResource(string $resource): array
+    public function getLogsByResource(string $resource, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
         Authorization::disable();
         $results = $this->db->find(Audit::COLLECTION, [
             new Query('resource', Query::TYPE_EQUAL, [$resource]),
-        ], 25, 0, ['_id'], ['DESC']);
+        ], $limit, $offset, ['_id'], ['DESC']);
         Authorization::reset();
         return $results;
     }
@@ -216,16 +222,19 @@ class Audit
      *
      * @param string $userId
      * @param array $events
-     *
+     * @param int $limit
+     * @param int $offset
+     * @param Document|null $orderAfter
+     * 
      * @return array
      */
-    public function getLogsByUserAndEvents(string $userId, array $events): array
+    public function getLogsByUserAndEvents(string $userId, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
         Authorization::disable();
         $results = $this->db->find(Audit::COLLECTION, [
             new Query('userId', Query::TYPE_EQUAL, [$userId]),
             new Query('event', Query::TYPE_EQUAL, $events),
-        ], 25, 0, ['_id'], ['DESC']);
+        ], $limit, $offset, ['_id'], ['DESC']);
         Authorization::reset();
         return $results;
     }
