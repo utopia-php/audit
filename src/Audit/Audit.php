@@ -135,6 +135,13 @@ class Audit
                 'lengths' => [],
                 'orders' => [],
             ]),
+            new Document([
+                '$id' => 'index5',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['resource', 'event'],
+                'lengths' => [],
+                'orders' => [],
+            ]),
         ];
 
         $this->db->createCollection(Audit::COLLECTION, $attributes, $indexes);
@@ -216,7 +223,7 @@ class Audit
     }
 
     /**
-     * Get All Logs By User and Actions.
+     * Get All Logs By User and Events.
      *
      * Get all user logs logs by given action names
      *
@@ -233,6 +240,30 @@ class Audit
         Authorization::disable();
         $results = $this->db->find(Audit::COLLECTION, [
             new Query('userId', Query::TYPE_EQUAL, [$userId]),
+            new Query('event', Query::TYPE_EQUAL, $events),
+        ], $limit, $offset, ['_id'], ['DESC']);
+        Authorization::reset();
+        return $results;
+    }
+
+    /**
+     * Get All Logs By Resource and Events.
+     *
+     * Get all user logs logs by given action names
+     *
+     * @param string $resource
+     * @param array $events
+     * @param int $limit
+     * @param int $offset
+     * @param Document|null $orderAfter
+     * 
+     * @return array
+     */
+    public function getLogsByResourceAndEvents(string $resource, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
+    {
+        Authorization::disable();
+        $results = $this->db->find(Audit::COLLECTION, [
+            new Query('resource', Query::TYPE_EQUAL, [$resource]),
             new Query('event', Query::TYPE_EQUAL, $events),
         ], $limit, $offset, ['_id'], ['DESC']);
         Authorization::reset();
