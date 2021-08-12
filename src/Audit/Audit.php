@@ -165,20 +165,20 @@ class Audit
      */
     public function log(string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): bool
     {
-        Authorization::disable();
-        $this->db->createDocument(Audit::COLLECTION, new Document([
-            '$read' => [],
-            '$write' => [],
-            'userId' => $userId,
-            'event' => $event,
-            'resource' => $resource,
-            'userAgent' => $userAgent,
-            'ip' => $ip,
-            'location' => $location,
-            'data' => $data,
-            'time' => \time(),
-        ]));
-        Authorization::reset();
+        Authorization::skip(function () use ($userId, $event, $resource, $userAgent, $ip, $location, $data) {
+            $this->db->createDocument(Audit::COLLECTION, new Document([
+                '$read' => [],
+                '$write' => [],
+                'userId' => $userId,
+                'event' => $event,
+                'resource' => $resource,
+                'userAgent' => $userAgent,
+                'ip' => $ip,
+                'location' => $location,
+                'data' => $data,
+                'time' => \time(),
+            ]));
+        });
         return true;
     }
 
@@ -194,11 +194,9 @@ class Audit
      */
     public function getLogsByUser(string $userId, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
-        Authorization::disable();
-        $result = $this->db->find(Audit::COLLECTION, [
+        $result = Authorization::skip($this->db->find(Audit::COLLECTION, [
             new Query('userId', Query::TYPE_EQUAL, [$userId]),
-        ], $limit, $offset, ['_id'], ['DESC'], $orderAfter);
-        Authorization::reset();
+        ], $limit, $offset, ['_id'], ['DESC'], $orderAfter));
         return $result;
     }
 
@@ -209,16 +207,14 @@ class Audit
      * @param int $limit
      * @param int $offset
      * @param Document|null $orderAfter
-     * 
+     *
      * @return array
      */
     public function getLogsByResource(string $resource, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
-        Authorization::disable();
-        $results = $this->db->find(Audit::COLLECTION, [
+        $results = Authorization::skip($this->db->find(Audit::COLLECTION, [
             new Query('resource', Query::TYPE_EQUAL, [$resource]),
-        ], $limit, $offset, ['_id'], ['DESC'], $orderAfter);
-        Authorization::reset();
+        ], $limit, $offset, ['_id'], ['DESC'], $orderAfter));
         return $results;
     }
 
@@ -232,17 +228,15 @@ class Audit
      * @param int $limit
      * @param int $offset
      * @param Document|null $orderAfter
-     * 
+     *
      * @return array
      */
     public function getLogsByUserAndEvents(string $userId, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
-        Authorization::disable();
-        $results = $this->db->find(Audit::COLLECTION, [
+        $results = Authorization::skip($this->db->find(Audit::COLLECTION, [
             new Query('userId', Query::TYPE_EQUAL, [$userId]),
             new Query('event', Query::TYPE_EQUAL, $events),
-        ], $limit, $offset, ['_id'], ['DESC'], $orderAfter);
-        Authorization::reset();
+        ], $limit, $offset, ['_id'], ['DESC'], $orderAfter));
         return $results;
     }
 
@@ -256,17 +250,15 @@ class Audit
      * @param int $limit
      * @param int $offset
      * @param Document|null $orderAfter
-     * 
+     *
      * @return array
      */
     public function getLogsByResourceAndEvents(string $resource, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
-        Authorization::disable();
-        $results = $this->db->find(Audit::COLLECTION, [
+        $results = Authorization::skip($this->db->find(Audit::COLLECTION, [
             new Query('resource', Query::TYPE_EQUAL, [$resource]),
             new Query('event', Query::TYPE_EQUAL, $events),
-        ], $limit, $offset, ['_id'], ['DESC'], $orderAfter);
-        Authorization::reset();
+        ], $limit, $offset, ['_id'], ['DESC'], $orderAfter));
         return $results;
     }
 
@@ -279,17 +271,15 @@ class Audit
      */
     public function cleanup(int $timestamp): bool
     {
-        Authorization::disable();
         do {
-            $documents = $this->db->find(Audit::COLLECTION, [
+            $documents = Authorization::skip($this->db->find(Audit::COLLECTION, [
                 new Query('time', Query::TYPE_LESSER, [$timestamp]),
-            ]);
-    
+            ]));
+
             foreach ($documents as $document) {
                 $this->db->deleteDocument(Audit::COLLECTION, $document['$id']);
             }
-        } while(!empty($documents));
-        Authorization::reset();
+        } while (!empty($documents));
         return true;
     }
 }
