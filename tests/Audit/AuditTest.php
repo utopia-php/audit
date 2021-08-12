@@ -84,7 +84,11 @@ class AuditTest extends TestCase
 
         $logs1 = $this->audit->getLogsByUser('userId', 1, 1);
         $this->assertEquals(1, \count($logs1));
-        $this->assertNotEquals($logs1[0]->getId(), $logs[0]->getId());
+        $this->assertEquals($logs1[0]->getId(), $logs[1]->getId());
+
+        $logs2 = $this->audit->getLogsByUser('userId', 1, 0, $logs[0]);
+        $this->assertEquals(1, \count($logs2));
+        $this->assertEquals($logs2[0]->getId(), $logs[1]->getId());
     }
     
     public function testGetLogsByUserAndEvents()
@@ -98,7 +102,12 @@ class AuditTest extends TestCase
         $logs3 = $this->audit->getLogsByUserAndEvents('userId', ['update', 'delete'], 1, 1);
 
         $this->assertEquals(1, \count($logs3));
-        $this->assertNotEquals($logs3[0]->getId(), $logs2[0]->getId());
+        $this->assertEquals($logs3[0]->getId(), $logs2[1]->getId());
+
+        $logs4 = $this->audit->getLogsByUserAndEvents('userId', ['update', 'delete'], 1, 0, $logs2[0]);
+
+        $this->assertEquals(1, \count($logs4));
+        $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
     }
 
     public function testGetLogsByResourceAndEvents()
@@ -112,7 +121,12 @@ class AuditTest extends TestCase
         $logs3 = $this->audit->getLogsByResourceAndEvents('database/document/2', ['update', 'delete'], 1, 1);
 
         $this->assertEquals(1, \count($logs3));
-        $this->assertNotEquals($logs3[0]->getId(), $logs2[0]->getId());
+        $this->assertEquals($logs3[0]->getId(), $logs2[1]->getId());
+
+        $logs4 = $this->audit->getLogsByResourceAndEvents('database/document/2', ['update', 'delete'], 1, 0, $logs2[0]);
+
+        $this->assertEquals(1, \count($logs4));
+        $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
     }
     
     public function testGetLogsByResource()
@@ -125,8 +139,12 @@ class AuditTest extends TestCase
 
         $logs3 = $this->audit->getLogsByResource('database/document/2', 1, 1);
         $this->assertEquals(1, \count($logs3));
+        $this->assertEquals($logs3[0]->getId(), $logs2[1]->getId());
 
-        $this->assertNotEquals($logs3[0]->getId(), $logs2[0]->getId());
+        $logs4 = $this->audit->getLogsByResource('database/document/2', 1, 0, $logs2[0]);
+        $this->assertEquals(1, \count($logs4));
+        $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
+
     }
 
     public function testCleanup() {
