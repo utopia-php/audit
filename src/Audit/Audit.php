@@ -194,9 +194,11 @@ class Audit
      */
     public function getLogsByUser(string $userId, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
-        $result = Authorization::skip($this->db->find(Audit::COLLECTION, [
-            new Query('userId', Query::TYPE_EQUAL, [$userId]),
-        ], $limit, $offset, ['_id'], ['DESC'], $orderAfter));
+        $result = Authorization::skip(function () use ($userId, $limit, $offset, $orderAfter) {
+            return $this->db->find(Audit::COLLECTION, [
+                new Query('userId', Query::TYPE_EQUAL, [$userId]),
+            ], $limit, $offset, ['_id'], ['DESC'], $orderAfter);
+        });
         return $result;
     }
 
@@ -212,9 +214,11 @@ class Audit
      */
     public function getLogsByResource(string $resource, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
-        $results = Authorization::skip($this->db->find(Audit::COLLECTION, [
-            new Query('resource', Query::TYPE_EQUAL, [$resource]),
-        ], $limit, $offset, ['_id'], ['DESC'], $orderAfter));
+        $results = Authorization::skip(function () use ($resource, $limit, $offset, $orderAfter) {
+            return $this->db->find(Audit::COLLECTION, [
+                new Query('resource', Query::TYPE_EQUAL, [$resource]),
+            ], $limit, $offset, ['_id'], ['DESC'], $orderAfter);
+        });
         return $results;
     }
 
@@ -233,10 +237,12 @@ class Audit
      */
     public function getLogsByUserAndEvents(string $userId, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
-        $results = Authorization::skip($this->db->find(Audit::COLLECTION, [
-            new Query('userId', Query::TYPE_EQUAL, [$userId]),
-            new Query('event', Query::TYPE_EQUAL, $events),
-        ], $limit, $offset, ['_id'], ['DESC'], $orderAfter));
+        $results = Authorization::skip(function () use ($userId, $events, $limit, $offset, $orderAfter) {
+            return $this->db->find(Audit::COLLECTION, [
+                new Query('userId', Query::TYPE_EQUAL, [$userId]),
+                new Query('event', Query::TYPE_EQUAL, $events),
+            ], $limit, $offset, ['_id'], ['DESC'], $orderAfter);
+        });
         return $results;
     }
 
@@ -255,10 +261,12 @@ class Audit
      */
     public function getLogsByResourceAndEvents(string $resource, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
-        $results = Authorization::skip($this->db->find(Audit::COLLECTION, [
-            new Query('resource', Query::TYPE_EQUAL, [$resource]),
-            new Query('event', Query::TYPE_EQUAL, $events),
-        ], $limit, $offset, ['_id'], ['DESC'], $orderAfter));
+        $results = Authorization::skip(function () use ($resource, $events, $limit, $offset, $orderAfter) {
+            return $this->db->find(Audit::COLLECTION, [
+                new Query('resource', Query::TYPE_EQUAL, [$resource]),
+                new Query('event', Query::TYPE_EQUAL, $events),
+            ], $limit, $offset, ['_id'], ['DESC'], $orderAfter);
+        });
         return $results;
     }
 
@@ -271,15 +279,17 @@ class Audit
      */
     public function cleanup(int $timestamp): bool
     {
-        do {
-            $documents = Authorization::skip($this->db->find(Audit::COLLECTION, [
-                new Query('time', Query::TYPE_LESSER, [$timestamp]),
-            ]));
+        Authorization::skip(function () use ($timestamp) {
+            do {
+                $documents = $this->db->find(Audit::COLLECTION, [
+                    new Query('time', Query::TYPE_LESSER, [$timestamp]),
+                ]);
 
-            foreach ($documents as $document) {
-                $this->db->deleteDocument(Audit::COLLECTION, $document['$id']);
-            }
-        } while (!empty($documents));
+                foreach ($documents as $document) {
+                    $this->db->deleteDocument(Audit::COLLECTION, $document['$id']);
+                }
+            } while (!empty($documents));
+        });
         return true;
     }
 }
