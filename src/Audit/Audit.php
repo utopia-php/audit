@@ -197,7 +197,7 @@ class Audit
         $result = Authorization::skip(function () use ($userId, $limit, $offset, $orderAfter) {
             return $this->db->find(Audit::COLLECTION, [
                 new Query('userId', Query::TYPE_EQUAL, [$userId]),
-            ], $limit, $offset, ['_id'], ['DESC'], $orderAfter);
+            ], $limit, $offset, [], ['DESC'], $orderAfter);
         });
         return $result;
     }
@@ -217,7 +217,7 @@ class Audit
         $results = Authorization::skip(function () use ($resource, $limit, $offset, $orderAfter) {
             return $this->db->find(Audit::COLLECTION, [
                 new Query('resource', Query::TYPE_EQUAL, [$resource]),
-            ], $limit, $offset, ['_id'], ['DESC'], $orderAfter);
+            ], $limit, $offset, [], ['DESC'], $orderAfter);
         });
         return $results;
     }
@@ -241,7 +241,7 @@ class Audit
             return $this->db->find(Audit::COLLECTION, [
                 new Query('userId', Query::TYPE_EQUAL, [$userId]),
                 new Query('event', Query::TYPE_EQUAL, $events),
-            ], $limit, $offset, ['_id'], ['DESC'], $orderAfter);
+            ], $limit, $offset, [], ['DESC'], $orderAfter);
         });
         return $results;
     }
@@ -265,7 +265,7 @@ class Audit
             return $this->db->find(Audit::COLLECTION, [
                 new Query('resource', Query::TYPE_EQUAL, [$resource]),
                 new Query('event', Query::TYPE_EQUAL, $events),
-            ], $limit, $offset, ['_id'], ['DESC'], $orderAfter);
+            ], $limit, $offset, [], ['DESC'], $orderAfter);
         });
         return $results;
     }

@@ -115,8 +115,8 @@ class AuditTest extends TestCase
         $logs1 = $this->audit->getLogsByResourceAndEvents('database/document/1', ['update']);
         $logs2 = $this->audit->getLogsByResourceAndEvents('database/document/2', ['update', 'delete']);
 
-        $this->assertEquals(2, \count($logs1));
-        $this->assertEquals(3, \count($logs2));
+        $this->assertEquals(1, \count($logs1));
+        $this->assertEquals(2, \count($logs2));
 
         $logs3 = $this->audit->getLogsByResourceAndEvents('database/document/2', ['update', 'delete'], 1, 1);
 
