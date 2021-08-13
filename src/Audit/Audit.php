@@ -135,6 +135,13 @@ class Audit
                 'lengths' => [],
                 'orders' => [],
             ]),
+            new Document([
+                '$id' => 'index5',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['resource', 'event'],
+                'lengths' => [],
+                'orders' => [],
+            ]),
         ];
 
         $this->db->createCollection(Audit::COLLECTION, $attributes, $indexes);
@@ -158,20 +165,20 @@ class Audit
      */
     public function log(string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): bool
     {
-        Authorization::disable();
-        $this->db->createDocument(Audit::COLLECTION, new Document([
-            '$read' => [],
-            '$write' => [],
-            'userId' => $userId,
-            'event' => $event,
-            'resource' => $resource,
-            'userAgent' => $userAgent,
-            'ip' => $ip,
-            'location' => $location,
-            'data' => $data,
-            'time' => \time(),
-        ]));
-        Authorization::reset();
+        Authorization::skip(function () use ($userId, $event, $resource, $userAgent, $ip, $location, $data) {
+            $this->db->createDocument(Audit::COLLECTION, new Document([
+                '$read' => [],
+                '$write' => [],
+                'userId' => $userId,
+                'event' => $event,
+                'resource' => $resource,
+                'userAgent' => $userAgent,
+                'ip' => $ip,
+                'location' => $location,
+                'data' => $data,
+                'time' => \time(),
+            ]));
+        });
         return true;
     }
 
@@ -179,16 +186,19 @@ class Audit
      * Get All Logs By User ID.
      *
      * @param string $userId
+     * @param int $limit
+     * @param int $offset
+     * @param Document|null $orderAfter
      *
      * @return array
      */
-    public function getLogsByUser(string $userId): array
+    public function getLogsByUser(string $userId, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
-        Authorization::disable();
-        $result = $this->db->find(Audit::COLLECTION, [
-            new Query('userId', Query::TYPE_EQUAL, [$userId]),
-        ], 25, 0, ['_id'], ['DESC']);
-        Authorization::reset();
+        $result = Authorization::skip(function () use ($userId, $limit, $offset, $orderAfter) {
+            return $this->db->find(Audit::COLLECTION, [
+                new Query('userId', Query::TYPE_EQUAL, [$userId]),
+            ], $limit, $offset, [], ['DESC'], $orderAfter);
+        });
         return $result;
     }
 
@@ -196,37 +206,67 @@ class Audit
      * Get All Logs By Resource.
      *
      * @param string $resource
+     * @param int $limit
+     * @param int $offset
+     * @param Document|null $orderAfter
      *
      * @return array
      */
-    public function getLogsByResource(string $resource): array
+    public function getLogsByResource(string $resource, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
-        Authorization::disable();
-        $results = $this->db->find(Audit::COLLECTION, [
-            new Query('resource', Query::TYPE_EQUAL, [$resource]),
-        ], 25, 0, ['_id'], ['DESC']);
-        Authorization::reset();
+        $results = Authorization::skip(function () use ($resource, $limit, $offset, $orderAfter) {
+            return $this->db->find(Audit::COLLECTION, [
+                new Query('resource', Query::TYPE_EQUAL, [$resource]),
+            ], $limit, $offset, [], ['DESC'], $orderAfter);
+        });
         return $results;
     }
 
     /**
-     * Get All Logs By User and Actions.
+     * Get All Logs By User and Events.
      *
      * Get all user logs logs by given action names
      *
      * @param string $userId
      * @param array $events
+     * @param int $limit
+     * @param int $offset
+     * @param Document|null $orderAfter
      *
      * @return array
      */
-    public function getLogsByUserAndEvents(string $userId, array $events): array
+    public function getLogsByUserAndEvents(string $userId, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
-        Authorization::disable();
-        $results = $this->db->find(Audit::COLLECTION, [
-            new Query('userId', Query::TYPE_EQUAL, [$userId]),
-            new Query('event', Query::TYPE_EQUAL, $events),
-        ], 25, 0, ['_id'], ['DESC']);
-        Authorization::reset();
+        $results = Authorization::skip(function () use ($userId, $events, $limit, $offset, $orderAfter) {
+            return $this->db->find(Audit::COLLECTION, [
+                new Query('userId', Query::TYPE_EQUAL, [$userId]),
+                new Query('event', Query::TYPE_EQUAL, $events),
+            ], $limit, $offset, [], ['DESC'], $orderAfter);
+        });
+        return $results;
+    }
+
+    /**
+     * Get All Logs By Resource and Events.
+     *
+     * Get all user logs logs by given action names
+     *
+     * @param string $resource
+     * @param array $events
+     * @param int $limit
+     * @param int $offset
+     * @param Document|null $orderAfter
+     *
+     * @return array
+     */
+    public function getLogsByResourceAndEvents(string $resource, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
+    {
+        $results = Authorization::skip(function () use ($resource, $events, $limit, $offset, $orderAfter) {
+            return $this->db->find(Audit::COLLECTION, [
+                new Query('resource', Query::TYPE_EQUAL, [$resource]),
+                new Query('event', Query::TYPE_EQUAL, $events),
+            ], $limit, $offset, [], ['DESC'], $orderAfter);
+        });
         return $results;
     }
 
@@ -239,17 +279,17 @@ class Audit
      */
     public function cleanup(int $timestamp): bool
     {
-        Authorization::disable();
-        do {
-            $documents = $this->db->find(Audit::COLLECTION, [
-                new Query('time', Query::TYPE_LESSER, [$timestamp]),
-            ]);
-    
-            foreach ($documents as $document) {
-                $this->db->deleteDocument(Audit::COLLECTION, $document['$id']);
-            }
-        } while(!empty($documents));
-        Authorization::reset();
+        Authorization::skip(function () use ($timestamp) {
+            do {
+                $documents = $this->db->find(Audit::COLLECTION, [
+                    new Query('time', Query::TYPE_LESSER, [$timestamp]),
+                ]);
+
+                foreach ($documents as $document) {
+                    $this->db->deleteDocument(Audit::COLLECTION, $document['$id']);
+                }
+            } while (!empty($documents));
+        });
         return true;
     }
 }
