@@ -32,10 +32,10 @@ body:
       description: "What did actually happen? Add screenshots, if applicable."
       placeholder: "It actually ..."
   - type: dropdown
-    id: php-clamav-version
+    id: audit-version
     attributes:
-      label: "🎲 Appwrite ClamAV PHP Client version"
-      description: "What version of Appwrite are you running?"
+      label: "🎲 Utopia Audit version"
+      description: "What version of Utopia Audit are you running?"
       options:
         - Version 0.6.x
         - Version 0.5.x
