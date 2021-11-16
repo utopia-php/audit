@@ -242,9 +242,7 @@ class Audit
     public function getLogsByResource(string $resource, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
         $results = Authorization::skip(function () use ($resource, $limit, $offset, $orderAfter) {
-            return $this->db->find(Audit::COLLECTION, [
-                new Query('resource', Query::TYPE_EQUAL, [$resource]),
-            ], $limit, $offset, [], ['DESC'], $orderAfter);
+            return $this->db->find(Audit::COLLECTION, $this->getQueryByResource($resource), $limit, $offset, [], ['DESC'], $orderAfter);
         });
         return $results;
     }
