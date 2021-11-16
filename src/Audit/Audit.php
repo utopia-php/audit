@@ -195,11 +195,38 @@ class Audit
     public function getLogsByUser(string $userId, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
         $result = Authorization::skip(function () use ($userId, $limit, $offset, $orderAfter) {
-            return $this->db->find(Audit::COLLECTION, [
-                new Query('userId', Query::TYPE_EQUAL, [$userId]),
-            ], $limit, $offset, [], ['DESC'], $orderAfter);
+            return $this->db->find(Audit::COLLECTION, $this->getQueryByUser($userId), $limit, $offset, [], ['DESC'], $orderAfter);
         });
         return $result;
+    }
+
+    /**
+     * Get Logs Count By User ID.
+     *
+     * @param string $userId
+     *
+     * @return int
+     */
+    public function getLogsByUserCount(string $userId): int
+    {
+        $result = Authorization::skip(function () use ($userId) {
+            return $this->db->count(Audit::COLLECTION, $this->getQueryByUser($userId));
+        });
+        return $result;
+    }
+
+    /**
+     * Get Query to get Logs by User ID.
+     *
+     * @param string $userId
+     *
+     * @return array
+     */
+    private function getQueryByUser(string $userId): array
+    {
+        return [
+            new Query('userId', Query::TYPE_EQUAL, [$userId]),
+        ];
     }
 
     /**
@@ -223,9 +250,36 @@ class Audit
     }
 
     /**
-     * Get All Logs By User and Events.
+     * Get Logs Count By Resource.
      *
-     * Get all user logs logs by given action names
+     * @param string $resource
+     *
+     * @return int
+     */
+    public function getLogsByResourceCount(string $resource): int
+    {
+        $results = Authorization::skip(function () use ($resource) {
+            return $this->db->count(Audit::COLLECTION, $this->getQueryByResource($resource));
+        });
+        return $results;
+    }
+
+    /**
+     * Get Query to get Logs by Resource.
+     *
+     * @param string $resource
+     *
+     * @return array
+     */
+    private function getQueryByResource(string $resource): array
+    {
+        return [
+            new Query('resource', Query::TYPE_EQUAL, [$resource]),
+        ];
+    }
+
+    /**
+     * Get All Logs By User and Events.
      *
      * @param string $userId
      * @param array $events
@@ -238,18 +292,45 @@ class Audit
     public function getLogsByUserAndEvents(string $userId, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
         $results = Authorization::skip(function () use ($userId, $events, $limit, $offset, $orderAfter) {
-            return $this->db->find(Audit::COLLECTION, [
-                new Query('userId', Query::TYPE_EQUAL, [$userId]),
-                new Query('event', Query::TYPE_EQUAL, $events),
-            ], $limit, $offset, [], ['DESC'], $orderAfter);
+            return $this->db->find(Audit::COLLECTION, $this->getQueryByUserAndEvents($userId, $events), $limit, $offset, [], ['DESC'], $orderAfter);
         });
         return $results;
     }
 
     /**
-     * Get All Logs By Resource and Events.
+     * Get Logs Count By User and Events.
      *
-     * Get all user logs logs by given action names
+     * @param string $userId
+     * @param array $events
+     *
+     * @return int
+     */
+    public function getLogsByUserAndEventsCount(string $userId, array $events): int
+    {
+        $results = Authorization::skip(function () use ($userId, $events) {
+            return $this->db->count(Audit::COLLECTION, $this->getQueryByUserAndEvents($userId, $events));
+        });
+        return $results;
+    }
+
+    /**
+     * Get Query to get Logs by User and Events.
+     *
+     * @param string $userId
+     * @param array $events
+     *
+     * @return array
+     */
+    private function getQueryByUserAndEvents(string $userId, array $events): array
+    {
+        return [
+            new Query('userId', Query::TYPE_EQUAL, [$userId]),
+            new Query('event', Query::TYPE_EQUAL, $events),
+        ];
+    }
+
+    /**
+     * Get All Logs By Resource and Events.
      *
      * @param string $resource
      * @param array $events
@@ -262,12 +343,41 @@ class Audit
     public function getLogsByResourceAndEvents(string $resource, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
         $results = Authorization::skip(function () use ($resource, $events, $limit, $offset, $orderAfter) {
-            return $this->db->find(Audit::COLLECTION, [
-                new Query('resource', Query::TYPE_EQUAL, [$resource]),
-                new Query('event', Query::TYPE_EQUAL, $events),
-            ], $limit, $offset, [], ['DESC'], $orderAfter);
+            return $this->db->find(Audit::COLLECTION, $this->getQueryByResourceAndEvents($resource, $events), $limit, $offset, [], ['DESC'], $orderAfter);
         });
         return $results;
+    }
+
+    /**
+     * Get All Logs By Resource and Events.
+     *
+     * @param string $resource
+     * @param array $events
+     *
+     * @return int
+     */
+    public function getLogsByResourceAndEventsCount(string $resource, array $events): int
+    {
+        $results = Authorization::skip(function () use ($resource, $events) {
+            return $this->db->count(Audit::COLLECTION, $this->getQueryByResourceAndEvents($resource, $events));
+        });
+        return $results;
+    }
+
+    /**
+     * Get Query to get Logs by Resource and Events.
+     *
+     * @param string $resource
+     * @param array $events
+     *
+     * @return array
+     */
+    private function getQueryByResourceAndEvents(string $resource, array $events): array
+    {
+        return [
+            new Query('resource', Query::TYPE_EQUAL, [$resource]),
+            new Query('event', Query::TYPE_EQUAL, $events),
+        ];
     }
 
     /**
