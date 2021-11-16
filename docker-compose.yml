@@ -1,13 +1,13 @@
 version: '3'
 
 services:
-  mysql:
-    image: mysql:8
+  mariadb:
+    image: mariadb:10.6
     environment: 
-      - MYSQL_ROOT_PASSWORD=password
+      - MARIADB_ROOT_PASSWORD=password
     networks:
       - abuse
-  
+
   php7.4:
     build:
       context: .
@@ -15,7 +15,7 @@ services:
     networks:
       - abuse
     depends_on:
-      - mysql
+      - mariadb
 
   php8:
     build:
@@ -24,7 +24,7 @@ services:
     networks:
       - abuse
     depends_on:
-      - mysql
+      - mariadb
 
 networks:
   abuse:
