@@ -82,7 +82,7 @@ class AuditTest extends TestCase
         $logs = $this->audit->getLogsByUser('userId');
         $this->assertEquals(3, \count($logs));
 
-        $logsCount = $this->audit->getLogsByUserCount('userId');
+        $logsCount = $this->audit->countLogsByUser('userId');
         $this->assertEquals(3, $logsCount);
 
         $logs1 = $this->audit->getLogsByUser('userId', 1, 1);
@@ -102,8 +102,8 @@ class AuditTest extends TestCase
         $this->assertEquals(2, \count($logs1));
         $this->assertEquals(3, \count($logs2));
 
-        $logsCount1 = $this->audit->getLogsByUserAndEventsCount('userId', ['update']);
-        $logsCount2 = $this->audit->getLogsByUserAndEventsCount('userId', ['update', 'delete']);
+        $logsCount1 = $this->audit->countLogsByUserAndEvents('userId', ['update']);
+        $logsCount2 = $this->audit->countLogsByUserAndEvents('userId', ['update', 'delete']);
 
         $this->assertEquals(2, $logsCount1);
         $this->assertEquals(3, $logsCount2);
@@ -127,8 +127,8 @@ class AuditTest extends TestCase
         $this->assertEquals(1, \count($logs1));
         $this->assertEquals(2, \count($logs2));
 
-        $logsCount1 = $this->audit->getLogsByResourceAndEventsCount('database/document/1', ['update']);
-        $logsCount2 = $this->audit->getLogsByResourceAndEventsCount('database/document/2', ['update', 'delete']);
+        $logsCount1 = $this->audit->countLogsByResourceAndEvents('database/document/1', ['update']);
+        $logsCount2 = $this->audit->countLogsByResourceAndEvents('database/document/2', ['update', 'delete']);
 
         $this->assertEquals(1, $logsCount1);
         $this->assertEquals(2, $logsCount2);
@@ -152,8 +152,8 @@ class AuditTest extends TestCase
         $this->assertEquals(1, \count($logs1));
         $this->assertEquals(2, \count($logs2));
 
-        $logsCount1 = $this->audit->getLogsByResourceCount('database/document/1');
-        $logsCount2 = $this->audit->getLogsByResourceCount('database/document/2');
+        $logsCount1 = $this->audit->countLogsByResource('database/document/1');
+        $logsCount2 = $this->audit->countLogsByResource('database/document/2');
 
         $this->assertEquals(1, $logsCount1);
         $this->assertEquals(2, $logsCount2);

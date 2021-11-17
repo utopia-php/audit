@@ -214,7 +214,7 @@ class Audit
      *
      * @return int
      */
-    public function getLogsByUserCount(string $userId): int
+    public function countLogsByUser(string $userId): int
     {
         $result = Authorization::skip(function () use ($userId) {
             return $this->db->count(collection: Audit::COLLECTION,
@@ -257,7 +257,7 @@ class Audit
      *
      * @return int
      */
-    public function getLogsByResourceCount(string $resource): int
+    public function countLogsByResource(string $resource): int
     {
         $results = Authorization::skip(function () use ($resource) {
             return $this->db->count(collection: Audit::COLLECTION,
@@ -303,7 +303,7 @@ class Audit
      *
      * @return int
      */
-    public function getLogsByUserAndEventsCount(string $userId, array $events): int
+    public function countLogsByUserAndEvents(string $userId, array $events): int
     {
         $results = Authorization::skip(function () use ($userId, $events) {
             return $this->db->count(collection: Audit::COLLECTION,
@@ -352,7 +352,7 @@ class Audit
      *
      * @return int
      */
-    public function getLogsByResourceAndEventsCount(string $resource, array $events): int
+    public function countLogsByResourceAndEvents(string $resource, array $events): int
     {
         $results = Authorization::skip(function () use ($resource, $events) {
             return $this->db->count(collection: Audit::COLLECTION,
