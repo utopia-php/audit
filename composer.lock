@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "570dfa3bb36faef6c30e775efbbb7016",
+    "content-hash": "1ee458ca7b566baea2adc152dea763fb",
     "packages": [
         {
             "name": "composer/package-versions-deprecated",
@@ -340,16 +340,16 @@
         },
         {
             "name": "utopia-php/database",
-            "version": "dev-feat-query-operator-helper-method",
+            "version": "dev-main",
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/database.git",
-                "reference": "8c5a139fd74800bf8d22f27bcdb0bf6d68cb74f2"
+                "reference": "5fc0476d05567d1a156b00e17033f32148c93a38"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/database/zipball/8c5a139fd74800bf8d22f27bcdb0bf6d68cb74f2",
-                "reference": "8c5a139fd74800bf8d22f27bcdb0bf6d68cb74f2",
+                "url": "https://api.github.com/repos/utopia-php/database/zipball/5fc0476d05567d1a156b00e17033f32148c93a38",
+                "reference": "5fc0476d05567d1a156b00e17033f32148c93a38",
                 "shasum": ""
             },
             "require": {
@@ -367,6 +367,7 @@
                 "utopia-php/cli": "^0.11.0",
                 "vimeo/psalm": "4.0.1"
             },
+            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -397,9 +398,9 @@
             ],
             "support": {
                 "issues": "https://github.com/utopia-php/database/issues",
-                "source": "https://github.com/utopia-php/database/tree/feat-query-operator-helper-method"
+                "source": "https://github.com/utopia-php/database/tree/main"
             },
-            "time": "2021-11-16T20:19:43+00:00"
+            "time": "2021-11-17T09:53:02+00:00"
         },
         {
             "name": "utopia-php/framework",
