@@ -8,19 +8,10 @@ services:
     networks:
       - abuse
 
-  php7.4:
-    build:
-      context: .
-      dockerfile: ./Dockerfile-php7
-    networks:
-      - abuse
-    depends_on:
-      - mariadb
-
   php8:
     build:
       context: .
-      dockerfile: ./Dockerfile-php8
+      dockerfile: ./Dockerfile
     networks:
       - abuse
     depends_on:

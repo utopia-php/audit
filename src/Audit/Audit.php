@@ -195,7 +195,14 @@ class Audit
     public function getLogsByUser(string $userId, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
         $result = Authorization::skip(function () use ($userId, $limit, $offset, $orderAfter) {
-            return $this->db->find(Audit::COLLECTION, $this->getQueryByUser($userId), $limit, $offset, [], ['DESC'], $orderAfter);
+            return $this->db->find(
+                collection: Audit::COLLECTION,
+                queries: $this->buildQuery(['userId' => $userId], Query::TYPE_EQUAL),
+                limit: $limit,
+                offset: $offset,
+                orderTypes: ['DESC'],
+                cursor: $orderAfter
+            );
         });
         return $result;
     }
@@ -210,24 +217,13 @@ class Audit
     public function getLogsByUserCount(string $userId): int
     {
         $result = Authorization::skip(function () use ($userId) {
-            return $this->db->count(Audit::COLLECTION, $this->getQueryByUser($userId));
+            return $this->db->count(collection: Audit::COLLECTION,
+                queries: $this->buildQuery(['userId' => $userId], Query::TYPE_EQUAL)
+            );
         });
         return $result;
     }
 
-    /**
-     * Get Query to get Logs by User ID.
-     *
-     * @param string $userId
-     *
-     * @return array
-     */
-    private function getQueryByUser(string $userId): array
-    {
-        return [
-            new Query('userId', Query::TYPE_EQUAL, [$userId]),
-        ];
-    }
 
     /**
      * Get All Logs By Resource.
@@ -242,7 +238,14 @@ class Audit
     public function getLogsByResource(string $resource, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
         $results = Authorization::skip(function () use ($resource, $limit, $offset, $orderAfter) {
-            return $this->db->find(Audit::COLLECTION, $this->getQueryByResource($resource), $limit, $offset, [], ['DESC'], $orderAfter);
+            return $this->db->find(
+                collection: Audit::COLLECTION,
+                queries: $this->buildQuery(['resource' => $resource],Query::TYPE_EQUAL),
+                limit: $limit,
+                offset: $offset,
+                orderTypes: ['DESC'],
+                cursor: $orderAfter
+            );
         });
         return $results;
     }
@@ -257,23 +260,11 @@ class Audit
     public function getLogsByResourceCount(string $resource): int
     {
         $results = Authorization::skip(function () use ($resource) {
-            return $this->db->count(Audit::COLLECTION, $this->getQueryByResource($resource));
+            return $this->db->count(collection: Audit::COLLECTION,
+                queries: $this->buildQuery(['resource' => $resource], Query::TYPE_EQUAL)
+            );
         });
         return $results;
-    }
-
-    /**
-     * Get Query to get Logs by Resource.
-     *
-     * @param string $resource
-     *
-     * @return array
-     */
-    private function getQueryByResource(string $resource): array
-    {
-        return [
-            new Query('resource', Query::TYPE_EQUAL, [$resource]),
-        ];
     }
 
     /**
@@ -290,7 +281,16 @@ class Audit
     public function getLogsByUserAndEvents(string $userId, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
         $results = Authorization::skip(function () use ($userId, $events, $limit, $offset, $orderAfter) {
-            return $this->db->find(Audit::COLLECTION, $this->getQueryByUserAndEvents($userId, $events), $limit, $offset, [], ['DESC'], $orderAfter);
+            return $this->db->find(collection: Audit::COLLECTION,
+                queries: $this->buildQuery([
+                    'userId' => $userId,
+                    'event' => $events,
+                ], Query::TYPE_EQUAL),
+                limit: $limit,
+                offset: $offset,
+                orderTypes: ['DESC'],
+                cursor: $orderAfter
+            );
         });
         return $results;
     }
@@ -306,25 +306,14 @@ class Audit
     public function getLogsByUserAndEventsCount(string $userId, array $events): int
     {
         $results = Authorization::skip(function () use ($userId, $events) {
-            return $this->db->count(Audit::COLLECTION, $this->getQueryByUserAndEvents($userId, $events));
+            return $this->db->count(collection: Audit::COLLECTION,
+                queries: $this->buildQuery([
+                    'userId' => $userId,
+                    'event' => $events,
+                ], Query::TYPE_EQUAL)
+            );
         });
         return $results;
-    }
-
-    /**
-     * Get Query to get Logs by User and Events.
-     *
-     * @param string $userId
-     * @param array $events
-     *
-     * @return array
-     */
-    private function getQueryByUserAndEvents(string $userId, array $events): array
-    {
-        return [
-            new Query('userId', Query::TYPE_EQUAL, [$userId]),
-            new Query('event', Query::TYPE_EQUAL, $events),
-        ];
     }
 
     /**
@@ -341,7 +330,16 @@ class Audit
     public function getLogsByResourceAndEvents(string $resource, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
         $results = Authorization::skip(function () use ($resource, $events, $limit, $offset, $orderAfter) {
-            return $this->db->find(Audit::COLLECTION, $this->getQueryByResourceAndEvents($resource, $events), $limit, $offset, [], ['DESC'], $orderAfter);
+            return $this->db->find(collection: Audit::COLLECTION,
+                queries: $this->buildQuery([
+                    'resource' => $resource,
+                    'event' => $events,
+                ], Query::TYPE_EQUAL),
+                limit: $limit,
+                offset: $offset,
+                orderTypes: ['DESC'],
+                cursor: $orderAfter
+            );
         });
         return $results;
     }
@@ -357,25 +355,14 @@ class Audit
     public function getLogsByResourceAndEventsCount(string $resource, array $events): int
     {
         $results = Authorization::skip(function () use ($resource, $events) {
-            return $this->db->count(Audit::COLLECTION, $this->getQueryByResourceAndEvents($resource, $events));
+            return $this->db->count(collection: Audit::COLLECTION,
+                queries: $this->buildQuery([
+                    'resource' => $resource,
+                    'event' => $events,
+                ], Query::TYPE_EQUAL)
+            );
         });
         return $results;
-    }
-
-    /**
-     * Get Query to get Logs by Resource and Events.
-     *
-     * @param string $resource
-     * @param array $events
-     *
-     * @return array
-     */
-    private function getQueryByResourceAndEvents(string $resource, array $events): array
-    {
-        return [
-            new Query('resource', Query::TYPE_EQUAL, [$resource]),
-            new Query('event', Query::TYPE_EQUAL, $events),
-        ];
     }
 
     /**
@@ -389,9 +376,11 @@ class Audit
     {
         Authorization::skip(function () use ($timestamp) {
             do {
-                $documents = $this->db->find(Audit::COLLECTION, [
-                    new Query('time', Query::TYPE_LESSER, [$timestamp]),
-                ]);
+                $documents = $this->db->find(collection: Audit::COLLECTION, 
+                    queries: $this->buildQuery([
+                        'time' => $timestamp
+                    ], Query::TYPE_LESSER)
+                );
 
                 foreach ($documents as $document) {
                     $this->db->deleteDocument(Audit::COLLECTION, $document['$id']);
@@ -400,4 +389,33 @@ class Audit
         });
         return true;
     }
+
+    /**
+     * Builds an array of Query objects from
+     * an assoc array of $key => $value pairs
+     *
+     * The $operator is applied to each k/v pair
+     *
+     * @param array $values
+     * @param string $operator
+     *
+     * @return Query[]
+     */
+    private function buildQuery($values, string $operator): array
+    {
+        if (!Query::isOperator($operator)) {
+            throw new Exception('Operator not supported');
+        }
+
+        $query = [];
+        foreach ($values as $key => $value) {
+            if (!\is_array($value)) {
+                $value = [$value];
+            }
+            $query[] = new Query($key, $operator, $value);
+        }
+        return $query;
+
+    }
+
 }
