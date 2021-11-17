@@ -4,7 +4,7 @@ services:
   mariadb:
     image: mariadb:10.6
     environment: 
-      - MARIADB_ROOT_PASSWORD=password
+      - MYSQL_ROOT_PASSWORD=password
     networks:
       - abuse
 
