@@ -15,7 +15,7 @@
         "psr-4": {"Utopia\\Audit\\": "src/Audit"}
     },
     "require": {
-        "php": ">=7.4",
+        "php": ">=8.0",
         "ext-pdo": "*",
         "utopia-php/database": "dev-feat-database-and-namespace as 0.13.0"
     },
