@@ -50,11 +50,12 @@ class AuditTest extends TestCase
         $cache = new Cache(new NoCache());
 
         $database = new Database(new MariaDB($pdo),$cache);
+        $database->setDefaultDatabase('utopiaTests');
         $database->setNamespace('namespace');
 
         $this->audit = new Audit($database);
-        if(!$database->exists()) {
-            $database->create();
+        if(!$database->exists('utopiaTests')) {
+            $database->create('utopiaTests');
             $this->audit->setup();
         }
     }
