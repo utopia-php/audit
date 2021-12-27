@@ -15,10 +15,10 @@ class Audit
     /**
      * @var Database
      */
-    private $db;
+    private Database $db;
 
     /**
-     * @param Database $adapter
+     * @param Database $db
      */
     public function __construct(Database $db)
     {
@@ -27,8 +27,8 @@ class Audit
 
     public function setup(): void
     {
-        if (!$this->db->exists()) {
-            throw new Exception("You need to create the databse before running Audit setup");
+        if (!$this->db->exists($this->db->getDefaultDatabase())) {
+            throw new Exception("You need to create the database before running Audit setup");
         }
 
         $attributes = [
