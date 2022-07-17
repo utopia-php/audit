@@ -130,6 +130,13 @@ class Audit
                 'lengths' => [],
                 'orders' => [],
             ]),
+            new Document([
+                '$id' => 'index-time',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['time'],
+                'lengths' => [],
+                'orders' => [Database::ORDER_DESC],
+            ]),
         ];
 
         $this->db->createCollection(Audit::COLLECTION, $attributes, $indexes);
