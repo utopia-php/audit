@@ -20,6 +20,7 @@ use Utopia\Cache\Cache;
 use Utopia\Cache\Adapter\None as NoCache;
 use Utopia\Database\Adapter\MariaDB;
 use Utopia\Database\Database;
+use Utopia\Database\DateTime;
 
 class AuditTest extends TestCase
 {
@@ -32,20 +33,18 @@ class AuditTest extends TestCase
     public function setUp(): void
     {
         $dbHost = 'mariadb';
-        $dbUser = 'root';
         $dbPort = '3306';
         $dbUser = 'root';
         $dbPass = 'password';
 
-        $pdo = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $dbPass, array(
-            PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8mb4',
+        $pdo = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $dbPass, [
             PDO::ATTR_TIMEOUT => 3, // Seconds
-            PDO::ATTR_PERSISTENT => true
-        ));
-
-        // Connection settings
-        $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);   // Return arrays
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);        // Handle all errors with exceptions 
+            PDO::ATTR_PERSISTENT => true,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_EMULATE_PREPARES => true,
+            PDO::ATTR_STRINGIFY_FETCHES => true,
+        ]);
 
         $cache = new Cache(new NoCache());
 
@@ -62,7 +61,7 @@ class AuditTest extends TestCase
 
     public function tearDown(): void
     {
-        $this->audit->cleanup(time());
+        $this->audit->cleanup(DateTime::now());
         $this->audit = null;
     }
 
@@ -171,7 +170,7 @@ class AuditTest extends TestCase
     public function testCleanup() {
         sleep(3);
         // First delete all the logs
-        $status = $this->audit->cleanup(time());
+        $status = $this->audit->cleanup(DateTime::now());
         $this->assertEquals($status, true);
 
         // Check that all logs have been deleted 
@@ -193,7 +192,7 @@ class AuditTest extends TestCase
         sleep(5);
 
         // DELETE logs older than 10 seconds and check that status is true
-        $status = $this->audit->cleanup(time()-10);
+        $status = $this->audit->cleanup(DateTime::addSeconds(new \DateTime(), -10));
         $this->assertEquals($status, true);
 
         // Check if 1 log has been deleted
