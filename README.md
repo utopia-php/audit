@@ -81,12 +81,12 @@ $logs = $audit->getLogsByUser(
 
 **Get Logs By User and Action**
 
-Fetch all logs by given user ID and a specific action name
+Fetch all logs by given user ID and a specific event name
 
 ```php
-$logs = $audit->getLogsByUserAndActions(
+$logs = $audit->getLogsByUserAndEvents( 
     'userId', // User unique ID
-    ['update', 'delete'] // List of selected action to fetch
+    ['update', 'delete'] // List of selected event to fetch
 ); // Returns an array of all logs for specific user filtered by given actions
 ```
 

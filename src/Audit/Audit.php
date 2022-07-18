@@ -395,8 +395,9 @@ class Audit
      * @param string $operator
      *
      * @return Query[]
+     * @throws Exception
      */
-    private function buildQuery($values, string $operator): array
+    private function buildQuery(array $values, string $operator): array
     {
         if (!Query::isOperator($operator)) {
             throw new Exception('Operator not supported');
