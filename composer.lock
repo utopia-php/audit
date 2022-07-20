@@ -344,12 +344,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/database.git",
-                "reference": "407c0e95a4f5cf9b8932dc5b314a93b634339c09"
+                "reference": "a27af8922b7f01e3d5b410dda116449ae4bd4a9a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/database/zipball/407c0e95a4f5cf9b8932dc5b314a93b634339c09",
-                "reference": "407c0e95a4f5cf9b8932dc5b314a93b634339c09",
+                "url": "https://api.github.com/repos/utopia-php/database/zipball/a27af8922b7f01e3d5b410dda116449ae4bd4a9a",
+                "reference": "a27af8922b7f01e3d5b410dda116449ae4bd4a9a",
                 "shasum": ""
             },
             "require": {
@@ -400,7 +400,7 @@
                 "issues": "https://github.com/utopia-php/database/issues",
                 "source": "https://github.com/utopia-php/database/tree/feat-attr-datetime"
             },
-            "time": "2022-07-19T10:06:50+00:00"
+            "time": "2022-07-20T15:39:45+00:00"
         },
         {
             "name": "utopia-php/framework",
