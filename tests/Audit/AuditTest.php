@@ -183,7 +183,7 @@ class AuditTest extends TestCase
         $this->assertEquals($this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data), true);
         sleep(5);
 
-        // DELETE logs older than 10 seconds and check that status is true
+        // DELETE logs older than 11 seconds and check that status is true
         $status = $this->audit->cleanup(DateTime::addSeconds(new \DateTime(), -11));
         $this->assertEquals($status, true);
 
