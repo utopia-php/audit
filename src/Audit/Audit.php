@@ -3,6 +3,7 @@
 namespace Utopia\Audit;
 
 use Utopia\Database\Database;
+use Utopia\Database\DateTime;
 use Utopia\Database\Document;
 use Utopia\Database\Query;
 use Utopia\Database\Validator\Authorization;
@@ -88,10 +89,11 @@ class Audit
             ]),
             new Document([
                 '$id' => 'time',
-                'type' => Database::VAR_INTEGER,
+                'type' => Database::VAR_DATETIME,
+                'format' => '',
                 'size' => 0,
-                'required' => false,
                 'signed' => true,
+                'required' => false,
                 'array' => false,
                 'filters' => [],
             ]),
@@ -108,23 +110,9 @@ class Audit
 
         $indexes = [
             new Document([
-                '$id' => 'index1',
-                'type' => Database::INDEX_KEY,
-                'attributes' => ['userId'],
-                'lengths' => [],
-                'orders' => [],
-            ]),
-            new Document([
                 '$id' => 'index2',
                 'type' => Database::INDEX_KEY,
                 'attributes' => ['event'],
-                'lengths' => [],
-                'orders' => [],
-            ]),
-            new Document([
-                '$id' => 'index3',
-                'type' => Database::INDEX_KEY,
-                'attributes' => ['resource'],
                 'lengths' => [],
                 'orders' => [],
             ]),
@@ -141,6 +129,13 @@ class Audit
                 'attributes' => ['resource', 'event'],
                 'lengths' => [],
                 'orders' => [],
+            ]),
+            new Document([
+                '$id' => 'index-time',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['time'],
+                'lengths' => [],
+                'orders' => [Database::ORDER_DESC],
             ]),
         ];
 
@@ -176,7 +171,7 @@ class Audit
                 'ip' => $ip,
                 'location' => $location,
                 'data' => $data,
-                'time' => \time(),
+                'time' => DateTime::now(),
             ]));
         });
         return true;
@@ -368,17 +363,17 @@ class Audit
     /**
      * Delete all logs older than $timestamp seconds
      *
-     * @param int $timestamp
+     * @param string $datetime
      *
      * @return bool
      */
-    public function cleanup(int $timestamp): bool
+    public function cleanup(string $datetime): bool
     {
-        Authorization::skip(function () use ($timestamp) {
+        Authorization::skip(function () use ($datetime) {
             do {
                 $documents = $this->db->find(collection: Audit::COLLECTION, 
                     queries: $this->buildQuery([
-                        'time' => $timestamp
+                        'time' => $datetime
                     ], Query::TYPE_LESSER)
                 );
 
@@ -400,8 +395,9 @@ class Audit
      * @param string $operator
      *
      * @return Query[]
+     * @throws Exception
      */
-    private function buildQuery($values, string $operator): array
+    private function buildQuery(array $values, string $operator): array
     {
         if (!Query::isOperator($operator)) {
             throw new Exception('Operator not supported');
