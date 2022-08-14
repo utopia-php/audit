@@ -20,6 +20,7 @@ use Utopia\Cache\Cache;
 use Utopia\Cache\Adapter\None as NoCache;
 use Utopia\Database\Adapter\MariaDB;
 use Utopia\Database\Database;
+use Utopia\Database\DateTime;
 
 class AuditTest extends TestCase
 {
@@ -32,23 +33,12 @@ class AuditTest extends TestCase
     public function setUp(): void
     {
         $dbHost = 'mariadb';
-        $dbUser = 'root';
         $dbPort = '3306';
         $dbUser = 'root';
         $dbPass = 'password';
 
-        $pdo = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $dbPass, array(
-            PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8mb4',
-            PDO::ATTR_TIMEOUT => 3, // Seconds
-            PDO::ATTR_PERSISTENT => true
-        ));
-
-        // Connection settings
-        $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);   // Return arrays
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);        // Handle all errors with exceptions 
-
+        $pdo = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $dbPass, MariaDB::getPdoAttributes());
         $cache = new Cache(new NoCache());
-
         $database = new Database(new MariaDB($pdo),$cache);
         $database->setDefaultDatabase('utopiaTests');
         $database->setNamespace('namespace');
@@ -58,24 +48,25 @@ class AuditTest extends TestCase
             $database->create('utopiaTests');
             $this->audit->setup();
         }
+        $this->createLogs();
     }
 
     public function tearDown(): void
     {
-        $this->audit->cleanup(time());
+        $this->audit->cleanup(DateTime::now());
         $this->audit = null;
     }
 
-    public function testLog()
+    public function createLogs()
     {
         $userId = 'userId';
         $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36';
         $ip = '127.0.0.1';
         $location = 'US';
         $data = ['key1' => 'value1','key2' => 'value2'];
-        $this->assertEquals($this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data), true);
-        $this->assertEquals($this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data), true);
-        $this->assertEquals($this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data), true);
+        $this->assertTrue($this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
+        $this->assertTrue($this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
+        $this->assertTrue($this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
     }
 
     public function testGetLogsByUser()
@@ -171,7 +162,7 @@ class AuditTest extends TestCase
     public function testCleanup() {
         sleep(3);
         // First delete all the logs
-        $status = $this->audit->cleanup(time());
+        $status = $this->audit->cleanup(DateTime::now());
         $this->assertEquals($status, true);
 
         // Check that all logs have been deleted 
@@ -192,8 +183,8 @@ class AuditTest extends TestCase
         $this->assertEquals($this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data), true);
         sleep(5);
 
-        // DELETE logs older than 10 seconds and check that status is true
-        $status = $this->audit->cleanup(time()-10);
+        // DELETE logs older than 11 seconds and check that status is true
+        $status = $this->audit->cleanup(DateTime::addSeconds(new \DateTime(), -11));
         $this->assertEquals($status, true);
 
         // Check if 1 log has been deleted
