@@ -161,8 +161,7 @@ class Audit
     {
         Authorization::skip(function () use ($userId, $event, $resource, $userAgent, $ip, $location, $data) {
             $this->db->createDocument(Audit::COLLECTION, new Document([
-                '$read' => [],
-                '$write' => [],
+                '$permissions' => [],
                 'userId' => $userId,
                 'event' => $event,
                 'resource' => $resource,
