@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "1fd57662c5232718ef11197146dddc50",
+    "content-hash": "8c8a6f3a920ad4d0585623272d4363b3",
     "packages": [
         {
             "name": "composer/package-versions-deprecated",
@@ -340,11 +340,17 @@
         },
         {
             "name": "utopia-php/database",
-            "version": "dev-refactor-permissions",
+            "version": "0.20.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/database.git",
-                "reference": "75ac6965dea2ddada8ecb6bb7ede2e8a7f2249c2"
+                "reference": "cd89b41564223cddf7d87a41bbaf736a0c89f327"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/utopia-php/database/zipball/cd89b41564223cddf7d87a41bbaf736a0c89f327",
+                "reference": "cd89b41564223cddf7d87a41bbaf736a0c89f327",
+                "shasum": ""
             },
             "require": {
                 "ext-mongodb": "*",
@@ -368,11 +374,7 @@
                     "Utopia\\Database\\": "src/Database"
                 }
             },
-            "autoload-dev": {
-                "psr-4": {
-                    "Utopia\\Tests\\": "tests/Database"
-                }
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -394,7 +396,11 @@
                 "upf",
                 "utopia"
             ],
-            "time": "2022-08-14T09:23:08+00:00"
+            "support": {
+                "issues": "https://github.com/utopia-php/database/issues",
+                "source": "https://github.com/utopia-php/database/tree/0.20.0"
+            },
+            "time": "2022-08-14T15:22:34+00:00"
         },
         {
             "name": "utopia-php/framework",
@@ -4066,9 +4072,7 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {
-        "utopia-php/database": 20
-    },
+    "stability-flags": [],
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
