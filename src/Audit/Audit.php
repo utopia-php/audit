@@ -95,7 +95,7 @@ class Audit
                 'signed' => true,
                 'required' => false,
                 'array' => false,
-                'filters' => [],
+                'filters' => ['datetime'],
             ]),
             new Document([
                 '$id' => 'data',
