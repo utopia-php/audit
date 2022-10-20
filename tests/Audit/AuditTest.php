@@ -15,8 +15,11 @@ class AuditTest extends TestCase
 {
     /**
      * @var Audit
+     * @var Initialized
      */
+    /* @phpstan-ignore-next-line */
     protected $audit = null;
+    /* @phpstan-ignore-next-line */
     protected $initialized = false;
 
     public function setUp(): void
@@ -46,7 +49,7 @@ class AuditTest extends TestCase
         $this->audit = null;
     }
 
-    public function createLogs()
+    public function createLogs(): void
     {
         $userId = 'userId';
         $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36';
@@ -58,7 +61,7 @@ class AuditTest extends TestCase
         $this->assertTrue($this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
     }
 
-    public function testGetLogsByUser()
+    public function testGetLogsByUser(): void
     {
         $logs = $this->audit->getLogsByUser('userId');
         $this->assertEquals(3, \count($logs));
@@ -75,7 +78,7 @@ class AuditTest extends TestCase
         $this->assertEquals($logs2[0]->getId(), $logs[1]->getId());
     }
 
-    public function testGetLogsByUserAndEvents()
+    public function testGetLogsByUserAndEvents(): void
     {
         $logs1 = $this->audit->getLogsByUserAndEvents('userId', ['update']);
         $logs2 = $this->audit->getLogsByUserAndEvents('userId', ['update', 'delete']);
@@ -100,7 +103,7 @@ class AuditTest extends TestCase
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
     }
 
-    public function testGetLogsByResourceAndEvents()
+    public function testGetLogsByResourceAndEvents(): void
     {
         $logs1 = $this->audit->getLogsByResourceAndEvents('database/document/1', ['update']);
         $logs2 = $this->audit->getLogsByResourceAndEvents('database/document/2', ['update', 'delete']);
@@ -125,7 +128,7 @@ class AuditTest extends TestCase
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
     }
 
-    public function testGetLogsByResource()
+    public function testGetLogsByResource(): void
     {
         $logs1 = $this->audit->getLogsByResource('database/document/1');
         $logs2 = $this->audit->getLogsByResource('database/document/2');
@@ -148,7 +151,7 @@ class AuditTest extends TestCase
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
     }
 
-    public function testCleanup() {
+    public function testCleanup(): void {
         sleep(3);
         // First delete all the logs
         $status = $this->audit->cleanup(DateTime::now());

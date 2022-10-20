@@ -153,7 +153,7 @@ class Audit
      * @param string $userAgent
      * @param string $ip
      * @param string $location
-     * @param array  $data
+     * @param array<string, mixed>  $data
      *
      * @return bool
      */
@@ -183,9 +183,9 @@ class Audit
      * @param int $offset
      * @param Document|null $orderAfter
      *
-     * @return array
+     * @return mixed
      */
-    public function getLogsByUser(string $userId, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
+    public function getLogsByUser(string $userId, int $limit = 25, int $offset = 0, Document $orderAfter = null): mixed
     {
         $result = Authorization::skip(function () use ($userId, $limit, $offset, $orderAfter) {
             $queries = $this->buildQuery(['userId' => $userId], Query::TYPE_EQUAL);
@@ -210,9 +210,9 @@ class Audit
      *
      * @param string $userId
      *
-     * @return int
+     * @return mixed
      */
-    public function countLogsByUser(string $userId): int
+    public function countLogsByUser(string $userId): mixed
     {
         $result = Authorization::skip(function () use ($userId) {
             return $this->db->count(
@@ -232,9 +232,9 @@ class Audit
      * @param int $offset
      * @param Document|null $orderAfter
      *
-     * @return array
+     * @return mixed
      */
-    public function getLogsByResource(string $resource, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
+    public function getLogsByResource(string $resource, int $limit = 25, int $offset = 0, Document $orderAfter = null): mixed
     {
         $results = Authorization::skip(function () use ($resource, $limit, $offset, $orderAfter) {
             $queries = $this->buildQuery(['resource' => $resource], Query::TYPE_EQUAL);
@@ -259,9 +259,9 @@ class Audit
      *
      * @param string $resource
      *
-     * @return int
+     * @return mixed
      */
-    public function countLogsByResource(string $resource): int
+    public function countLogsByResource(string $resource): mixed
     {
         $results = Authorization::skip(function () use ($resource) {
             return $this->db->count(
@@ -276,14 +276,14 @@ class Audit
      * Get All Logs By User and Events.
      *
      * @param string $userId
-     * @param array $events
+     * @param array<string,mixed> $events
      * @param int $limit
      * @param int $offset
      * @param Document|null $orderAfter
      *
-     * @return array
+     * @return mixed
      */
-    public function getLogsByUserAndEvents(string $userId, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
+    public function getLogsByUserAndEvents(string $userId, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): mixed
     {
         $results = Authorization::skip(function () use ($userId, $events, $limit, $offset, $orderAfter) {
             $queries = $this->buildQuery([
@@ -310,11 +310,11 @@ class Audit
      * Get Logs Count By User and Events.
      *
      * @param string $userId
-     * @param array $events
+     * @param array<string,mixed> $events
      *
-     * @return int
+     * @return mixed
      */
-    public function countLogsByUserAndEvents(string $userId, array $events): int
+    public function countLogsByUserAndEvents(string $userId, array $events): mixed
     {
         $results = Authorization::skip(function () use ($userId, $events) {
             return $this->db->count(
@@ -332,14 +332,14 @@ class Audit
      * Get All Logs By Resource and Events.
      *
      * @param string $resource
-     * @param array $events
+     * @param array<string,mixed> $events
      * @param int $limit
      * @param int $offset
      * @param Document|null $orderAfter
      *
-     * @return array
+     * @return mixed
      */
-    public function getLogsByResourceAndEvents(string $resource, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
+    public function getLogsByResourceAndEvents(string $resource, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): mixed
     {
         $results = Authorization::skip(function () use ($resource, $events, $limit, $offset, $orderAfter) {
             $queries = $this->buildQuery([
@@ -366,11 +366,11 @@ class Audit
      * Get All Logs By Resource and Events.
      *
      * @param string $resource
-     * @param array $events
+     * @param array<string,mixed> $events
      *
-     * @return int
+     * @return mixed
      */
-    public function countLogsByResourceAndEvents(string $resource, array $events): int
+    public function countLogsByResourceAndEvents(string $resource, array $events): mixed
     {
         $results = Authorization::skip(function () use ($resource, $events) {
             return $this->db->count(
@@ -416,7 +416,7 @@ class Audit
      *
      * The $method is applied to each k/v pair
      *
-     * @param array $values
+     * @param array<string,mixed> $values
      * @param string $method
      *
      * @return Query[]
