@@ -11,7 +11,7 @@ use Utopia\Exception;
 
 class Audit
 {
-    const COLLECTION = "audit";
+    const COLLECTION = 'audit';
 
     /**
      * @var Database
@@ -19,7 +19,7 @@ class Audit
     private Database $db;
 
     /**
-     * @param Database $db
+     * @param  Database  $db
      */
     public function __construct(Database $db)
     {
@@ -28,8 +28,8 @@ class Audit
 
     public function setup(): void
     {
-        if (!$this->db->exists($this->db->getDefaultDatabase())) {
-            throw new Exception("You need to create the database before running Audit setup");
+        if (! $this->db->exists($this->db->getDefaultDatabase())) {
+            throw new Exception('You need to create the database before running Audit setup');
         }
 
         $attributes = [
@@ -172,6 +172,7 @@ class Audit
                 'time' => DateTime::now(),
             ]));
         });
+
         return true;
     }
 
@@ -203,6 +204,7 @@ class Audit
                 queries: $queries,
             );
         });
+
         return $result;
     }
 
@@ -221,9 +223,9 @@ class Audit
                 queries: $this->buildQuery(['userId' => $userId], Query::TYPE_EQUAL)
             );
         });
+
         return $result;
     }
-
 
     /**
      * Get All Logs By Resource.
@@ -252,6 +254,7 @@ class Audit
                 queries: $queries,
             );
         });
+
         return $results;
     }
 
@@ -270,6 +273,7 @@ class Audit
                 queries: $this->buildQuery(['resource' => $resource], Query::TYPE_EQUAL)
             );
         });
+
         return $results;
     }
 
@@ -304,6 +308,7 @@ class Audit
                 queries: $queries,
             );
         });
+
         return $results;
     }
 
@@ -326,6 +331,7 @@ class Audit
                 ], Query::TYPE_EQUAL)
             );
         });
+
         return $results;
     }
 
@@ -360,6 +366,7 @@ class Audit
                 queries: $queries,
             );
         });
+
         return $results;
     }
 
@@ -382,14 +389,14 @@ class Audit
                 ], Query::TYPE_EQUAL)
             );
         });
+
         return $results;
     }
 
     /**
      * Delete all logs older than $timestamp seconds
      *
-     * @param string $datetime
-     *
+     * @param  string  $datetime
      * @return bool
      */
     public function cleanup(string $datetime): bool
@@ -399,15 +406,16 @@ class Audit
                 $documents = $this->db->find(
                     collection: Audit::COLLECTION,
                     queries: $this->buildQuery([
-                        'time' => $datetime
+                        'time' => $datetime,
                     ], Query::TYPE_LESSER)
                 );
 
                 foreach ($documents as $document) {
                     $this->db->deleteDocument(Audit::COLLECTION, $document['$id']);
                 }
-            } while (!empty($documents));
+            } while (! empty($documents));
         });
+
         return true;
     }
 
@@ -421,21 +429,23 @@ class Audit
      * @param string $method
      *
      * @return Query[]
+     *
      * @throws Exception
      */
     private function buildQuery(array $values, string $method): array
     {
-        if (!Query::isMethod($method)) {
+        if (! Query::isMethod($method)) {
             throw new Exception('Method not supported');
         }
 
         $query = [];
         foreach ($values as $key => $value) {
-            if (!\is_array($value)) {
+            if (! \is_array($value)) {
                 $value = [$value];
             }
             $query[] = new Query($method, $key, $value);
         }
+
         return $query;
     }
 }

@@ -3,10 +3,10 @@
 namespace Utopia\Tests;
 
 use PDO;
-use Utopia\Audit\Audit;
 use PHPUnit\Framework\TestCase;
-use Utopia\Cache\Cache;
+use Utopia\Audit\Audit;
 use Utopia\Cache\Adapter\None as NoCache;
+use Utopia\Cache\Cache;
 use Utopia\Database\Adapter\MariaDB;
 use Utopia\Database\Database;
 use Utopia\Database\DateTime;
@@ -24,12 +24,12 @@ class AuditTest extends TestCase
 
         $pdo = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $dbPass, MariaDB::getPdoAttributes());
         $cache = new Cache(new NoCache());
-        $database = new Database(new MariaDB($pdo),$cache);
+        $database = new Database(new MariaDB($pdo), $cache);
         $database->setDefaultDatabase('utopiaTests');
         $database->setNamespace('namespace');
 
         $this->audit = new Audit($database);
-        if(!$database->exists('utopiaTests')) {
+        if (! $database->exists('utopiaTests')) {
             $database->create('utopiaTests');
             $this->audit->setup();
         }
@@ -48,7 +48,7 @@ class AuditTest extends TestCase
         $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36';
         $ip = '127.0.0.1';
         $location = 'US';
-        $data = ['key1' => 'value1','key2' => 'value2'];
+        $data = ['key1' => 'value1', 'key2' => 'value2'];
         $this->assertTrue($this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
         $this->assertTrue($this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
         $this->assertTrue($this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
@@ -150,16 +150,16 @@ class AuditTest extends TestCase
         $status = $this->audit->cleanup(DateTime::now());
         $this->assertEquals($status, true);
 
-        // Check that all logs have been deleted 
+        // Check that all logs have been deleted
         $logs = $this->audit->getLogsByUser('userId');
         $this->assertEquals(0, \count($logs));
 
-        // Add three sample logs 
+        // Add three sample logs
         $userId = 'userId';
         $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36';
         $ip = '127.0.0.1';
         $location = 'US';
-        $data = ['key1' => 'value1','key2' => 'value2'];
+        $data = ['key1' => 'value1', 'key2' => 'value2'];
 
         $this->assertEquals($this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data), true);
         sleep(5);
