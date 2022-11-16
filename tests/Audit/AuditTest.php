@@ -39,7 +39,6 @@ class AuditTest extends TestCase
     public function tearDown(): void
     {
         $this->audit->cleanup(DateTime::now());
-        $this->audit = null;
     }
 
     public function createLogs(): void
