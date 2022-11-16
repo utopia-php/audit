@@ -185,8 +185,9 @@ class Audit
      *
      * @return Document[]
      */
-    public function getLogsByUser(string $userId, int $limit = 25, int $offset = 0, Document $orderAfter = null): mixed
+    public function getLogsByUser(string $userId, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
     {
+        /** @var Document[] $result */
         $result = Authorization::skip(function () use ($userId, $limit, $offset, $orderAfter) {
             $queries = $this->buildQuery(['userId' => $userId], Query::TYPE_EQUAL);
 
