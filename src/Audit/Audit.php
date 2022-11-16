@@ -277,7 +277,7 @@ class Audit
      * Get All Logs By User and Events.
      *
      * @param string $userId
-     * @param array<string,mixed> $events
+     * @param array<int,string> $events
      * @param int $limit
      * @param int $offset
      * @param Document|null $orderAfter
@@ -311,7 +311,7 @@ class Audit
      * Get Logs Count By User and Events.
      *
      * @param string $userId
-     * @param array<string,mixed> $events
+     * @param array<int,string> $events
      *
      * @return mixed
      */
@@ -333,7 +333,7 @@ class Audit
      * Get All Logs By Resource and Events.
      *
      * @param string $resource
-     * @param array<string,mixed> $events
+     * @param array<int,string> $events
      * @param int $limit
      * @param int $offset
      * @param Document|null $orderAfter
@@ -367,7 +367,7 @@ class Audit
      * Get All Logs By Resource and Events.
      *
      * @param string $resource
-     * @param array<string,mixed> $events
+     * @param array<int,string> $events
      *
      * @return mixed
      */
