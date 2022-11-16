@@ -183,7 +183,7 @@ class Audit
      * @param int $offset
      * @param Document|null $orderAfter
      *
-     * @return mixed
+     * @return Document[]
      */
     public function getLogsByUser(string $userId, int $limit = 25, int $offset = 0, Document $orderAfter = null): mixed
     {
