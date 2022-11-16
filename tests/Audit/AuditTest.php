@@ -13,14 +13,7 @@ use Utopia\Database\DateTime;
 
 class AuditTest extends TestCase
 {
-    /**
-     * @var Audit
-     * @var Initialized
-     */
-    /* @phpstan-ignore-next-line */
-    protected $audit = null;
-    /* @phpstan-ignore-next-line */
-    protected $initialized = false;
+    protected Audit $audit;
 
     public function setUp(): void
     {
