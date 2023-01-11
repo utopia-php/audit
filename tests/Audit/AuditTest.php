@@ -38,6 +38,7 @@ class AuditTest extends TestCase
             $database->create('utopiaTests');
             $this->audit->setup();
         }
+
         $this->createLogs();
     }
 
@@ -49,14 +50,16 @@ class AuditTest extends TestCase
 
     public function createLogs()
     {
+        $userInternalIdId = '1';
         $userId = 'userId';
         $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36';
         $ip = '127.0.0.1';
         $location = 'US';
         $data = ['key1' => 'value1', 'key2' => 'value2'];
-        $this->assertTrue($this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
-        $this->assertTrue($this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
-        $this->assertTrue($this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
+
+        $this->assertTrue($this->audit->log($userInternalIdId, $userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
+        $this->assertTrue($this->audit->log($userInternalIdId, $userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
+        $this->assertTrue($this->audit->log($userInternalIdId, $userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
     }
 
     public function testGetLogsByUser()
@@ -161,17 +164,18 @@ class AuditTest extends TestCase
         $this->assertEquals(0, \count($logs));
 
         // Add three sample logs
+        $userInternalIdId = '1';
         $userId = 'userId';
         $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36';
         $ip = '127.0.0.1';
         $location = 'US';
         $data = ['key1' => 'value1', 'key2' => 'value2'];
 
-        $this->assertEquals($this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data), true);
+        $this->assertEquals($this->audit->log($userInternalIdId, $userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data), true);
         sleep(5);
-        $this->assertEquals($this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data), true);
+        $this->assertEquals($this->audit->log($userInternalIdId, $userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data), true);
         sleep(5);
-        $this->assertEquals($this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data), true);
+        $this->assertEquals($this->audit->log($userInternalIdId, $userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data), true);
         sleep(5);
 
         // DELETE logs older than 11 seconds and check that status is true
