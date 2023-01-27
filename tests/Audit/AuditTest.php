@@ -30,7 +30,7 @@ class AuditTest extends TestCase
 
         $this->audit = new Audit($database);
         if (! $database->exists('utopiaTests')) {
-            $database->create('utopiaTests');
+            $database->create();
             $this->audit->setup();
         }
         $this->createLogs();
