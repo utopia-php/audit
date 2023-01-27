@@ -6,8 +6,6 @@
     "license": "MIT",
     "minimum-stability": "stable",
     "scripts": {
-        "lint": "./vendor/bin/pint --test",
-        "format": "./vendor/bin/pint",
         "check": "./vendor/bin/phpstan analyse --level 8 src tests"
     },
     "autoload": {
