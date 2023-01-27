@@ -156,14 +156,13 @@ class Audit
      *
      * Add specific event log
      *
-     * @param string $userId
-     * @param string $event
-     * @param string $resource
-     * @param string $userAgent
-     * @param string $ip
-     * @param string $location
-     * @param array<string, mixed>  $data
-     *
+     * @param  string  $userId
+     * @param  string  $event
+     * @param  string  $resource
+     * @param  string  $userAgent
+     * @param  string  $ip
+     * @param  string  $location
+     * @param  array<string, mixed>  $data
      * @return bool
      */
     public function log(string $userInternalId, string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): bool
@@ -189,11 +188,10 @@ class Audit
     /**
      * Get All Logs By User ID.
      *
-     * @param string $userId
-     * @param int $limit
-     * @param int $offset
-     * @param Document|null $orderAfter
-     *
+     * @param  string  $userId
+     * @param  int  $limit
+     * @param  int  $offset
+     * @param  Document|null  $orderAfter
      * @return Document[]
      */
     public function getLogsByUser(string $userId, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
@@ -221,8 +219,7 @@ class Audit
     /**
      * Get Logs Count By User ID.
      *
-     * @param string $userId
-     *
+     * @param  string  $userId
      * @return mixed
      */
     public function countLogsByUser(string $userId): mixed
@@ -240,11 +237,10 @@ class Audit
     /**
      * Get All Logs By Resource.
      *
-     * @param string $resource
-     * @param int $limit
-     * @param int $offset
-     * @param Document|null $orderAfter
-     *
+     * @param  string  $resource
+     * @param  int  $limit
+     * @param  int  $offset
+     * @param  Document|null  $orderAfter
      * @return mixed
      */
     public function getLogsByResource(string $resource, int $limit = 25, int $offset = 0, Document $orderAfter = null): mixed
@@ -271,8 +267,7 @@ class Audit
     /**
      * Get Logs Count By Resource.
      *
-     * @param string $resource
-     *
+     * @param  string  $resource
      * @return mixed
      */
     public function countLogsByResource(string $resource): mixed
@@ -290,12 +285,11 @@ class Audit
     /**
      * Get All Logs By User and Events.
      *
-     * @param string $userId
-     * @param array<int,string> $events
-     * @param int $limit
-     * @param int $offset
-     * @param Document|null $orderAfter
-     *
+     * @param  string  $userId
+     * @param  array<int,string>  $events
+     * @param  int  $limit
+     * @param  int  $offset
+     * @param  Document|null  $orderAfter
      * @return mixed
      */
     public function getLogsByUserAndEvents(string $userId, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): mixed
@@ -325,9 +319,8 @@ class Audit
     /**
      * Get Logs Count By User and Events.
      *
-     * @param string $userId
-     * @param array<int,string> $events
-     *
+     * @param  string  $userId
+     * @param  array<int,string>  $events
      * @return mixed
      */
     public function countLogsByUserAndEvents(string $userId, array $events): mixed
@@ -348,12 +341,11 @@ class Audit
     /**
      * Get All Logs By Resource and Events.
      *
-     * @param string $resource
-     * @param array<int,string> $events
-     * @param int $limit
-     * @param int $offset
-     * @param Document|null $orderAfter
-     *
+     * @param  string  $resource
+     * @param  array<int,string>  $events
+     * @param  int  $limit
+     * @param  int  $offset
+     * @param  Document|null  $orderAfter
      * @return mixed
      */
     public function getLogsByResourceAndEvents(string $resource, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): mixed
@@ -383,9 +375,8 @@ class Audit
     /**
      * Get All Logs By Resource and Events.
      *
-     * @param string $resource
-     * @param array<int,string> $events
-     *
+     * @param  string  $resource
+     * @param  array<int,string>  $events
      * @return mixed
      */
     public function countLogsByResourceAndEvents(string $resource, array $events): mixed
@@ -435,9 +426,8 @@ class Audit
      *
      * The $method is applied to each k/v pair
      *
-     * @param array<string,mixed> $values
-     * @param string $method
-     *
+     * @param  array<string,mixed>  $values
+     * @param  string  $method
      * @return Query[]
      *
      * @throws Exception

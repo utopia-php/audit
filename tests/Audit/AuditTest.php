@@ -146,7 +146,8 @@ class AuditTest extends TestCase
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
     }
 
-    public function testCleanup(): void {
+    public function testCleanup(): void
+    {
         sleep(3);
         // First delete all the logs
         $status = $this->audit->cleanup(DateTime::now());
