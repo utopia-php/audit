@@ -5,6 +5,10 @@ namespace Utopia\Audit;
 use Utopia\Database\Database;
 use Utopia\Database\DateTime;
 use Utopia\Database\Document;
+use Utopia\Database\Exception\Authorization as AuthorizationException;
+use Utopia\Database\Exception\Duplicate as DuplicateException;
+use Utopia\Database\Exception\Limit as LimitException;
+use Utopia\Database\Exception\Structure as StructureException;
 use Utopia\Database\Query;
 use Utopia\Database\Validator\Authorization;
 use Utopia\Exception;
@@ -26,6 +30,11 @@ class Audit
         $this->db = $db;
     }
 
+    /**
+     * @throws LimitException
+     * @throws DuplicateException
+     * @throws \Exception
+     */
     public function setup(): void
     {
         if (! $this->db->exists($this->db->getDefaultDatabase())) {
@@ -156,6 +165,7 @@ class Audit
      *
      * Add specific event log
      *
+     * @param  string  $userInternalId
      * @param  string  $userId
      * @param  string  $event
      * @param  string  $resource
@@ -164,6 +174,10 @@ class Audit
      * @param  string  $location
      * @param  array<string, mixed>  $data
      * @return bool
+     *
+     * @throws AuthorizationException
+     * @throws StructureException
+     * @throws \Exception
      */
     public function log(string $userInternalId, string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): bool
     {
@@ -189,21 +203,26 @@ class Audit
      * Get All Logs By User ID.
      *
      * @param  string  $userId
-     * @param  int  $limit
-     * @param  int  $offset
+     * @param  int|null  $limit
+     * @param  int|null  $offset
      * @param  Document|null  $orderAfter
-     * @return Document[]
+     * @return array<Document>
+     *
+     * @throws \Exception
      */
-    public function getLogsByUser(string $userId, int $limit = 25, int $offset = 0, Document $orderAfter = null): array
+    public function getLogsByUser(string $userId, ?int $limit = null, ?int $offset = null, ?Document $orderAfter = null): array
     {
-        /** @var Document[] $result */
+        /** @var array<Document> $result */
         $result = Authorization::skip(function () use ($userId, $limit, $offset, $orderAfter) {
-            $queries = $this->buildQuery(['userId' => $userId], Query::TYPE_EQUAL);
+            $queries[] = Query::equal('userId', [$userId]);
 
-            $queries[] = Query::limit($limit);
-            $queries[] = Query::offset($offset);
-            $queries[] = Query::orderDesc('');
-            if ($orderAfter) {
+            if (! \is_null($limit)) {
+                $queries[] = Query::limit($limit);
+            }
+            if (! \is_null($offset)) {
+                $queries[] = Query::offset($offset);
+            }
+            if (! \is_null($orderAfter)) {
                 $queries[] = Query::cursorAfter($orderAfter);
             }
 
@@ -220,14 +239,17 @@ class Audit
      * Get Logs Count By User ID.
      *
      * @param  string  $userId
-     * @return mixed
+     * @return int
+     *
+     * @throws \Exception
      */
-    public function countLogsByUser(string $userId): mixed
+    public function countLogsByUser(string $userId): int
     {
+        /** @var int $result */
         $result = Authorization::skip(function () use ($userId) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
-                queries: $this->buildQuery(['userId' => $userId], Query::TYPE_EQUAL)
+                queries: [Query::equal('userId', [$userId])]
             );
         });
 
@@ -238,20 +260,26 @@ class Audit
      * Get All Logs By Resource.
      *
      * @param  string  $resource
-     * @param  int  $limit
-     * @param  int  $offset
+     * @param  int|null  $limit
+     * @param  int|null  $offset
      * @param  Document|null  $orderAfter
-     * @return mixed
+     * @return array<Document>
+     *
+     * @throws \Exception
      */
-    public function getLogsByResource(string $resource, int $limit = 25, int $offset = 0, Document $orderAfter = null): mixed
+    public function getLogsByResource(string $resource, ?int $limit = null, ?int $offset = null, ?Document $orderAfter = null): array
     {
-        $results = Authorization::skip(function () use ($resource, $limit, $offset, $orderAfter) {
-            $queries = $this->buildQuery(['resource' => $resource], Query::TYPE_EQUAL);
+        /** @var array<Document> $result */
+        $result = Authorization::skip(function () use ($resource, $limit, $offset, $orderAfter) {
+            $queries[] = Query::equal('resource', [$resource]);
 
-            $queries[] = Query::limit($limit);
-            $queries[] = Query::offset($offset);
-            $queries[] = Query::orderDesc('');
-            if ($orderAfter) {
+            if (! \is_null($limit)) {
+                $queries[] = Query::limit($limit);
+            }
+            if (! \is_null($offset)) {
+                $queries[] = Query::offset($offset);
+            }
+            if (! \is_null($orderAfter)) {
                 $queries[] = Query::cursorAfter($orderAfter);
             }
 
@@ -261,25 +289,28 @@ class Audit
             );
         });
 
-        return $results;
+        return $result;
     }
 
     /**
      * Get Logs Count By Resource.
      *
      * @param  string  $resource
-     * @return mixed
+     * @return int
+     *
+     * @throws \Exception
      */
-    public function countLogsByResource(string $resource): mixed
+    public function countLogsByResource(string $resource): int
     {
-        $results = Authorization::skip(function () use ($resource) {
+        /** @var int $result */
+        $result = Authorization::skip(function () use ($resource) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
-                queries: $this->buildQuery(['resource' => $resource], Query::TYPE_EQUAL)
+                queries: [Query::equal('resource', [$resource])]
             );
         });
 
-        return $results;
+        return $result;
     }
 
     /**
@@ -287,23 +318,27 @@ class Audit
      *
      * @param  string  $userId
      * @param  array<int,string>  $events
-     * @param  int  $limit
-     * @param  int  $offset
+     * @param  int|null  $limit
+     * @param  int|null  $offset
      * @param  Document|null  $orderAfter
-     * @return mixed
+     * @return array<Document>
+     *
+     * @throws \Exception
      */
-    public function getLogsByUserAndEvents(string $userId, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): mixed
+    public function getLogsByUserAndEvents(string $userId, array $events, ?int $limit = null, ?int $offset = null, ?Document $orderAfter = null): array
     {
-        $results = Authorization::skip(function () use ($userId, $events, $limit, $offset, $orderAfter) {
-            $queries = $this->buildQuery([
-                'userId' => $userId,
-                'event' => $events,
-            ], Query::TYPE_EQUAL);
+        /** @var array<Document> $result */
+        $result = Authorization::skip(function () use ($userId, $events, $limit, $offset, $orderAfter) {
+            $queries[] = Query::equal('userId', [$userId]);
+            $queries[] = Query::equal('event', $events);
 
-            $queries[] = Query::limit($limit);
-            $queries[] = Query::offset($offset);
-            $queries[] = Query::orderDesc('');
-            if ($orderAfter) {
+            if (! \is_null($limit)) {
+                $queries[] = Query::limit($limit);
+            }
+            if (! \is_null($offset)) {
+                $queries[] = Query::offset($offset);
+            }
+            if (! \is_null($orderAfter)) {
                 $queries[] = Query::cursorAfter($orderAfter);
             }
 
@@ -313,7 +348,7 @@ class Audit
             );
         });
 
-        return $results;
+        return $result;
     }
 
     /**
@@ -321,21 +356,24 @@ class Audit
      *
      * @param  string  $userId
      * @param  array<int,string>  $events
-     * @return mixed
+     * @return int
+     *
+     * @throws \Exception
      */
-    public function countLogsByUserAndEvents(string $userId, array $events): mixed
+    public function countLogsByUserAndEvents(string $userId, array $events): int
     {
-        $results = Authorization::skip(function () use ($userId, $events) {
+        /** @var int $result */
+        $result = Authorization::skip(function () use ($userId, $events) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
-                queries: $this->buildQuery([
-                    'userId' => $userId,
-                    'event' => $events,
-                ], Query::TYPE_EQUAL)
+                queries: [
+                    Query::equal('userId', [$userId]),
+                    Query::equal('event', $events),
+                ]
             );
         });
 
-        return $results;
+        return $result;
     }
 
     /**
@@ -343,23 +381,27 @@ class Audit
      *
      * @param  string  $resource
      * @param  array<int,string>  $events
-     * @param  int  $limit
-     * @param  int  $offset
+     * @param  int|null  $limit
+     * @param  int|null  $offset
      * @param  Document|null  $orderAfter
-     * @return mixed
+     * @return array<Document>
+     *
+     * @throws \Exception
      */
-    public function getLogsByResourceAndEvents(string $resource, array $events, int $limit = 25, int $offset = 0, Document $orderAfter = null): mixed
+    public function getLogsByResourceAndEvents(string $resource, array $events, ?int $limit = null, ?int $offset = null, ?Document $orderAfter = null): array
     {
-        $results = Authorization::skip(function () use ($resource, $events, $limit, $offset, $orderAfter) {
-            $queries = $this->buildQuery([
-                'resource' => $resource,
-                'event' => $events,
-            ], Query::TYPE_EQUAL);
+        /** @var array<Document> $result */
+        $result = Authorization::skip(function () use ($resource, $events, $limit, $offset, $orderAfter) {
+            $queries[] = Query::equal('resource', [$resource]);
+            $queries[] = Query::equal('event', $events);
 
-            $queries[] = Query::limit($limit);
-            $queries[] = Query::offset($offset);
-            $queries[] = Query::orderDesc('');
-            if ($orderAfter) {
+            if (! \is_null($limit)) {
+                $queries[] = Query::limit($limit);
+            }
+            if (! \is_null($offset)) {
+                $queries[] = Query::offset($offset);
+            }
+            if (! \is_null($orderAfter)) {
                 $queries[] = Query::cursorAfter($orderAfter);
             }
 
@@ -369,7 +411,7 @@ class Audit
             );
         });
 
-        return $results;
+        return $result;
     }
 
     /**
@@ -377,21 +419,24 @@ class Audit
      *
      * @param  string  $resource
      * @param  array<int,string>  $events
-     * @return mixed
+     * @return int
+     *
+     * @throws \Exception
      */
-    public function countLogsByResourceAndEvents(string $resource, array $events): mixed
+    public function countLogsByResourceAndEvents(string $resource, array $events): int
     {
-        $results = Authorization::skip(function () use ($resource, $events) {
+        /** @var int $result */
+        $result = Authorization::skip(function () use ($resource, $events) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
-                queries: $this->buildQuery([
-                    'resource' => $resource,
-                    'event' => $events,
-                ], Query::TYPE_EQUAL)
+                queries: [
+                    Query::equal('resource', [$resource]),
+                    Query::equal('event', $events),
+                ]
             );
         });
 
-        return $results;
+        return $result;
     }
 
     /**
@@ -399,6 +444,9 @@ class Audit
      *
      * @param  string  $datetime
      * @return bool
+     *
+     * @throws AuthorizationException
+     * @throws \Exception
      */
     public function cleanup(string $datetime): bool
     {
@@ -406,9 +454,9 @@ class Audit
             do {
                 $documents = $this->db->find(
                     collection: Audit::COLLECTION,
-                    queries: $this->buildQuery([
-                        'time' => $datetime,
-                    ], Query::TYPE_LESSER)
+                    queries: [
+                        Query::lessThan('time', [$datetime]),
+                    ]
                 );
 
                 foreach ($documents as $document) {
@@ -418,34 +466,5 @@ class Audit
         });
 
         return true;
-    }
-
-    /**
-     * Builds an array of Query objects from
-     * an assoc array of $key => $value pairs
-     *
-     * The $method is applied to each k/v pair
-     *
-     * @param  array<string,mixed>  $values
-     * @param  string  $method
-     * @return Query[]
-     *
-     * @throws Exception
-     */
-    private function buildQuery(array $values, string $method): array
-    {
-        if (! Query::isMethod($method)) {
-            throw new Exception('Method not supported');
-        }
-
-        $query = [];
-        foreach ($values as $key => $value) {
-            if (! \is_array($value)) {
-                $value = [$value];
-            }
-            $query[] = new Query($method, $key, $value);
-        }
-
-        return $query;
     }
 }
