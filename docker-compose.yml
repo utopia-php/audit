@@ -10,7 +10,7 @@ services:
     ports:
       - "9306:3306"
 
-  php8:
+  tests:
     build:
       context: .
       dockerfile: ./Dockerfile
