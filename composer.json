@@ -13,6 +13,9 @@
     "autoload": {
         "psr-4": {"Utopia\\Audit\\": "src/Audit"}
     },
+    "autoload-dev": {
+        "psr-4": {"Utopia\\Tests\\": "tests/Audit"}
+    },
     "require": {
         "php": ">=8.0",
         "ext-pdo": "*",
