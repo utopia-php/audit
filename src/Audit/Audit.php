@@ -7,7 +7,6 @@ use Utopia\Database\DateTime;
 use Utopia\Database\Document;
 use Utopia\Database\Exception\Authorization as AuthorizationException;
 use Utopia\Database\Exception\Duplicate as DuplicateException;
-use Utopia\Database\Exception\Limit as LimitException;
 use Utopia\Database\Exception\Structure as StructureException;
 use Utopia\Database\Query;
 use Utopia\Database\Validator\Authorization;
@@ -164,14 +163,14 @@ class Audit
      *
      * Add specific event log
      *
-     * @param string $userInternalId
-     * @param string $userId
-     * @param string $event
-     * @param string $resource
-     * @param string $userAgent
-     * @param string $ip
-     * @param string $location
-     * @param array<string, mixed> $data
+     * @param  string  $userInternalId
+     * @param  string  $userId
+     * @param  string  $event
+     * @param  string  $resource
+     * @param  string  $userAgent
+     * @param  string  $ip
+     * @param  string  $location
+     * @param  array<string, mixed>  $data
      * @return bool
      *
      * @throws AuthorizationException
