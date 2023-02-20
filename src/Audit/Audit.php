@@ -31,7 +31,6 @@ class Audit
     }
 
     /**
-     * @throws LimitException
      * @throws DuplicateException
      * @throws \Exception
      */
@@ -165,19 +164,20 @@ class Audit
      *
      * Add specific event log
      *
-     * @param  string  $userInternalId
-     * @param  string  $userId
-     * @param  string  $event
-     * @param  string  $resource
-     * @param  string  $userAgent
-     * @param  string  $ip
-     * @param  string  $location
-     * @param  array<string, mixed>  $data
+     * @param string $userInternalId
+     * @param string $userId
+     * @param string $event
+     * @param string $resource
+     * @param string $userAgent
+     * @param string $ip
+     * @param string $location
+     * @param array<string, mixed> $data
      * @return bool
      *
      * @throws AuthorizationException
      * @throws StructureException
      * @throws \Exception
+     * @throws \Throwable
      */
     public function log(string $userInternalId, string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): bool
     {
@@ -460,7 +460,7 @@ class Audit
                 );
 
                 foreach ($documents as $document) {
-                    $this->db->deleteDocument(Audit::COLLECTION, $document['$id']);
+                    $this->db->deleteDocument(Audit::COLLECTION, $document->getId());
                 }
             } while (! empty($documents));
         });
