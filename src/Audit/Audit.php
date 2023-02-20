@@ -455,7 +455,7 @@ class Audit
                 $documents = $this->db->find(
                     collection: Audit::COLLECTION,
                     queries: [
-                        Query::lessThan('time', [$datetime]),
+                        Query::lessThan('time', $datetime),
                     ]
                 );
 
