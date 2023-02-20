@@ -214,6 +214,7 @@ class Audit
         /** @var array<Document> $result */
         $result = Authorization::skip(function () use ($userId, $limit, $offset, $orderAfter) {
             $queries[] = Query::equal('userId', [$userId]);
+            $queries[] = Query::orderDesc('');
 
             if (! \is_null($limit)) {
                 $queries[] = Query::limit($limit);
@@ -271,6 +272,7 @@ class Audit
         /** @var array<Document> $result */
         $result = Authorization::skip(function () use ($resource, $limit, $offset, $orderAfter) {
             $queries[] = Query::equal('resource', [$resource]);
+            $queries[] = Query::orderDesc('');
 
             if (! \is_null($limit)) {
                 $queries[] = Query::limit($limit);
@@ -330,6 +332,7 @@ class Audit
         $result = Authorization::skip(function () use ($userId, $events, $limit, $offset, $orderAfter) {
             $queries[] = Query::equal('userId', [$userId]);
             $queries[] = Query::equal('event', $events);
+            $queries[] = Query::orderDesc('');
 
             if (! \is_null($limit)) {
                 $queries[] = Query::limit($limit);
@@ -393,6 +396,7 @@ class Audit
         $result = Authorization::skip(function () use ($resource, $events, $limit, $offset, $orderAfter) {
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::equal('event', $events);
+            $queries[] = Query::orderDesc('');
 
             if (! \is_null($limit)) {
                 $queries[] = Query::limit($limit);
