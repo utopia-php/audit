@@ -267,7 +267,7 @@ class Audit
      *
      * @throws \Exception
      */
-    public function getLogsByResource(string $resource, ?int $limit = null, ?int $offset = null, ?Document $orderAfter = null): array
+    public function getLogsByResource(string $resource, ?int $limit = 25, ?int $offset = null, ?Document $orderAfter = null): array
     {
         /** @var array<Document> $result */
         $result = Authorization::skip(function () use ($resource, $limit, $offset, $orderAfter) {
