@@ -2,7 +2,6 @@
 
 namespace Utopia\Audit;
 
-use Exception as GlobalException;
 use Utopia\Database\Database;
 use Utopia\Database\DateTime;
 use Utopia\Database\Document;
