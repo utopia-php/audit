@@ -2,6 +2,7 @@
 
 namespace Utopia\Audit;
 
+use Exception as GlobalException;
 use Utopia\Database\Database;
 use Utopia\Database\DateTime;
 use Utopia\Database\Document;
@@ -16,20 +17,18 @@ class Audit
 {
     const COLLECTION = 'audit';
 
-    /**
-     * @var Database
-     */
     private Database $db;
 
-    /**
-     * @param  Database  $db
-     */
     public function __construct(Database $db)
     {
         $this->db = $db;
     }
 
     /**
+     * Setup database structure.
+     *
+     * @return void
+     *
      * @throws DuplicateException
      * @throws \Exception
      */
@@ -159,9 +158,7 @@ class Audit
     }
 
     /**
-     * Log.
-     *
-     * Add specific event log
+     * Add event log.
      *
      * @param  string  $userInternalId
      * @param  string  $userId
@@ -170,7 +167,7 @@ class Audit
      * @param  string  $userAgent
      * @param  string  $ip
      * @param  string  $location
-     * @param  array<string, mixed>  $data
+     * @param  array<string,mixed>  $data
      * @return bool
      *
      * @throws AuthorizationException
@@ -199,7 +196,7 @@ class Audit
     }
 
     /**
-     * Get All Logs By User ID.
+     * Get all logs by user ID.
      *
      * @param  string  $userId
      * @param  int|null  $limit
@@ -236,28 +233,26 @@ class Audit
     }
 
     /**
-     * Get Logs Count By User ID.
+     * Count logs by user ID.
      *
      * @param  string  $userId
      * @return int
-     *
-     * @throws \Exception
      */
     public function countLogsByUser(string $userId): int
     {
-        /** @var int $result */
-        $result = Authorization::skip(function () use ($userId) {
+        /** @var int $count */
+        $count = Authorization::skip(function () use ($userId) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [Query::equal('userId', [$userId])]
             );
         });
 
-        return $result;
+        return $count;
     }
 
     /**
-     * Get All Logs By Resource.
+     * Get all logs by resource.
      *
      * @param  string  $resource
      * @param  int|null  $limit
@@ -294,7 +289,7 @@ class Audit
     }
 
     /**
-     * Get Logs Count By Resource.
+     * Count logs by resource.
      *
      * @param  string  $resource
      * @return int
@@ -303,19 +298,19 @@ class Audit
      */
     public function countLogsByResource(string $resource): int
     {
-        /** @var int $result */
-        $result = Authorization::skip(function () use ($resource) {
+        /** @var int $count */
+        $count = Authorization::skip(function () use ($resource) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [Query::equal('resource', [$resource])]
             );
         });
 
-        return $result;
+        return $count;
     }
 
     /**
-     * Get All Logs By User and Events.
+     * Get logs by user and events.
      *
      * @param  string  $userId
      * @param  array<int,string>  $events
@@ -354,7 +349,7 @@ class Audit
     }
 
     /**
-     * Get Logs Count By User and Events.
+     * Count logs by user and events.
      *
      * @param  string  $userId
      * @param  array<int,string>  $events
@@ -364,8 +359,8 @@ class Audit
      */
     public function countLogsByUserAndEvents(string $userId, array $events): int
     {
-        /** @var int $result */
-        $result = Authorization::skip(function () use ($userId, $events) {
+        /** @var int $count */
+        $count = Authorization::skip(function () use ($userId, $events) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [
@@ -375,11 +370,11 @@ class Audit
             );
         });
 
-        return $result;
+        return $count;
     }
 
     /**
-     * Get All Logs By Resource and Events.
+     * Get logs by resource and events.
      *
      * @param  string  $resource
      * @param  array<int,string>  $events
@@ -418,7 +413,7 @@ class Audit
     }
 
     /**
-     * Get All Logs By Resource and Events.
+     * Count logs by resource and events.
      *
      * @param  string  $resource
      * @param  array<int,string>  $events
@@ -428,8 +423,8 @@ class Audit
      */
     public function countLogsByResourceAndEvents(string $resource, array $events): int
     {
-        /** @var int $result */
-        $result = Authorization::skip(function () use ($resource, $events) {
+        /** @var int $count */
+        $count = Authorization::skip(function () use ($resource, $events) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [
@@ -439,11 +434,11 @@ class Audit
             );
         });
 
-        return $result;
+        return $count;
     }
 
     /**
-     * Delete all logs older than $timestamp seconds
+     * Delete all logs older than `$timestamp` seconds
      *
      * @param  string  $datetime
      * @return bool
