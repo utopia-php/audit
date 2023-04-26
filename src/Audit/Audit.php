@@ -14,7 +14,7 @@ use Utopia\Exception;
 
 class Audit
 {
-    const COLLECTION = 'audit';
+    public const COLLECTION = 'audit';
 
     private Database $db;
 
