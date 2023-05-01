@@ -35,6 +35,7 @@ class Audit
         $attributes = [
             new Document([
                 '$id' => 'userInternalId',
+                'key' => 'userInternalId',
                 'type' => Database::VAR_STRING,
                 'size' => Database::LENGTH_KEY,
                 'required' => true,
@@ -44,6 +45,7 @@ class Audit
             ]),
             new Document([
                 '$id' => 'userId',
+                'key' => 'userId',
                 'type' => Database::VAR_STRING,
                 'size' => Database::LENGTH_KEY,
                 'required' => true,
@@ -53,6 +55,7 @@ class Audit
             ]),
             new Document([
                 '$id' => 'event',
+                'key' => 'event',
                 'type' => Database::VAR_STRING,
                 'size' => 255,
                 'required' => true,
@@ -62,6 +65,7 @@ class Audit
             ]),
             new Document([
                 '$id' => 'resource',
+                'key' => 'resource',
                 'type' => Database::VAR_STRING,
                 'size' => 255,
                 'required' => false,
@@ -71,6 +75,7 @@ class Audit
             ]),
             new Document([
                 '$id' => 'userAgent',
+                'key' => 'userAgent',
                 'type' => Database::VAR_STRING,
                 'size' => 65534,
                 'required' => true,
@@ -80,6 +85,7 @@ class Audit
             ]),
             new Document([
                 '$id' => 'ip',
+                'key' => 'ip',
                 'type' => Database::VAR_STRING,
                 'size' => 45,
                 'required' => true,
@@ -89,6 +95,7 @@ class Audit
             ]),
             new Document([
                 '$id' => 'location',
+                'key' => 'location',
                 'type' => Database::VAR_STRING,
                 'size' => 45,
                 'required' => false,
@@ -98,6 +105,7 @@ class Audit
             ]),
             new Document([
                 '$id' => 'time',
+                'key' => 'time',
                 'type' => Database::VAR_DATETIME,
                 'format' => '',
                 'size' => 0,
@@ -108,6 +116,7 @@ class Audit
             ]),
             new Document([
                 '$id' => 'data',
+                'key' => 'data',
                 'type' => Database::VAR_STRING,
                 'size' => 16777216,
                 'required' => false,
