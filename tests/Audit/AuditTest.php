@@ -13,12 +13,7 @@ use Utopia\Database\DateTime;
 
 class AuditTest extends TestCase
 {
-    /**
-     * @var Audit
-     */
-    protected $audit = null;
-
-    protected $initialized = false;
+    protected Audit $audit;
 
     public function setUp(): void
     {
@@ -35,7 +30,7 @@ class AuditTest extends TestCase
 
         $this->audit = new Audit($database);
         if (! $database->exists('utopiaTests')) {
-            $database->create('utopiaTests');
+            $database->create();
             $this->audit->setup();
         }
 
@@ -45,10 +40,9 @@ class AuditTest extends TestCase
     public function tearDown(): void
     {
         $this->audit->cleanup(DateTime::now());
-        $this->audit = null;
     }
 
-    public function createLogs()
+    public function createLogs(): void
     {
         $userInternalIdId = '1';
         $userId = 'userId';
@@ -62,7 +56,7 @@ class AuditTest extends TestCase
         $this->assertTrue($this->audit->log($userInternalIdId, $userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
     }
 
-    public function testGetLogsByUser()
+    public function testGetLogsByUser(): void
     {
         $logs = $this->audit->getLogsByUser('userId');
         $this->assertEquals(3, \count($logs));
@@ -79,7 +73,7 @@ class AuditTest extends TestCase
         $this->assertEquals($logs2[0]->getId(), $logs[1]->getId());
     }
 
-    public function testGetLogsByUserAndEvents()
+    public function testGetLogsByUserAndEvents(): void
     {
         $logs1 = $this->audit->getLogsByUserAndEvents('userId', ['update']);
         $logs2 = $this->audit->getLogsByUserAndEvents('userId', ['update', 'delete']);
@@ -104,7 +98,7 @@ class AuditTest extends TestCase
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
     }
 
-    public function testGetLogsByResourceAndEvents()
+    public function testGetLogsByResourceAndEvents(): void
     {
         $logs1 = $this->audit->getLogsByResourceAndEvents('database/document/1', ['update']);
         $logs2 = $this->audit->getLogsByResourceAndEvents('database/document/2', ['update', 'delete']);
@@ -129,7 +123,7 @@ class AuditTest extends TestCase
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
     }
 
-    public function testGetLogsByResource()
+    public function testGetLogsByResource(): void
     {
         $logs1 = $this->audit->getLogsByResource('database/document/1');
         $logs2 = $this->audit->getLogsByResource('database/document/2');
@@ -152,7 +146,7 @@ class AuditTest extends TestCase
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
     }
 
-    public function testCleanup()
+    public function testCleanup(): void
     {
         sleep(3);
         // First delete all the logs
