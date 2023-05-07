@@ -39,15 +39,6 @@ class Audit
 
         $attributes = [
             new Document([
-                '$id' => 'userInternalId',
-                'type' => Database::VAR_STRING,
-                'size' => Database::LENGTH_KEY,
-                'required' => true,
-                'signed' => true,
-                'array' => false,
-                'filters' => [],
-            ]),
-            new Document([
                 '$id' => 'userId',
                 'type' => Database::VAR_STRING,
                 'size' => Database::LENGTH_KEY,
@@ -159,7 +150,6 @@ class Audit
     /**
      * Add event log.
      *
-     * @param  string  $userInternalId
      * @param  string  $userId
      * @param  string  $event
      * @param  string  $resource
@@ -174,12 +164,11 @@ class Audit
      * @throws \Exception
      * @throws \Throwable
      */
-    public function log(string $userInternalId, string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): bool
+    public function log(string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): bool
     {
-        Authorization::skip(function () use ($userId, $userInternalId, $event, $resource, $userAgent, $ip, $location, $data) {
+        Authorization::skip(function () use ($userId, $event, $resource, $userAgent, $ip, $location, $data) {
             $this->db->createDocument(Audit::COLLECTION, new Document([
                 '$permissions' => [],
-                'userInternalId' => $userInternalId,
                 'userId' => $userId,
                 'event' => $event,
                 'resource' => $resource,
