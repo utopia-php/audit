@@ -144,7 +144,11 @@ class Audit
             ]),
         ];
 
-        $this->db->createCollection(Audit::COLLECTION, $attributes, $indexes);
+        try {
+            $this->db->createCollection(Audit::COLLECTION, $attributes, $indexes);
+        } catch (DuplicateException) {
+            // Collection already exists
+        }
     }
 
     /**
