@@ -33,7 +33,7 @@ class Audit
      */
     public function setup(): void
     {
-        if (! $this->db->exists($this->db->getDefaultDatabase())) {
+        if (! $this->db->exists($this->db->getDatabase())) {
             throw new Exception('You need to create the database before running Audit setup');
         }
 
