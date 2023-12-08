@@ -25,7 +25,7 @@ class AuditTest extends TestCase
         $pdo = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $dbPass, MariaDB::getPdoAttributes());
         $cache = new Cache(new NoCache());
         $database = new Database(new MariaDB($pdo), $cache);
-        $database->setDefaultDatabase('utopiaTests');
+        $database->setDatabase('utopiaTests');
         $database->setNamespace('namespace');
 
         $this->audit = new Audit($database);
