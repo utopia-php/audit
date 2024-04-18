@@ -2,6 +2,8 @@
 
 namespace Utopia\Audit;
 
+use Exception;
+use Throwable;
 use Utopia\Database\Database;
 use Utopia\Database\DateTime;
 use Utopia\Database\Document;
@@ -9,8 +11,6 @@ use Utopia\Database\Exception\Authorization as AuthorizationException;
 use Utopia\Database\Exception\Duplicate as DuplicateException;
 use Utopia\Database\Exception\Structure as StructureException;
 use Utopia\Database\Query;
-use Utopia\Database\Validator\Authorization;
-use Utopia\Exception;
 
 class Audit
 {
@@ -28,12 +28,11 @@ class Audit
      *
      * @return void
      *
-     * @throws DuplicateException
-     * @throws \Exception
+     * @throws Exception
      */
     public function setup(): void
     {
-        if (! $this->db->exists($this->db->getDatabase())) {
+        if (!$this->db->exists($this->db->getDatabase())) {
             throw new Exception('You need to create the database before running Audit setup');
         }
 
@@ -165,12 +164,12 @@ class Audit
      *
      * @throws AuthorizationException
      * @throws StructureException
-     * @throws \Exception
-     * @throws \Throwable
+     * @throws Exception
+     * @throws Throwable
      */
     public function log(string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): bool
     {
-        Authorization::skip(function () use ($userId, $event, $resource, $userAgent, $ip, $location, $data) {
+        $this->db->getAuthorization()->skip(function () use ($userId, $event, $resource, $userAgent, $ip, $location, $data) {
             $this->db->createDocument(Audit::COLLECTION, new Document([
                 '$permissions' => [],
                 'userId' => $userId,
@@ -196,12 +195,12 @@ class Audit
      * @param  Document|null  $orderAfter
      * @return array<Document>
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function getLogsByUser(string $userId, ?int $limit = null, ?int $offset = null, ?Document $orderAfter = null): array
     {
         /** @var array<Document> $result */
-        $result = Authorization::skip(function () use ($userId, $limit, $offset, $orderAfter) {
+        $result = $this->db->getAuthorization()->skip(function () use ($userId, $limit, $offset, $orderAfter) {
             $queries[] = Query::equal('userId', [$userId]);
             $queries[] = Query::orderDesc('');
 
@@ -233,7 +232,7 @@ class Audit
     public function countLogsByUser(string $userId): int
     {
         /** @var int $count */
-        $count = Authorization::skip(function () use ($userId) {
+        $count = $this->db->getAuthorization()->skip(function () use ($userId) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [Query::equal('userId', [$userId])]
@@ -252,12 +251,12 @@ class Audit
      * @param  Document|null  $orderAfter
      * @return array<Document>
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function getLogsByResource(string $resource, ?int $limit = 25, ?int $offset = null, ?Document $orderAfter = null): array
     {
         /** @var array<Document> $result */
-        $result = Authorization::skip(function () use ($resource, $limit, $offset, $orderAfter) {
+        $result = $this->db->getAuthorization()->skip(function () use ($resource, $limit, $offset, $orderAfter) {
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::orderDesc('');
 
@@ -286,12 +285,12 @@ class Audit
      * @param  string  $resource
      * @return int
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function countLogsByResource(string $resource): int
     {
         /** @var int $count */
-        $count = Authorization::skip(function () use ($resource) {
+        $count = $this->db->getAuthorization()->skip(function () use ($resource) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [Query::equal('resource', [$resource])]
@@ -311,12 +310,12 @@ class Audit
      * @param  Document|null  $orderAfter
      * @return array<Document>
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function getLogsByUserAndEvents(string $userId, array $events, ?int $limit = null, ?int $offset = null, ?Document $orderAfter = null): array
     {
         /** @var array<Document> $result */
-        $result = Authorization::skip(function () use ($userId, $events, $limit, $offset, $orderAfter) {
+        $result = $this->db->getAuthorization()->skip(function () use ($userId, $events, $limit, $offset, $orderAfter) {
             $queries[] = Query::equal('userId', [$userId]);
             $queries[] = Query::equal('event', $events);
             $queries[] = Query::orderDesc('');
@@ -347,12 +346,12 @@ class Audit
      * @param  array<int,string>  $events
      * @return int
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function countLogsByUserAndEvents(string $userId, array $events): int
     {
         /** @var int $count */
-        $count = Authorization::skip(function () use ($userId, $events) {
+        $count = $this->db->getAuthorization()->skip(function () use ($userId, $events) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [
@@ -375,12 +374,12 @@ class Audit
      * @param  Document|null  $orderAfter
      * @return array<Document>
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function getLogsByResourceAndEvents(string $resource, array $events, ?int $limit = null, ?int $offset = null, ?Document $orderAfter = null): array
     {
         /** @var array<Document> $result */
-        $result = Authorization::skip(function () use ($resource, $events, $limit, $offset, $orderAfter) {
+        $result = $this->db->getAuthorization()->skip(function () use ($resource, $events, $limit, $offset, $orderAfter) {
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::equal('event', $events);
             $queries[] = Query::orderDesc('');
@@ -411,12 +410,12 @@ class Audit
      * @param  array<int,string>  $events
      * @return int
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function countLogsByResourceAndEvents(string $resource, array $events): int
     {
         /** @var int $count */
-        $count = Authorization::skip(function () use ($resource, $events) {
+        $count = $this->db->getAuthorization()->skip(function () use ($resource, $events) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [
@@ -436,11 +435,11 @@ class Audit
      * @return bool
      *
      * @throws AuthorizationException
-     * @throws \Exception
+     * @throws Throwable
      */
     public function cleanup(string $datetime): bool
     {
-        Authorization::skip(function () use ($datetime) {
+        $this->db->getAuthorization()->skip(function () use ($datetime) {
             do {
                 $documents = $this->db->find(
                     collection: Audit::COLLECTION,
