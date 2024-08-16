@@ -18,7 +18,7 @@
     },
     "require": {
         "php": ">=8.0",
-        "utopia-php/database": "0.50.*"
+        "utopia-php/database": "0.51.*"
     },
     "require-dev": {
         "phpunit/phpunit": "^9.3",
