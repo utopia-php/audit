@@ -16,6 +16,103 @@ class Audit
 {
     public const COLLECTION = 'audit';
 
+    public const ATTRIBUTES = [
+        [
+            '$id' => 'userId',
+            'type' => Database::VAR_STRING,
+            'size' => Database::LENGTH_KEY,
+            'required' => true,
+            'signed' => true,
+            'array' => false,
+            'filters' => [],
+        ], [
+            '$id' => 'event',
+            'type' => Database::VAR_STRING,
+            'size' => 255,
+            'required' => true,
+            'signed' => true,
+            'array' => false,
+            'filters' => [],
+        ], [
+            '$id' => 'resource',
+            'type' => Database::VAR_STRING,
+            'size' => 255,
+            'required' => false,
+            'signed' => true,
+            'array' => false,
+            'filters' => [],
+        ], [
+            '$id' => 'userAgent',
+            'type' => Database::VAR_STRING,
+            'size' => 65534,
+            'required' => true,
+            'signed' => true,
+            'array' => false,
+            'filters' => [],
+        ], [
+            '$id' => 'ip',
+            'type' => Database::VAR_STRING,
+            'size' => 45,
+            'required' => true,
+            'signed' => true,
+            'array' => false,
+            'filters' => [],
+        ], [
+            '$id' => 'location',
+            'type' => Database::VAR_STRING,
+            'size' => 45,
+            'required' => false,
+            'signed' => true,
+            'array' => false,
+            'filters' => [],
+        ], [
+            '$id' => 'time',
+            'type' => Database::VAR_DATETIME,
+            'format' => '',
+            'size' => 0,
+            'signed' => true,
+            'required' => false,
+            'array' => false,
+            'filters' => ['datetime'],
+        ], [
+            '$id' => 'data',
+            'type' => Database::VAR_STRING,
+            'size' => 16777216,
+            'required' => false,
+            'signed' => true,
+            'array' => false,
+            'filters' => ['json'],
+        ],
+    ];
+
+    public const INDEXES = [
+        [
+            '$id' => 'index2',
+            'type' => Database::INDEX_KEY,
+            'attributes' => ['event'],
+            'lengths' => [],
+            'orders' => [],
+        ], [
+            '$id' => 'index4',
+            'type' => Database::INDEX_KEY,
+            'attributes' => ['userId', 'event'],
+            'lengths' => [],
+            'orders' => [],
+        ], [
+            '$id' => 'index5',
+            'type' => Database::INDEX_KEY,
+            'attributes' => ['resource', 'event'],
+            'lengths' => [],
+            'orders' => [],
+        ], [
+            '$id' => 'index-time',
+            'type' => Database::INDEX_KEY,
+            'attributes' => ['time'],
+            'lengths' => [],
+            'orders' => [Database::ORDER_DESC],
+        ],
+    ];
+
     private Database $db;
 
     public function __construct(Database $db)
@@ -37,115 +134,20 @@ class Audit
             throw new Exception('You need to create the database before running Audit setup');
         }
 
-        $attributes = [
-            new Document([
-                '$id' => 'userId',
-                'type' => Database::VAR_STRING,
-                'size' => Database::LENGTH_KEY,
-                'required' => true,
-                'signed' => true,
-                'array' => false,
-                'filters' => [],
-            ]),
-            new Document([
-                '$id' => 'event',
-                'type' => Database::VAR_STRING,
-                'size' => 255,
-                'required' => true,
-                'signed' => true,
-                'array' => false,
-                'filters' => [],
-            ]),
-            new Document([
-                '$id' => 'resource',
-                'type' => Database::VAR_STRING,
-                'size' => 255,
-                'required' => false,
-                'signed' => true,
-                'array' => false,
-                'filters' => [],
-            ]),
-            new Document([
-                '$id' => 'userAgent',
-                'type' => Database::VAR_STRING,
-                'size' => 65534,
-                'required' => true,
-                'signed' => true,
-                'array' => false,
-                'filters' => [],
-            ]),
-            new Document([
-                '$id' => 'ip',
-                'type' => Database::VAR_STRING,
-                'size' => 45,
-                'required' => true,
-                'signed' => true,
-                'array' => false,
-                'filters' => [],
-            ]),
-            new Document([
-                '$id' => 'location',
-                'type' => Database::VAR_STRING,
-                'size' => 45,
-                'required' => false,
-                'signed' => true,
-                'array' => false,
-                'filters' => [],
-            ]),
-            new Document([
-                '$id' => 'time',
-                'type' => Database::VAR_DATETIME,
-                'format' => '',
-                'size' => 0,
-                'signed' => true,
-                'required' => false,
-                'array' => false,
-                'filters' => ['datetime'],
-            ]),
-            new Document([
-                '$id' => 'data',
-                'type' => Database::VAR_STRING,
-                'size' => 16777216,
-                'required' => false,
-                'signed' => true,
-                'array' => false,
-                'filters' => ['json'],
-            ]),
-        ];
+        $attributes = \array_map(function ($attribute) {
+            return new Document($attribute);
+        }, self::ATTRIBUTES);
 
-        $indexes = [
-            new Document([
-                '$id' => 'index2',
-                'type' => Database::INDEX_KEY,
-                'attributes' => ['event'],
-                'lengths' => [],
-                'orders' => [],
-            ]),
-            new Document([
-                '$id' => 'index4',
-                'type' => Database::INDEX_KEY,
-                'attributes' => ['userId', 'event'],
-                'lengths' => [],
-                'orders' => [],
-            ]),
-            new Document([
-                '$id' => 'index5',
-                'type' => Database::INDEX_KEY,
-                'attributes' => ['resource', 'event'],
-                'lengths' => [],
-                'orders' => [],
-            ]),
-            new Document([
-                '$id' => 'index-time',
-                'type' => Database::INDEX_KEY,
-                'attributes' => ['time'],
-                'lengths' => [],
-                'orders' => [Database::ORDER_DESC],
-            ]),
-        ];
+        $indexes = \array_map(function ($index) {
+            return new Document($index);
+        }, self::INDEXES);
 
         try {
-            $this->db->createCollection(Audit::COLLECTION, $attributes, $indexes);
+            $this->db->createCollection(
+                Audit::COLLECTION,
+                $attributes,
+                $indexes
+            );
         } catch (DuplicateException) {
             // Collection already exists
         }
