@@ -2,8 +2,6 @@
 
 namespace Utopia\Audit;
 
-use Exception;
-use Throwable;
 use Utopia\Database\Database;
 use Utopia\Database\DateTime;
 use Utopia\Database\Document;
@@ -11,10 +9,109 @@ use Utopia\Database\Exception\Authorization as AuthorizationException;
 use Utopia\Database\Exception\Duplicate as DuplicateException;
 use Utopia\Database\Exception\Structure as StructureException;
 use Utopia\Database\Query;
+use Utopia\Database\Validator\Authorization;
+use Utopia\Exception;
 
 class Audit
 {
     public const COLLECTION = 'audit';
+
+    public const ATTRIBUTES = [
+        [
+            '$id' => 'userId',
+            'type' => Database::VAR_STRING,
+            'size' => Database::LENGTH_KEY,
+            'required' => true,
+            'signed' => true,
+            'array' => false,
+            'filters' => [],
+        ], [
+            '$id' => 'event',
+            'type' => Database::VAR_STRING,
+            'size' => 255,
+            'required' => true,
+            'signed' => true,
+            'array' => false,
+            'filters' => [],
+        ], [
+            '$id' => 'resource',
+            'type' => Database::VAR_STRING,
+            'size' => 255,
+            'required' => false,
+            'signed' => true,
+            'array' => false,
+            'filters' => [],
+        ], [
+            '$id' => 'userAgent',
+            'type' => Database::VAR_STRING,
+            'size' => 65534,
+            'required' => true,
+            'signed' => true,
+            'array' => false,
+            'filters' => [],
+        ], [
+            '$id' => 'ip',
+            'type' => Database::VAR_STRING,
+            'size' => 45,
+            'required' => true,
+            'signed' => true,
+            'array' => false,
+            'filters' => [],
+        ], [
+            '$id' => 'location',
+            'type' => Database::VAR_STRING,
+            'size' => 45,
+            'required' => false,
+            'signed' => true,
+            'array' => false,
+            'filters' => [],
+        ], [
+            '$id' => 'time',
+            'type' => Database::VAR_DATETIME,
+            'format' => '',
+            'size' => 0,
+            'signed' => true,
+            'required' => false,
+            'array' => false,
+            'filters' => ['datetime'],
+        ], [
+            '$id' => 'data',
+            'type' => Database::VAR_STRING,
+            'size' => 16777216,
+            'required' => false,
+            'signed' => true,
+            'array' => false,
+            'filters' => ['json'],
+        ],
+    ];
+
+    public const INDEXES = [
+        [
+            '$id' => 'index2',
+            'type' => Database::INDEX_KEY,
+            'attributes' => ['event'],
+            'lengths' => [],
+            'orders' => [],
+        ], [
+            '$id' => 'index4',
+            'type' => Database::INDEX_KEY,
+            'attributes' => ['userId', 'event'],
+            'lengths' => [],
+            'orders' => [],
+        ], [
+            '$id' => 'index5',
+            'type' => Database::INDEX_KEY,
+            'attributes' => ['resource', 'event'],
+            'lengths' => [],
+            'orders' => [],
+        ], [
+            '$id' => 'index-time',
+            'type' => Database::INDEX_KEY,
+            'attributes' => ['time'],
+            'lengths' => [],
+            'orders' => [Database::ORDER_DESC],
+        ],
+    ];
 
     private Database $db;
 
@@ -28,123 +125,29 @@ class Audit
      *
      * @return void
      *
-     * @throws Exception
+     * @throws DuplicateException
+     * @throws \Exception
      */
     public function setup(): void
     {
-        if (!$this->db->exists($this->db->getDatabase())) {
+        if (! $this->db->exists($this->db->getDatabase())) {
             throw new Exception('You need to create the database before running Audit setup');
         }
 
-        $attributes = [
-            new Document([
-                '$id' => 'userId',
-                'type' => Database::VAR_STRING,
-                'size' => Database::LENGTH_KEY,
-                'required' => true,
-                'signed' => true,
-                'array' => false,
-                'filters' => [],
-            ]),
-            new Document([
-                '$id' => 'event',
-                'type' => Database::VAR_STRING,
-                'size' => 255,
-                'required' => true,
-                'signed' => true,
-                'array' => false,
-                'filters' => [],
-            ]),
-            new Document([
-                '$id' => 'resource',
-                'type' => Database::VAR_STRING,
-                'size' => 255,
-                'required' => false,
-                'signed' => true,
-                'array' => false,
-                'filters' => [],
-            ]),
-            new Document([
-                '$id' => 'userAgent',
-                'type' => Database::VAR_STRING,
-                'size' => 65534,
-                'required' => true,
-                'signed' => true,
-                'array' => false,
-                'filters' => [],
-            ]),
-            new Document([
-                '$id' => 'ip',
-                'type' => Database::VAR_STRING,
-                'size' => 45,
-                'required' => true,
-                'signed' => true,
-                'array' => false,
-                'filters' => [],
-            ]),
-            new Document([
-                '$id' => 'location',
-                'type' => Database::VAR_STRING,
-                'size' => 45,
-                'required' => false,
-                'signed' => true,
-                'array' => false,
-                'filters' => [],
-            ]),
-            new Document([
-                '$id' => 'time',
-                'type' => Database::VAR_DATETIME,
-                'format' => '',
-                'size' => 0,
-                'signed' => true,
-                'required' => false,
-                'array' => false,
-                'filters' => ['datetime'],
-            ]),
-            new Document([
-                '$id' => 'data',
-                'type' => Database::VAR_STRING,
-                'size' => 16777216,
-                'required' => false,
-                'signed' => true,
-                'array' => false,
-                'filters' => ['json'],
-            ]),
-        ];
+        $attributes = \array_map(function ($attribute) {
+            return new Document($attribute);
+        }, self::ATTRIBUTES);
 
-        $indexes = [
-            new Document([
-                '$id' => 'index2',
-                'type' => Database::INDEX_KEY,
-                'attributes' => ['event'],
-                'lengths' => [],
-                'orders' => [],
-            ]),
-            new Document([
-                '$id' => 'index4',
-                'type' => Database::INDEX_KEY,
-                'attributes' => ['userId', 'event'],
-                'lengths' => [],
-                'orders' => [],
-            ]),
-            new Document([
-                '$id' => 'index5',
-                'type' => Database::INDEX_KEY,
-                'attributes' => ['resource', 'event'],
-                'lengths' => [],
-                'orders' => [],
-            ]),
-            new Document([
-                '$id' => 'index-time',
-                'type' => Database::INDEX_KEY,
-                'attributes' => ['time'],
-                'lengths' => [],
-                'orders' => [Database::ORDER_DESC],
-            ]),
-        ];
+        $indexes = \array_map(function ($index) {
+            return new Document($index);
+        }, self::INDEXES);
 
         try {
-            $this->db->createCollection(Audit::COLLECTION, $attributes, $indexes);
+            $this->db->createCollection(
+                Audit::COLLECTION,
+                $attributes,
+                $indexes
+            );
         } catch (DuplicateException) {
             // Collection already exists
         }
@@ -164,12 +167,12 @@ class Audit
      *
      * @throws AuthorizationException
      * @throws StructureException
-     * @throws Exception
-     * @throws Throwable
+     * @throws \Exception
+     * @throws \Throwable
      */
     public function log(string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): bool
     {
-        $this->db->getAuthorization()->skip(function () use ($userId, $event, $resource, $userAgent, $ip, $location, $data) {
+        Authorization::skip(function () use ($userId, $event, $resource, $userAgent, $ip, $location, $data) {
             $this->db->createDocument(Audit::COLLECTION, new Document([
                 '$permissions' => [],
                 'userId' => $userId,
@@ -195,12 +198,12 @@ class Audit
      * @param  Document|null  $orderAfter
      * @return array<Document>
      *
-     * @throws Exception
+     * @throws \Exception
      */
     public function getLogsByUser(string $userId, ?int $limit = null, ?int $offset = null, ?Document $orderAfter = null): array
     {
         /** @var array<Document> $result */
-        $result = $this->db->getAuthorization()->skip(function () use ($userId, $limit, $offset, $orderAfter) {
+        $result = Authorization::skip(function () use ($userId, $limit, $offset, $orderAfter) {
             $queries[] = Query::equal('userId', [$userId]);
             $queries[] = Query::orderDesc('');
 
@@ -232,7 +235,7 @@ class Audit
     public function countLogsByUser(string $userId): int
     {
         /** @var int $count */
-        $count = $this->db->getAuthorization()->skip(function () use ($userId) {
+        $count = Authorization::skip(function () use ($userId) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [Query::equal('userId', [$userId])]
@@ -251,12 +254,12 @@ class Audit
      * @param  Document|null  $orderAfter
      * @return array<Document>
      *
-     * @throws Exception
+     * @throws \Exception
      */
     public function getLogsByResource(string $resource, ?int $limit = 25, ?int $offset = null, ?Document $orderAfter = null): array
     {
         /** @var array<Document> $result */
-        $result = $this->db->getAuthorization()->skip(function () use ($resource, $limit, $offset, $orderAfter) {
+        $result = Authorization::skip(function () use ($resource, $limit, $offset, $orderAfter) {
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::orderDesc('');
 
@@ -285,12 +288,12 @@ class Audit
      * @param  string  $resource
      * @return int
      *
-     * @throws Exception
+     * @throws \Exception
      */
     public function countLogsByResource(string $resource): int
     {
         /** @var int $count */
-        $count = $this->db->getAuthorization()->skip(function () use ($resource) {
+        $count = Authorization::skip(function () use ($resource) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [Query::equal('resource', [$resource])]
@@ -310,12 +313,12 @@ class Audit
      * @param  Document|null  $orderAfter
      * @return array<Document>
      *
-     * @throws Exception
+     * @throws \Exception
      */
     public function getLogsByUserAndEvents(string $userId, array $events, ?int $limit = null, ?int $offset = null, ?Document $orderAfter = null): array
     {
         /** @var array<Document> $result */
-        $result = $this->db->getAuthorization()->skip(function () use ($userId, $events, $limit, $offset, $orderAfter) {
+        $result = Authorization::skip(function () use ($userId, $events, $limit, $offset, $orderAfter) {
             $queries[] = Query::equal('userId', [$userId]);
             $queries[] = Query::equal('event', $events);
             $queries[] = Query::orderDesc('');
@@ -346,12 +349,12 @@ class Audit
      * @param  array<int,string>  $events
      * @return int
      *
-     * @throws Exception
+     * @throws \Exception
      */
     public function countLogsByUserAndEvents(string $userId, array $events): int
     {
         /** @var int $count */
-        $count = $this->db->getAuthorization()->skip(function () use ($userId, $events) {
+        $count = Authorization::skip(function () use ($userId, $events) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [
@@ -374,12 +377,12 @@ class Audit
      * @param  Document|null  $orderAfter
      * @return array<Document>
      *
-     * @throws Exception
+     * @throws \Exception
      */
     public function getLogsByResourceAndEvents(string $resource, array $events, ?int $limit = null, ?int $offset = null, ?Document $orderAfter = null): array
     {
         /** @var array<Document> $result */
-        $result = $this->db->getAuthorization()->skip(function () use ($resource, $events, $limit, $offset, $orderAfter) {
+        $result = Authorization::skip(function () use ($resource, $events, $limit, $offset, $orderAfter) {
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::equal('event', $events);
             $queries[] = Query::orderDesc('');
@@ -410,12 +413,12 @@ class Audit
      * @param  array<int,string>  $events
      * @return int
      *
-     * @throws Exception
+     * @throws \Exception
      */
     public function countLogsByResourceAndEvents(string $resource, array $events): int
     {
         /** @var int $count */
-        $count = $this->db->getAuthorization()->skip(function () use ($resource, $events) {
+        $count = Authorization::skip(function () use ($resource, $events) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [
@@ -435,11 +438,11 @@ class Audit
      * @return bool
      *
      * @throws AuthorizationException
-     * @throws Throwable
+     * @throws \Exception
      */
     public function cleanup(string $datetime): bool
     {
-        $this->db->getAuthorization()->skip(function () use ($datetime) {
+        Authorization::skip(function () use ($datetime) {
             do {
                 $documents = $this->db->find(
                     collection: Audit::COLLECTION,
