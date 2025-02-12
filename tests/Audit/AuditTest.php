@@ -194,7 +194,7 @@ class AuditTest extends TestCase
         ];
 
         // Test batch insertion
-        $this->assertTrue($this->audit->logByBatch($batchEvents));
+        $this->assertTrue($this->audit->logBatch($batchEvents));
 
         // Verify the number of logs inserted
         $logs = $this->audit->getLogsByUser($userId);

@@ -189,6 +189,41 @@ class Audit
         return true;
     }
 
+
+    /**
+     * Add multiple event logs in batch.
+     *
+     * @param array<array{userId: string, event: string, resource: string, userAgent: string, ip: string, location: string, timestamp: string, data?: array<string,mixed>}> $events
+     * @return bool
+     *
+     * @throws AuthorizationException
+     * @throws StructureException
+     * @throws \Exception
+     * @throws \Throwable
+     */
+    public function logBatch(array $events): bool
+    {
+        Authorization::skip(function () use ($events) {
+            $documents = array_map(function ($event) {
+                return new Document([
+                    '$permissions' => [],
+                    'userId' => $event['userId'],
+                    'event' => $event['event'],
+                    'resource' => $event['resource'],
+                    'userAgent' => $event['userAgent'],
+                    'ip' => $event['ip'],
+                    'location' => $event['location'],
+                    'data' => $event['data'] ?? [],
+                    'time' => $event['timestamp'],
+                ]);
+            }, $events);
+
+            $this->db->createDocuments(Audit::COLLECTION, $documents);
+        });
+
+        return true;
+    }
+
     /**
      * Get all logs by user ID.
      *
@@ -460,37 +495,4 @@ class Audit
         return true;
     }
 
-    /**
-     * Add multiple event logs in batch.
-     *
-     * @param array<array{userId: string, event: string, resource: string, userAgent: string, ip: string, location: string, timestamp: string, data?: array<string,mixed>}> $events
-     * @return bool
-     *
-     * @throws AuthorizationException
-     * @throws StructureException
-     * @throws \Exception
-     * @throws \Throwable
-     */
-    public function logByBatch(array $events): bool
-    {
-        Authorization::skip(function () use ($events) {
-            $documents = array_map(function ($event) {
-                return new Document([
-                    '$permissions' => [],
-                    'userId' => $event['userId'],
-                    'event' => $event['event'],
-                    'resource' => $event['resource'],
-                    'userAgent' => $event['userAgent'],
-                    'ip' => $event['ip'],
-                    'location' => $event['location'],
-                    'data' => $event['data'] ?? [],
-                    'time' => $event['timestamp'],
-                ]);
-            }, $events);
-
-            $this->db->createDocuments(Audit::COLLECTION, $documents);
-        });
-
-        return true;
-    }
 }
