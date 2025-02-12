@@ -145,6 +145,81 @@ class AuditTest extends TestCase
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
     }
 
+    public function testLogByBatch(): void
+    {
+        // First cleanup existing logs
+        $this->audit->cleanup(DateTime::now());
+
+        $userId = 'batchUserId';
+        $userAgent = 'Mozilla/5.0 (Test User Agent)';
+        $ip = '192.168.1.1';
+        $location = 'UK';
+        
+        // Create timestamps 1 minute apart
+        $timestamp1 = DateTime::formatTz(DateTime::addSeconds(new \DateTime(), -120));
+        $timestamp2 = DateTime::formatTz(DateTime::addSeconds(new \DateTime(), -60));
+        $timestamp3 = DateTime::formatTz(DateTime::now());
+
+        $batchEvents = [
+            [
+                'userId' => $userId,
+                'event' => 'create',
+                'resource' => 'database/document/batch1',
+                'userAgent' => $userAgent,
+                'ip' => $ip,
+                'location' => $location,
+                'data' => ['key' => 'value1'],
+                'timestamp' => $timestamp1
+            ],
+            [
+                'userId' => $userId,
+                'event' => 'update',
+                'resource' => 'database/document/batch2',
+                'userAgent' => $userAgent,
+                'ip' => $ip,
+                'location' => $location,
+                'data' => ['key' => 'value2'],
+                'timestamp' => $timestamp2
+            ],
+            [
+                'userId' => $userId,
+                'event' => 'delete',
+                'resource' => 'database/document/batch3',
+                'userAgent' => $userAgent,
+                'ip' => $ip,
+                'location' => $location,
+                'data' => ['key' => 'value3'],
+                'timestamp' => $timestamp3
+            ]
+        ];
+
+        // Test batch insertion
+        $this->assertTrue($this->audit->logByBatch($batchEvents));
+
+        // Verify the number of logs inserted
+        $logs = $this->audit->getLogsByUser($userId);
+        $this->assertEquals(3, count($logs));
+
+        // Verify chronological order (newest first due to orderDesc)
+        $this->assertEquals('delete', $logs[0]->getAttribute('event'));
+        $this->assertEquals('update', $logs[1]->getAttribute('event'));
+        $this->assertEquals('create', $logs[2]->getAttribute('event'));
+
+        // Verify timestamps were preserved
+        $this->assertEquals($timestamp3, $logs[0]->getAttribute('time'));
+        $this->assertEquals($timestamp2, $logs[1]->getAttribute('time'));
+        $this->assertEquals($timestamp1, $logs[2]->getAttribute('time'));
+
+        // Test resource-based retrieval
+        $resourceLogs = $this->audit->getLogsByResource('database/document/batch2');
+        $this->assertEquals(1, count($resourceLogs));
+        $this->assertEquals('update', $resourceLogs[0]->getAttribute('event'));
+
+        // Test event-based retrieval
+        $eventLogs = $this->audit->getLogsByUserAndEvents($userId, ['create', 'delete']);
+        $this->assertEquals(2, count($eventLogs));
+    }
+
     public function testCleanup(): void
     {
         sleep(3);
