@@ -154,11 +154,11 @@ class AuditTest extends TestCase
         $userAgent = 'Mozilla/5.0 (Test User Agent)';
         $ip = '192.168.1.1';
         $location = 'UK';
-        
+
         // Create timestamps 1 minute apart
-        $timestamp1 = DateTime::formatTz(DateTime::addSeconds(new \DateTime(), -120));
-        $timestamp2 = DateTime::formatTz(DateTime::addSeconds(new \DateTime(), -60));
-        $timestamp3 = DateTime::formatTz(DateTime::now());
+        $timestamp1 = DateTime::formatTz(DateTime::addSeconds(new \DateTime(), -120)) ?? '';
+        $timestamp2 = DateTime::formatTz(DateTime::addSeconds(new \DateTime(), -60)) ?? '';
+        $timestamp3 = DateTime::formatTz(DateTime::now()) ?? '';
 
         $batchEvents = [
             [

@@ -487,7 +487,7 @@ class Audit
                     'time' => $event['timestamp'],
                 ]);
             }, $events);
-            
+
             $this->db->createDocuments(Audit::COLLECTION, $documents);
         });
 
