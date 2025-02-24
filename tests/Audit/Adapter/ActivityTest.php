@@ -1,17 +1,19 @@
 <?php
 
-namespace Utopia\Tests;
+namespace Audit\Adapter;
 
 use PDO;
 use PHPUnit\Framework\TestCase;
-use Utopia\Audit\Audit;
+use Utopia\Audit\Adapter\Audit;
+use Utopia\Audit\Log;
 use Utopia\Cache\Adapter\None as NoCache;
 use Utopia\Cache\Cache;
 use Utopia\Database\Adapter\MariaDB;
 use Utopia\Database\Database;
 use Utopia\Database\DateTime;
 
-class AuditTest extends TestCase
+class
+AuditTest extends TestCase
 {
     protected Audit $audit;
 
@@ -23,13 +25,16 @@ class AuditTest extends TestCase
         $dbPass = 'password';
 
         $pdo = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $dbPass, MariaDB::getPdoAttributes());
+
         $cache = new Cache(new NoCache());
-        $database = new Database(new MariaDB($pdo), $cache);
-        $database->setDatabase('utopiaTests');
-        $database->setNamespace('namespace');
+
+        $database = (new Database(new MariaDB($pdo), $cache))
+            ->setDatabase('utopiaTests')
+            ->setNamespace('namespace');
 
         $this->audit = new Audit($database);
-        if (! $database->exists('utopiaTests')) {
+
+        if (!$database->exists('utopiaTests')) {
             $database->create();
             $this->audit->setup();
         }
@@ -50,9 +55,38 @@ class AuditTest extends TestCase
         $location = 'US';
         $data = ['key1' => 'value1', 'key2' => 'value2'];
 
-        $this->assertTrue($this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
-        $this->assertTrue($this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
-        $this->assertTrue($this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
+        $log = (new Log())
+            ->setUserId($userId)
+            ->setUserAgent($userAgent)
+            ->setIp($ip)
+            ->setLocation($location)
+            ->setResource('database/document/1')
+            ->setEvent('update')
+            ->setData($data);
+
+        $this->assertTrue($this->audit->log($log));
+
+        $log = (new Log())
+            ->setUserId($userId)
+            ->setUserAgent($userAgent)
+            ->setIp($ip)
+            ->setLocation($location)
+            ->setResource('database/document/2')
+            ->setEvent('update')
+            ->setData($data);
+
+        $this->assertTrue($this->audit->log($log));
+
+        $log = (new Log())
+            ->setUserId($userId)
+            ->setUserAgent($userAgent)
+            ->setIp($ip)
+            ->setLocation($location)
+            ->setResource('database/document/2')
+            ->setEvent('delete')
+            ->setData($data);
+
+        $this->assertTrue($this->audit->log($log));
     }
 
     public function testGetLogsByUser(): void

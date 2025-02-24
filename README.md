@@ -22,13 +22,7 @@ Init the audit object:
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 
-use PDO;
-use PDO;
-use Utopia\Audit\Audit;
-use Utopia\Cache\Cache;
-use Utopia\Cache\Adapter\None as NoCache;
-use Utopia\Database\Adapter\MySQL;
-use Utopia\Database\Database;
+use Utopia\Audit\Adapter\Audit;use Utopia\Cache\Adapter\None as NoCache;use Utopia\Cache\Cache;use Utopia\Database\Adapter\MySQL;use Utopia\Database\Database;
 
 $dbHost = '127.0.0.1';
 $dbUser = 'travis';
