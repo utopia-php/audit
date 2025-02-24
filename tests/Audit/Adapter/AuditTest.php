@@ -16,6 +16,10 @@ class AuditTest extends Base
 
     public function setUp(): void
     {
+        if (isset(static::$adapter)) {
+            return;
+        }
+
         $dbHost = 'mariadb';
         $dbPort = '3306';
         $dbUser = 'root';
@@ -29,12 +33,14 @@ class AuditTest extends Base
             ->setDatabase('utopiaTests')
             ->setNamespace('namespace');
 
-        $this->audit = new Audit($database);
+        static::$adapter = new Audit($database);
 
-        if (!$database->exists('utopiaTests')) {
-            $database->create();
-            $this->adapter->setup();
+        if ($database->exists('utopiaTests')) {
+            $database->delete('utopiaTests');
         }
+
+        $database->create('utopiaTests');
+        $this->getAdapter()->setup();
 
         $this->createLogs();
     }

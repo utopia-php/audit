@@ -15,53 +15,6 @@ abstract class Adapter
 {
     protected Database $db;
 
-    /**
-     * Get collection name.
-     *
-     * @return string
-     */
-    abstract public function getCollection(): string;
-
-    /**
-     * Get collection attributes.
-     *
-     * @return array<array<string, mixed>>
-     */
-    abstract public function getAttributes(): array;
-
-    /**
-     * Get collection indexes.
-     *
-     * @return array<array<string, mixed>>
-     */
-    abstract public function getIndexes(): array;
-
-    /**
-     * Add event log.
-     *
-     * @param  Log $log
-     * @return bool
-     *
-     * @throws AuthorizationException
-     * @throws StructureException
-     * @throws \Exception
-     * @throws \Throwable
-     */
-    abstract public function log(Log $log): bool;
-
-    /**
-     * Add multiple event logs in batch.
-     *
-     * @param array<Log> $events
-     * @return bool
-     *
-     * @throws AuthorizationException
-     * @throws StructureException
-     * @throws \Exception
-     * @throws \Throwable
-     */
-    abstract public function logBatch(array $events): bool;
-
     public function __construct(Database $db)
     {
         $this->db = $db;
@@ -96,12 +49,95 @@ abstract class Adapter
     }
 
     /**
+     * Get collection attributes.
+     *
+     * @return array<array<string, mixed>>
+     */
+    abstract public function getAttributes(): array;
+
+    /**
+     * Get collection indexes.
+     *
+     * @return array<array<string, mixed>>
+     */
+    abstract public function getIndexes(): array;
+
+    /**
+     * Get collection name.
+     *
+     * @return string
+     */
+    abstract public function getCollection(): string;
+
+    /**
+     * Add event log.
+     *
+     * @param Log $log
+     * @return bool
+     *
+     * @throws AuthorizationException
+     * @throws StructureException
+     * @throws \Exception
+     * @throws \Throwable
+     */
+    public function log(Log $log): bool
+    {
+        Authorization::skip(function () use ($log) {
+            $this->db->createDocument(
+                $this->getCollection(),
+                new Document($this->filter($log)->getArrayCopy())
+            );
+        });
+
+        return true;
+    }
+
+    /**
+     * Override to filter log before saving.
+     *
+     * @param Log $log
+     * @return Log
+     */
+    public function filter(Log $log): Log
+    {
+        return $log;
+    }
+
+    /**
+     * Add multiple event logs in batch.
+     *
+     * @param array<Log> $logs
+     * @return bool
+     *
+     * @throws AuthorizationException
+     * @throws StructureException
+     * @throws \Exception
+     * @throws \Throwable
+     */
+    public function logBatch(array $logs): bool
+    {
+        Authorization::skip(function () use ($logs) {
+            $documents = \array_map(
+                fn ($log) => new Document($this->filter($log)->getArrayCopy()),
+                $logs
+            );
+
+            $this->db->createDocuments(
+                $this->getCollection(),
+                $documents
+            );
+        });
+
+        return true;
+    }
+
+    /**
      * Get all logs by user ID.
      *
-     * @param  string  $userId
-     * @param  int|null  $limit
-     * @param  int|null  $offset
-     * @param  Document|null  $orderAfter
+     * @param string $userId
+     * @param int|null $limit
+     * @param int|null $offset
+     * @param Document|null $orderAfter
      * @return array<Document>
      *
      * @throws \Exception
@@ -111,8 +147,7 @@ abstract class Adapter
         ?int $limit = null,
         ?int $offset = null,
         ?Document $orderAfter = null
-    ): array
-    {
+    ): array {
         /** @var array<Document> $result */
         $result = Authorization::skip(function () use ($userId, $limit, $offset, $orderAfter) {
             /** @var array<Query> $queries */
@@ -121,13 +156,13 @@ abstract class Adapter
             $queries[] = Query::equal('userId', [$userId]);
             $queries[] = Query::orderDesc('');
 
-            if (! \is_null($limit)) {
+            if (!\is_null($limit)) {
                 $queries[] = Query::limit($limit);
             }
-            if (! \is_null($offset)) {
+            if (!\is_null($offset)) {
                 $queries[] = Query::offset($offset);
             }
-            if (! \is_null($orderAfter)) {
+            if (!\is_null($orderAfter)) {
                 $queries[] = Query::cursorAfter($orderAfter);
             }
 
@@ -163,10 +198,10 @@ abstract class Adapter
     /**
      * Get all logs by resource.
      *
-     * @param  string  $resource
-     * @param  int|null  $limit
-     * @param  int|null  $offset
-     * @param  Document|null  $orderAfter
+     * @param string $resource
+     * @param int|null $limit
+     * @param int|null $offset
+     * @param Document|null $orderAfter
      * @return array<Document>
      *
      * @throws \Exception
@@ -181,13 +216,13 @@ abstract class Adapter
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::orderDesc('');
 
-            if (! \is_null($limit)) {
+            if (!\is_null($limit)) {
                 $queries[] = Query::limit($limit);
             }
-            if (! \is_null($offset)) {
+            if (!\is_null($offset)) {
                 $queries[] = Query::offset($offset);
             }
-            if (! \is_null($orderAfter)) {
+            if (!\is_null($orderAfter)) {
                 $queries[] = Query::cursorAfter($orderAfter);
             }
 
@@ -203,7 +238,7 @@ abstract class Adapter
     /**
      * Count logs by resource.
      *
-     * @param  string  $resource
+     * @param string $resource
      * @return int
      *
      * @throws \Exception
@@ -224,11 +259,11 @@ abstract class Adapter
     /**
      * Get logs by user and events.
      *
-     * @param  string  $userId
-     * @param  array<int,string>  $events
-     * @param  int|null  $limit
-     * @param  int|null  $offset
-     * @param  Document|null  $orderAfter
+     * @param string $userId
+     * @param array<int,string> $events
+     * @param int|null $limit
+     * @param int|null $offset
+     * @param Document|null $orderAfter
      * @return array<Document>
      *
      * @throws \Exception
@@ -244,13 +279,13 @@ abstract class Adapter
             $queries[] = Query::equal('event', $events);
             $queries[] = Query::orderDesc('');
 
-            if (! \is_null($limit)) {
+            if (!\is_null($limit)) {
                 $queries[] = Query::limit($limit);
             }
-            if (! \is_null($offset)) {
+            if (!\is_null($offset)) {
                 $queries[] = Query::offset($offset);
             }
-            if (! \is_null($orderAfter)) {
+            if (!\is_null($orderAfter)) {
                 $queries[] = Query::cursorAfter($orderAfter);
             }
 
@@ -266,8 +301,8 @@ abstract class Adapter
     /**
      * Count logs by user and events.
      *
-     * @param  string  $userId
-     * @param  array<int,string>  $events
+     * @param string $userId
+     * @param array<int,string> $events
      * @return int
      *
      * @throws \Exception
@@ -291,11 +326,11 @@ abstract class Adapter
     /**
      * Get logs by resource and events.
      *
-     * @param  string  $resource
-     * @param  array<int,string>  $events
-     * @param  int|null  $limit
-     * @param  int|null  $offset
-     * @param  Document|null  $orderAfter
+     * @param string $resource
+     * @param array<int,string> $events
+     * @param int|null $limit
+     * @param int|null $offset
+     * @param Document|null $orderAfter
      * @return array<Document>
      *
      * @throws \Exception
@@ -311,13 +346,13 @@ abstract class Adapter
             $queries[] = Query::equal('event', $events);
             $queries[] = Query::orderDesc('');
 
-            if (! \is_null($limit)) {
+            if (!\is_null($limit)) {
                 $queries[] = Query::limit($limit);
             }
-            if (! \is_null($offset)) {
+            if (!\is_null($offset)) {
                 $queries[] = Query::offset($offset);
             }
-            if (! \is_null($orderAfter)) {
+            if (!\is_null($orderAfter)) {
                 $queries[] = Query::cursorAfter($orderAfter);
             }
 
@@ -333,8 +368,8 @@ abstract class Adapter
     /**
      * Count logs by resource and events.
      *
-     * @param  string  $resource
-     * @param  array<int,string>  $events
+     * @param string $resource
+     * @param array<int,string> $events
      * @return int
      *
      * @throws \Exception
@@ -358,7 +393,7 @@ abstract class Adapter
     /**
      * Delete all logs older than `$timestamp` seconds
      *
-     * @param  string  $datetime
+     * @param string $datetime
      * @return bool
      *
      * @throws AuthorizationException
@@ -367,21 +402,14 @@ abstract class Adapter
     public function cleanup(string $datetime): bool
     {
         Authorization::skip(function () use ($datetime) {
-            do {
-                $documents = $this->db->find(
-                    collection: $this->getCollection(),
-                    queries: [
-                        Query::lessThan('time', $datetime),
-                    ]
-                );
-
-                foreach ($documents as $document) {
-                    $this->db->deleteDocument($this->getCollection(), $document->getId());
-                }
-            } while (! empty($documents));
+            $this->db->deleteDocuments(
+                collection: $this->getCollection(),
+                queries: [
+                    Query::lessThan('time', $datetime),
+                ]
+            );
         });
 
         return true;
     }
-
 }

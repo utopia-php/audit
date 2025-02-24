@@ -13,7 +13,7 @@ class Log extends ArrayObject
     protected string $country;
     protected string $event;
     protected string $hostname;
-    protected \DateTime $time;
+    protected string $time;
     protected string $userAgent;
     protected string $location;
     protected string $resource;
@@ -33,6 +33,11 @@ class Log extends ArrayObject
      * @var array<string, mixed>
      */
     protected array $data;
+
+    public function __construct(array $data = [])
+    {
+        parent::__construct($data, ArrayObject::ARRAY_AS_PROPS);
+    }
 
     /**
      * @return string
@@ -107,18 +112,18 @@ class Log extends ArrayObject
     }
 
     /**
-     * @return \DateTime
+     * @return string
      */
-    public function getTime(): \DateTime
+    public function getTime(): string
     {
         return $this->time;
     }
 
     /**
-     * @param \DateTime $time
+     * @param string $time
      * @return Log
      */
-    public function setTime(\DateTime $time): Log
+    public function setTime(string $time): Log
     {
         $this->time = $time;
         return $this;

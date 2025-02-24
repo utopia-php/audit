@@ -2,6 +2,7 @@
 
 namespace Utopia\Tests\Adapter;
 
+use Override;
 use PDO;
 use Utopia\Audit\Adapter\Activity;
 use Utopia\Cache\Adapter\None as NoCache;
@@ -14,6 +15,10 @@ class ActivityTest extends Base
 {
     public function setUp(): void
     {
+        if (isset(static::$adapter)) {
+            return;
+        }
+
         $dbHost = 'mariadb';
         $dbPort = '3306';
         $dbUser = 'root';
@@ -27,12 +32,14 @@ class ActivityTest extends Base
             ->setDatabase('utopiaTests')
             ->setNamespace('namespace');
 
-        $this->adapter = new Activity($database);
+        static::$adapter = new Activity($database);
 
-        if (!$database->exists('utopiaTests')) {
-            $database->create();
-            $this->adapter->setup();
+        if ($database->exists('utopiaTests')) {
+            $database->delete('utopiaTests');
         }
+
+        $database->create('utopiaTests');
+        $this->getAdapter()->setup();
 
         $this->createLogs();
     }

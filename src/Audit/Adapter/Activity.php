@@ -5,10 +5,6 @@ namespace Utopia\Audit\Adapter;
 use Utopia\Audit\Adapter;
 use Utopia\Audit\Log;
 use Utopia\Database\Database;
-use Utopia\Database\Document;
-use Utopia\Database\Exception\Authorization as AuthorizationException;
-use Utopia\Database\Exception\Structure as StructureException;
-use Utopia\Database\Validator\Authorization;
 
 class Activity extends Adapter
 {
@@ -297,54 +293,9 @@ class Activity extends Adapter
         ];
     }
 
-    /**
-     * Add event log.
-     *
-     * @param Log $log
-     * @return bool
-     *
-     * @throws AuthorizationException
-     * @throws StructureException
-     * @throws \Exception
-     * @throws \Throwable
-     */
-    public function log(Log $log): bool
+    public function filter(Log $log): Log
     {
-        Authorization::skip(function () use ($log) {
-            $this->db->createDocument(
-                $this->getCollection(),
-                new Document($log->getArrayCopy())
-            );
-        });
-
-        return true;
-    }
-
-    /**
-     * Add multiple event logs in batch.
-     *
-     * @param array<Log> $events
-     * @return bool
-     *
-     * @throws AuthorizationException
-     * @throws StructureException
-     * @throws \Exception
-     * @throws \Throwable
-     */
-    public function logBatch(array $events): bool
-    {
-        Authorization::skip(function () use ($events) {
-            $documents = \array_map(
-                fn ($event) => new Document($event->getArrayCopy()),
-                $events
-            );
-
-            $this->db->createDocuments(
-                $this->getCollection(),
-                $documents
-            );
-        });
-
-        return true;
+        unset($log['location']);
+        return $log;
     }
 }
