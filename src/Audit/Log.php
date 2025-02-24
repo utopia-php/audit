@@ -4,31 +4,35 @@ namespace Utopia\Audit;
 
 use ArrayObject;
 
+/**
+ * @extends ArrayObject<string, mixed>
+ */
 class Log extends ArrayObject
 {
-    public function __construct(
-        protected string $ip,
-        protected string $country,
-        protected string $event,
-        protected string $hostname,
-        protected \DateTime $time,
-        protected string $userAgent,
-        protected string $location,
-        protected string $resource,
-        protected string $resourceId,
-        protected string $resourceType,
-        protected string $resourceParent,
-        protected string $resourceInternalId,
-        protected string $userType,
-        protected string $userId,
-        protected string $userInternalId,
-        protected string $projectId,
-        protected string $projectInternalId,
-        protected string $teamId,
-        protected string $teamInternalId,
-        protected array $data
-    ) {
-    }
+    protected string $ip;
+    protected string $country;
+    protected string $event;
+    protected string $hostname;
+    protected \DateTime $time;
+    protected string $userAgent;
+    protected string $location;
+    protected string $resource;
+    protected string $resourceId;
+    protected string $resourceType;
+    protected string $resourceParent;
+    protected string $resourceInternalId;
+    protected string $userType;
+    protected string $userId;
+    protected string $userInternalId;
+    protected string $projectId;
+    protected string $projectInternalId;
+    protected string $teamId;
+    protected string $teamInternalId;
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected array $data;
 
     /**
      * @return string
@@ -373,7 +377,7 @@ class Log extends ArrayObject
     }
 
     /**
-     * @return array
+     * @return array<string, mixed>
      */
     public function getData(): array
     {
@@ -381,7 +385,7 @@ class Log extends ArrayObject
     }
 
     /**
-     * @param array $data
+     * @param array<string, mixed> $data
      * @return Log
      */
     public function setData(array $data): Log
