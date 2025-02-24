@@ -21,8 +21,9 @@
         "utopia-php/database": "0.60.*"
     },
     "require-dev": {
+        "ext-pdo": "*",
         "phpunit/phpunit": "9.*",
-        "phpstan/phpstan": "1.*",
+        "phpstan/phpstan": "2.*",
         "laravel/pint": "1.*"
     },
     "config": {
