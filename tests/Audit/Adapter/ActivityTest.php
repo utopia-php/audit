@@ -2,7 +2,6 @@
 
 namespace Utopia\Tests\Adapter;
 
-use Override;
 use PDO;
 use Utopia\Audit\Adapter\Activity;
 use Utopia\Cache\Adapter\None as NoCache;
@@ -39,7 +38,8 @@ class ActivityTest extends Base
         }
 
         $database->create('utopiaTests');
-        $this->getAdapter()->setup();
+
+        $this->getAdapter()?->setup();
 
         $this->createLogs();
     }

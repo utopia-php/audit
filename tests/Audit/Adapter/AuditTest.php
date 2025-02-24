@@ -40,7 +40,8 @@ class AuditTest extends Base
         }
 
         $database->create('utopiaTests');
-        $this->getAdapter()->setup();
+
+        $this->getAdapter()?->setup();
 
         $this->createLogs();
     }

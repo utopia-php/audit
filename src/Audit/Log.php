@@ -34,6 +34,9 @@ class Log extends ArrayObject
      */
     protected array $data;
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function __construct(array $data = [])
     {
         parent::__construct($data, ArrayObject::ARRAY_AS_PROPS);
