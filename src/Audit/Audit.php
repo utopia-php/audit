@@ -318,8 +318,10 @@ class Audit
      *
      * @throws \Utopia\Database\Exception
      */
-    public function countLogsByResource(string $resource, array $queries = []): int
-    {
+    public function countLogsByResource(
+        string $resource,
+        array $queries = []
+    ): int {
         /** @var int $count */
         $count = Authorization::skip(function () use ($resource, $queries) {
             return $this->db->count(
@@ -433,7 +435,7 @@ class Audit
      *
      * @param string $resource
      * @param array<int,string> $events
-     * @param array $queries
+     * @param array<Query> $queries
      * @return int
      *
      * @throws \Utopia\Database\Exception
