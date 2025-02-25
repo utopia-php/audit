@@ -1,4 +1,4 @@
-FROM composer:2.8 AS composer
+FROM composer:2.0 as step0
 
 WORKDIR /src/
 
@@ -8,7 +8,7 @@ COPY composer.json /src/
 RUN composer install --ignore-platform-reqs --optimize-autoloader \
     --no-plugins --no-scripts --prefer-dist
 
-FROM php:8.3.17-cli-alpine3.20 AS  final
+FROM php:8.3.3-cli-alpine3.19 as  final
 
 LABEL maintainer="team@appwrite.io"
 
@@ -16,7 +16,7 @@ RUN docker-php-ext-install pdo_mysql
 
 WORKDIR /code
 
-COPY --from=composer /src/vendor /code/vendor
+COPY --from=step0 /src/vendor /code/vendor
 
 # Add Source Code
 COPY ./tests /code/tests
