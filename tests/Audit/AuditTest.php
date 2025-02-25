@@ -10,6 +10,7 @@ use Utopia\Cache\Cache;
 use Utopia\Database\Adapter\MariaDB;
 use Utopia\Database\Database;
 use Utopia\Database\DateTime;
+use Utopia\Database\Query;
 
 class AuditTest extends TestCase
 {
@@ -218,6 +219,15 @@ class AuditTest extends TestCase
         // Test event-based retrieval
         $eventLogs = $this->audit->getLogsByUserAndEvents($userId, ['create', 'delete']);
         $this->assertEquals(2, count($eventLogs));
+    }
+
+    public function testGetLogsCustomFilters(): void
+    {
+        $logs = $this->audit->getLogsByUser('userId', queries: [
+            Query::greaterThan('time', DateTime::addSeconds(new \DateTime(), -10))->toString()
+        ]);
+
+        $this->assertEquals(3, \count($logs));
     }
 
     public function testCleanup(): void
