@@ -229,9 +229,6 @@ class Audit
      * Get all logs by user ID.
      *
      * @param string $userId
-     * @param int|null $limit
-     * @param int|null $offset
-     * @param Document|null $orderAfter
      * @param array<Query> $queries
      * @return array<Document>
      *
@@ -241,26 +238,12 @@ class Audit
      */
     public function getLogsByUser(
         string $userId,
-        ?int $limit = null,
-        ?int $offset = null,
-        ?Document $orderAfter = null,
         array $queries = []
-    ): array
-    {
+    ): array {
         /** @var array<Document> $result */
-        $result = Authorization::skip(function () use ($queries, $userId, $limit, $offset, $orderAfter) {
+        $result = Authorization::skip(function () use ($queries, $userId) {
             $queries[] = Query::equal('userId', [$userId]);
             $queries[] = Query::orderDesc();
-
-            if (! \is_null($limit)) {
-                $queries[] = Query::limit($limit);
-            }
-            if (! \is_null($offset)) {
-                $queries[] = Query::offset($offset);
-            }
-            if (! \is_null($orderAfter)) {
-                $queries[] = Query::cursorAfter($orderAfter);
-            }
 
             return $this->db->find(
                 collection: Audit::COLLECTION,
@@ -282,8 +265,7 @@ class Audit
     public function countLogsByUser(
         string $userId,
         array $queries = []
-    ): int
-    {
+    ): int {
         /** @var int $count */
         $count = Authorization::skip(function () use ($queries, $userId) {
             return $this->db->count(
@@ -302,9 +284,6 @@ class Audit
      * Get all logs by resource.
      *
      * @param string $resource
-     * @param int|null $limit
-     * @param int|null $offset
-     * @param Document|null $orderAfter
      * @param array<Query> $queries
      * @return array<Document>
      *
@@ -314,26 +293,12 @@ class Audit
      */
     public function getLogsByResource(
         string $resource,
-        ?int $limit = 25,
-        ?int $offset = null,
-        ?Document $orderAfter = null,
         array $queries = [],
-    ): array
-    {
+    ): array {
         /** @var array<Document> $result */
-        $result = Authorization::skip(function () use ($queries, $resource, $limit, $offset, $orderAfter) {
+        $result = Authorization::skip(function () use ($queries, $resource) {
             $queries[] = Query::equal('resource', [$resource]);
-            $queries[] = Query::orderDesc('');
-
-            if (! \is_null($limit)) {
-                $queries[] = Query::limit($limit);
-            }
-            if (! \is_null($offset)) {
-                $queries[] = Query::offset($offset);
-            }
-            if (! \is_null($orderAfter)) {
-                $queries[] = Query::cursorAfter($orderAfter);
-            }
+            $queries[] = Query::orderDesc();
 
             return $this->db->find(
                 collection: Audit::COLLECTION,
@@ -374,9 +339,6 @@ class Audit
      *
      * @param string $userId
      * @param array<int,string> $events
-     * @param int|null $limit
-     * @param int|null $offset
-     * @param Document|null $orderAfter
      * @param array<Query> $queries
      * @return array<Document>
      *
@@ -387,27 +349,13 @@ class Audit
     public function getLogsByUserAndEvents(
         string $userId,
         array $events,
-        ?int $limit = null,
-        ?int $offset = null,
-        ?Document $orderAfter = null,
         array $queries = [],
-    ): array
-    {
+    ): array {
         /** @var array<Document> $result */
-        $result = Authorization::skip(function () use ($userId, $events, $limit, $offset, $orderAfter, $queries) {
+        $result = Authorization::skip(function () use ($userId, $events, $queries) {
             $queries[] = Query::equal('userId', [$userId]);
             $queries[] = Query::equal('event', $events);
-            $queries[] = Query::orderDesc('');
-
-            if (! \is_null($limit)) {
-                $queries[] = Query::limit($limit);
-            }
-            if (! \is_null($offset)) {
-                $queries[] = Query::offset($offset);
-            }
-            if (! \is_null($orderAfter)) {
-                $queries[] = Query::cursorAfter($orderAfter);
-            }
+            $queries[] = Query::orderDesc();
 
             return $this->db->find(
                 collection: Audit::COLLECTION,
@@ -432,8 +380,7 @@ class Audit
         string $userId,
         array $events,
         array $queries = [],
-    ): int
-    {
+    ): int {
         /** @var int $count */
         $count = Authorization::skip(function () use ($userId, $events, $queries) {
             return $this->db->count(
@@ -454,9 +401,6 @@ class Audit
      *
      * @param string $resource
      * @param array<int,string> $events
-     * @param int|null $limit
-     * @param int|null $offset
-     * @param Document|null $orderAfter
      * @param array<Query> $queries
      * @return array<Document>
      *
@@ -467,27 +411,13 @@ class Audit
     public function getLogsByResourceAndEvents(
         string $resource,
         array $events,
-        ?int $limit = null,
-        ?int $offset = null,
-        ?Document $orderAfter = null,
         array $queries = [],
-    ): array
-    {
+    ): array {
         /** @var array<Document> $result */
-        $result = Authorization::skip(function () use ($resource, $events, $limit, $offset, $orderAfter, $queries) {
+        $result = Authorization::skip(function () use ($resource, $events, $queries) {
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::equal('event', $events);
-            $queries[] = Query::orderDesc('');
-
-            if (! \is_null($limit)) {
-                $queries[] = Query::limit($limit);
-            }
-            if (! \is_null($offset)) {
-                $queries[] = Query::offset($offset);
-            }
-            if (! \is_null($orderAfter)) {
-                $queries[] = Query::cursorAfter($orderAfter);
-            }
+            $queries[] = Query::orderDesc();
 
             return $this->db->find(
                 collection: Audit::COLLECTION,
@@ -501,18 +431,18 @@ class Audit
     /**
      * Count logs by resource and events.
      *
-     * @param  string  $resource
-     * @param  array<int,string>  $events
+     * @param string $resource
+     * @param array<int,string> $events
+     * @param array $queries
      * @return int
      *
-     * @throws \Exception
+     * @throws \Utopia\Database\Exception
      */
     public function countLogsByResourceAndEvents(
         string $resource,
         array $events,
         array $queries = [],
-    ): int
-    {
+    ): int {
         /** @var int $count */
         $count = Authorization::skip(function () use ($resource, $events, $queries) {
             return $this->db->count(
