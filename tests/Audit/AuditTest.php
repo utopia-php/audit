@@ -68,7 +68,7 @@ class AuditTest extends TestCase
         $this->assertEquals(1, \count($logs1));
         $this->assertEquals($logs1[0]->getId(), $logs[1]->getId());
 
-        $logs2 = $this->audit->getLogsByUser('userId', [Query::limit(1), Query::offset(0)]);
+        $logs2 = $this->audit->getLogsByUser('userId', [Query::limit(1), Query::offset(1)]);
         $this->assertEquals(1, \count($logs2));
         $this->assertEquals($logs2[0]->getId(), $logs[1]->getId());
     }
@@ -92,7 +92,7 @@ class AuditTest extends TestCase
         $this->assertEquals(1, \count($logs3));
         $this->assertEquals($logs3[0]->getId(), $logs2[1]->getId());
 
-        $logs4 = $this->audit->getLogsByUserAndEvents('userId', ['update', 'delete'], [Query::limit(1), Query::offset(0)]);
+        $logs4 = $this->audit->getLogsByUserAndEvents('userId', ['update', 'delete'], [Query::limit(1), Query::offset(1)]);
 
         $this->assertEquals(1, \count($logs4));
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
@@ -117,7 +117,7 @@ class AuditTest extends TestCase
         $this->assertEquals(1, \count($logs3));
         $this->assertEquals($logs3[0]->getId(), $logs2[1]->getId());
 
-        $logs4 = $this->audit->getLogsByResourceAndEvents('database/document/2', ['update', 'delete'], [Query::limit(1), Query::offset(0)]);
+        $logs4 = $this->audit->getLogsByResourceAndEvents('database/document/2', ['update', 'delete'], [Query::limit(1), Query::offset(1)]);
 
         $this->assertEquals(1, \count($logs4));
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
@@ -141,7 +141,7 @@ class AuditTest extends TestCase
         $this->assertEquals(1, \count($logs3));
         $this->assertEquals($logs3[0]->getId(), $logs2[1]->getId());
 
-        $logs4 = $this->audit->getLogsByResource('database/document/2', [Query::limit(1), Query::offset(0)]);
+        $logs4 = $this->audit->getLogsByResource('database/document/2', [Query::limit(1), Query::offset(1)]);
         $this->assertEquals(1, \count($logs4));
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
     }
