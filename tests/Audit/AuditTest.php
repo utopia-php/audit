@@ -64,11 +64,11 @@ class AuditTest extends TestCase
         $logsCount = $this->audit->countLogsByUser('userId');
         $this->assertEquals(3, $logsCount);
 
-        $logs1 = $this->audit->getLogsByUser('userId', 1, 1);
+        $logs1 = $this->audit->getLogsByUser('userId', [Query::limit(1), Query::offset(1)]);
         $this->assertEquals(1, \count($logs1));
         $this->assertEquals($logs1[0]->getId(), $logs[1]->getId());
 
-        $logs2 = $this->audit->getLogsByUser('userId', 1, 0, $logs[0]);
+        $logs2 = $this->audit->getLogsByUser('userId', [Query::limit(1), Query::offset(1)]);
         $this->assertEquals(1, \count($logs2));
         $this->assertEquals($logs2[0]->getId(), $logs[1]->getId());
     }
@@ -87,12 +87,12 @@ class AuditTest extends TestCase
         $this->assertEquals(2, $logsCount1);
         $this->assertEquals(3, $logsCount2);
 
-        $logs3 = $this->audit->getLogsByUserAndEvents('userId', ['update', 'delete'], 1, 1);
+        $logs3 = $this->audit->getLogsByUserAndEvents('userId', ['update', 'delete'], [Query::limit(1), Query::offset(1)]);
 
         $this->assertEquals(1, \count($logs3));
         $this->assertEquals($logs3[0]->getId(), $logs2[1]->getId());
 
-        $logs4 = $this->audit->getLogsByUserAndEvents('userId', ['update', 'delete'], 1, 0, $logs2[0]);
+        $logs4 = $this->audit->getLogsByUserAndEvents('userId', ['update', 'delete'], [Query::limit(1), Query::offset(1)]);
 
         $this->assertEquals(1, \count($logs4));
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
@@ -112,12 +112,12 @@ class AuditTest extends TestCase
         $this->assertEquals(1, $logsCount1);
         $this->assertEquals(2, $logsCount2);
 
-        $logs3 = $this->audit->getLogsByResourceAndEvents('database/document/2', ['update', 'delete'], 1, 1);
+        $logs3 = $this->audit->getLogsByResourceAndEvents('database/document/2', ['update', 'delete'], [Query::limit(1), Query::offset(1)]);
 
         $this->assertEquals(1, \count($logs3));
         $this->assertEquals($logs3[0]->getId(), $logs2[1]->getId());
 
-        $logs4 = $this->audit->getLogsByResourceAndEvents('database/document/2', ['update', 'delete'], 1, 0, $logs2[0]);
+        $logs4 = $this->audit->getLogsByResourceAndEvents('database/document/2', ['update', 'delete'], [Query::limit(1), Query::offset(1)]);
 
         $this->assertEquals(1, \count($logs4));
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
@@ -137,11 +137,11 @@ class AuditTest extends TestCase
         $this->assertEquals(1, $logsCount1);
         $this->assertEquals(2, $logsCount2);
 
-        $logs3 = $this->audit->getLogsByResource('database/document/2', 1, 1);
+        $logs3 = $this->audit->getLogsByResource('database/document/2', [Query::limit(1), Query::offset(1)]);
         $this->assertEquals(1, \count($logs3));
         $this->assertEquals($logs3[0]->getId(), $logs2[1]->getId());
 
-        $logs4 = $this->audit->getLogsByResource('database/document/2', 1, 0, $logs2[0]);
+        $logs4 = $this->audit->getLogsByResource('database/document/2', [Query::limit(1), Query::offset(1)]);
         $this->assertEquals(1, \count($logs4));
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
     }
@@ -224,7 +224,7 @@ class AuditTest extends TestCase
     public function testGetLogsCustomFilters(): void
     {
         $logs = $this->audit->getLogsByUser('userId', queries: [
-            Query::greaterThan('time', DateTime::addSeconds(new \DateTime(), -10))->toString()
+            Query::greaterThan('time', DateTime::addSeconds(new \DateTime(), -10))
         ]);
 
         $this->assertEquals(3, \count($logs));
