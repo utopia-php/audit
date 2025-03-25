@@ -53,21 +53,21 @@ abstract class Adapter
      *
      * @return array<array<string, mixed>>
      */
-    abstract public function getAttributes(): array;
+    abstract public static function getAttributes(): array;
 
     /**
      * Get collection indexes.
      *
      * @return array<array<string, mixed>>
      */
-    abstract public function getIndexes(): array;
+    abstract public static function getIndexes(): array;
 
     /**
      * Get collection name.
      *
      * @return string
      */
-    abstract public function getCollection(): string;
+    abstract public static function getCollection(): string;
 
     /**
      * Add event log.
