@@ -167,36 +167,66 @@ abstract class Base extends TestCase
         $timestamp3 = DateTime::formatTz(DateTime::now()) ?? '';
 
         $batchEvents = [
-            new Log([
-                'userId' => $userId,
-                'event' => 'create',
-                'resource' => 'database/document/batch1',
-                'userAgent' => $userAgent,
-                'ip' => $ip,
-                'location' => $location,
-                'data' => ['key' => 'value1'],
-                'timestamp' => $timestamp1
-            ]),
-            new Log([
-                'userId' => $userId,
-                'event' => 'update',
-                'resource' => 'database/document/batch2',
-                'userAgent' => $userAgent,
-                'ip' => $ip,
-                'location' => $location,
-                'data' => ['key' => 'value2'],
-                'timestamp' => $timestamp2
-            ]),
-            new Log([
-                'userId' => $userId,
-                'event' => 'delete',
-                'resource' => 'database/document/batch3',
-                'userAgent' => $userAgent,
-                'ip' => $ip,
-                'location' => $location,
-                'data' => ['key' => 'value3'],
-                'timestamp' => $timestamp3
-            ]),
+            (new Log())
+                ->setData(['key1' => 'value1'])
+                ->setEvent('create')
+                ->setHostname('')
+                ->setIp($ip)
+                ->setLocation($location)
+                ->setProjectId('1')
+                ->setProjectInternalId('1')
+                ->setResource('database/document/batch1')
+                ->setResourceId('db1')
+                ->setResourceInternalId('1')
+                ->setResourceParent('parent')
+                ->setResourceType('database')
+                ->setTeamId('1')
+                ->setTeamInternalId('1')
+                ->setTime($timestamp1)
+                ->setUserAgent($userAgent)
+                ->setUserId($userId)
+                ->setUserInternalId('1')
+                ->setUserType('anonymous'),
+            (new Log())
+                ->setData(['key1' => 'value2'])
+                ->setEvent('update')
+                ->setHostname('')
+                ->setIp($ip)
+                ->setLocation($location)
+                ->setProjectId('1')
+                ->setProjectInternalId('1')
+                ->setResource('database/document/batch2')
+                ->setResourceId('db1')
+                ->setResourceInternalId('1')
+                ->setResourceParent('parent')
+                ->setResourceType('database')
+                ->setTeamId('1')
+                ->setTeamInternalId('1')
+                ->setTime($timestamp2)
+                ->setUserAgent($userAgent)
+                ->setUserId($userId)
+                ->setUserInternalId('1')
+                ->setUserType('anonymous'),
+            (new Log())
+                ->setData(['key1' => 'value3'])
+                ->setEvent('delete')
+                ->setHostname('')
+                ->setIp($ip)
+                ->setLocation($location)
+                ->setProjectId('1')
+                ->setProjectInternalId('1')
+                ->setResource('database/document/batch3')
+                ->setResourceId('db1')
+                ->setResourceInternalId('1')
+                ->setResourceParent('parent')
+                ->setResourceType('database')
+                ->setTeamId('1')
+                ->setTeamInternalId('1')
+                ->setTime($timestamp3)
+                ->setUserAgent($userAgent)
+                ->setUserId($userId)
+                ->setUserInternalId('1')
+                ->setUserType('anonymous'),
         ];
 
         // Test batch insertion
