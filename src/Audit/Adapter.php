@@ -154,7 +154,7 @@ abstract class Adapter
             $queries = [];
 
             $queries[] = Query::equal('userId', [$userId]);
-            $queries[] = Query::orderDesc('');
+            $queries[] = Query::orderDesc();
 
             if (!\is_null($limit)) {
                 $queries[] = Query::limit($limit);
@@ -214,7 +214,7 @@ abstract class Adapter
             $queries = [];
 
             $queries[] = Query::equal('resource', [$resource]);
-            $queries[] = Query::orderDesc('');
+            $queries[] = Query::orderDesc();
 
             if (!\is_null($limit)) {
                 $queries[] = Query::limit($limit);
@@ -277,7 +277,7 @@ abstract class Adapter
 
             $queries[] = Query::equal('userId', [$userId]);
             $queries[] = Query::equal('event', $events);
-            $queries[] = Query::orderDesc('');
+            $queries[] = Query::orderDesc();
 
             if (!\is_null($limit)) {
                 $queries[] = Query::limit($limit);
@@ -344,7 +344,7 @@ abstract class Adapter
 
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::equal('event', $events);
-            $queries[] = Query::orderDesc('');
+            $queries[] = Query::orderDesc();
 
             if (!\is_null($limit)) {
                 $queries[] = Query::limit($limit);
@@ -397,7 +397,6 @@ abstract class Adapter
      * @return bool
      *
      * @throws AuthorizationException
-     * @throws \Exception
      */
     public function cleanup(string $datetime): bool
     {
@@ -406,6 +405,8 @@ abstract class Adapter
                 collection: $this->getCollection(),
                 queries: [
                     Query::lessThan('time', $datetime),
+                    Query::orderDesc('time'),
+                    Query::orderDesc(),
                 ]
             );
         });
