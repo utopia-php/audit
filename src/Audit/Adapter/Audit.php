@@ -8,12 +8,12 @@ use Utopia\Database\Database;
 
 class Audit extends Adapter
 {
-    public function getCollection(): string
+    public static function getCollection(): string
     {
         return 'audit';
     }
 
-    public function getAttributes(): array
+    public static function getAttributes(): array
     {
         return [
             [
@@ -85,7 +85,7 @@ class Audit extends Adapter
         ];
     }
 
-    public function getIndexes(): array
+    public static function getIndexes(): array
     {
         return [
             [
