@@ -4,9 +4,13 @@ namespace Utopia\Audit;
 
 use Utopia\Database\Database;
 use Utopia\Database\Document;
+use Utopia\Database\Exception as DatabaseException;
 use Utopia\Database\Exception\Authorization as AuthorizationException;
 use Utopia\Database\Exception\Duplicate as DuplicateException;
+use Utopia\Database\Exception\Restricted as RestrictedException;
 use Utopia\Database\Exception\Structure as StructureException;
+use Utopia\Database\Exception\Timeout as TimeoutException;
+use Utopia\Database\Exception\Query as QueryException;
 use Utopia\Database\Query;
 use Utopia\Database\Validator\Authorization;
 use Utopia\Exception;
@@ -135,39 +139,24 @@ abstract class Adapter
      * Get all logs by user ID.
      *
      * @param string $userId
-     * @param int|null $limit
-     * @param int|null $offset
-     * @param Document|null $orderAfter
+     * @param array<Query> $queries
      * @return array<Document>
      *
-     * @throws \Exception
+     * @throws TimeoutException
+     * @throws DatabaseException
+     * @throws QueryException
      */
     public function getLogsByUser(
         string $userId,
-        ?int $limit = null,
-        ?int $offset = null,
-        ?Document $orderAfter = null
+        array $queries = []
     ): array {
         /** @var array<Document> $result */
-        $result = Authorization::skip(function () use ($userId, $limit, $offset, $orderAfter) {
-            /** @var array<Query> $queries */
-            $queries = [];
-
+        $result = Authorization::skip(function () use ($queries, $userId) {
             $queries[] = Query::equal('userId', [$userId]);
             $queries[] = Query::orderDesc();
 
-            if (!\is_null($limit)) {
-                $queries[] = Query::limit($limit);
-            }
-            if (!\is_null($offset)) {
-                $queries[] = Query::offset($offset);
-            }
-            if (!\is_null($orderAfter)) {
-                $queries[] = Query::cursorAfter($orderAfter);
-            }
-
             return $this->db->find(
-                collection: $this->getCollection(),
+                collection: static::getCollection(),
                 queries: $queries,
             );
         });
@@ -179,16 +168,22 @@ abstract class Adapter
      * Count logs by user ID.
      *
      * @param string $userId
+     * @param array<Query> $queries
      * @return int
-     * @throws \Utopia\Database\Exception
+     * @throws DatabaseException
      */
-    public function countLogsByUser(string $userId): int
-    {
+    public function countLogsByUser(
+        string $userId,
+        array $queries = []
+    ): int {
         /** @var int $count */
-        $count = Authorization::skip(function () use ($userId) {
+        $count = Authorization::skip(function () use ($queries, $userId) {
             return $this->db->count(
-                collection: $this->getCollection(),
-                queries: [Query::equal('userId', [$userId])]
+                collection: static::getCollection(),
+                queries: [
+                    Query::equal('userId', [$userId]),
+                    ...$queries,
+                ]
             );
         });
 
@@ -199,35 +194,24 @@ abstract class Adapter
      * Get all logs by resource.
      *
      * @param string $resource
-     * @param int|null $limit
-     * @param int|null $offset
-     * @param Document|null $orderAfter
+     * @param array<Query> $queries
      * @return array<Document>
      *
-     * @throws \Exception
+     * @throws TimeoutException
+     * @throws DatabaseException
+     * @throws QueryException
      */
-    public function getLogsByResource(string $resource, ?int $limit = 25, ?int $offset = null, ?Document $orderAfter = null): array
-    {
+    public function getLogsByResource(
+        string $resource,
+        array $queries = [],
+    ): array {
         /** @var array<Document> $result */
-        $result = Authorization::skip(function () use ($resource, $limit, $offset, $orderAfter) {
-            /** @var array<Query> $queries */
-            $queries = [];
-
+        $result = Authorization::skip(function () use ($queries, $resource) {
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::orderDesc();
 
-            if (!\is_null($limit)) {
-                $queries[] = Query::limit($limit);
-            }
-            if (!\is_null($offset)) {
-                $queries[] = Query::offset($offset);
-            }
-            if (!\is_null($orderAfter)) {
-                $queries[] = Query::cursorAfter($orderAfter);
-            }
-
             return $this->db->find(
-                collection: $this->getCollection(),
+                collection: static::getCollection(),
                 queries: $queries,
             );
         });
@@ -239,17 +223,23 @@ abstract class Adapter
      * Count logs by resource.
      *
      * @param string $resource
+     * @param array<Query> $queries
      * @return int
      *
-     * @throws \Exception
+     * @throws DatabaseException
      */
-    public function countLogsByResource(string $resource): int
-    {
+    public function countLogsByResource(
+        string $resource,
+        array $queries = []
+    ): int {
         /** @var int $count */
-        $count = Authorization::skip(function () use ($resource) {
+        $count = Authorization::skip(function () use ($resource, $queries) {
             return $this->db->count(
-                collection: $this->getCollection(),
-                queries: [Query::equal('resource', [$resource])]
+                collection: static::getCollection(),
+                queries: [
+                    Query::equal('resource', [$resource]),
+                    ...$queries,
+                ]
             );
         });
 
@@ -261,36 +251,26 @@ abstract class Adapter
      *
      * @param string $userId
      * @param array<int,string> $events
-     * @param int|null $limit
-     * @param int|null $offset
-     * @param Document|null $orderAfter
+     * @param array<Query> $queries
      * @return array<Document>
      *
-     * @throws \Exception
+     * @throws TimeoutException
+     * @throws DatabaseException
+     * @throws QueryException
      */
-    public function getLogsByUserAndEvents(string $userId, array $events, ?int $limit = null, ?int $offset = null, ?Document $orderAfter = null): array
-    {
+    public function getLogsByUserAndEvents(
+        string $userId,
+        array $events,
+        array $queries = [],
+    ): array {
         /** @var array<Document> $result */
-        $result = Authorization::skip(function () use ($userId, $events, $limit, $offset, $orderAfter) {
-            /** @var array<Query> $queries */
-            $queries = [];
-
+        $result = Authorization::skip(function () use ($userId, $events, $queries) {
             $queries[] = Query::equal('userId', [$userId]);
             $queries[] = Query::equal('event', $events);
             $queries[] = Query::orderDesc();
 
-            if (!\is_null($limit)) {
-                $queries[] = Query::limit($limit);
-            }
-            if (!\is_null($offset)) {
-                $queries[] = Query::offset($offset);
-            }
-            if (!\is_null($orderAfter)) {
-                $queries[] = Query::cursorAfter($orderAfter);
-            }
-
             return $this->db->find(
-                collection: $this->getCollection(),
+                collection: static::getCollection(),
                 queries: $queries,
             );
         });
@@ -303,19 +283,24 @@ abstract class Adapter
      *
      * @param string $userId
      * @param array<int,string> $events
+     * @param array<Query> $queries
      * @return int
      *
-     * @throws \Exception
+     * @throws DatabaseException
      */
-    public function countLogsByUserAndEvents(string $userId, array $events): int
-    {
+    public function countLogsByUserAndEvents(
+        string $userId,
+        array $events,
+        array $queries = [],
+    ): int {
         /** @var int $count */
-        $count = Authorization::skip(function () use ($userId, $events) {
+        $count = Authorization::skip(function () use ($userId, $events, $queries) {
             return $this->db->count(
-                collection: $this->getCollection(),
+                collection: static::getCollection(),
                 queries: [
                     Query::equal('userId', [$userId]),
                     Query::equal('event', $events),
+                    ...$queries,
                 ]
             );
         });
@@ -328,36 +313,26 @@ abstract class Adapter
      *
      * @param string $resource
      * @param array<int,string> $events
-     * @param int|null $limit
-     * @param int|null $offset
-     * @param Document|null $orderAfter
+     * @param array<Query> $queries
      * @return array<Document>
      *
-     * @throws \Exception
+     * @throws TimeoutException
+     * @throws DatabaseException
+     * @throws QueryException
      */
-    public function getLogsByResourceAndEvents(string $resource, array $events, ?int $limit = null, ?int $offset = null, ?Document $orderAfter = null): array
-    {
+    public function getLogsByResourceAndEvents(
+        string $resource,
+        array $events,
+        array $queries = [],
+    ): array {
         /** @var array<Document> $result */
-        $result = Authorization::skip(function () use ($resource, $events, $limit, $offset, $orderAfter) {
-            /** @var array<Query> $queries */
-            $queries = [];
-
+        $result = Authorization::skip(function () use ($resource, $events, $queries) {
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::equal('event', $events);
             $queries[] = Query::orderDesc();
 
-            if (!\is_null($limit)) {
-                $queries[] = Query::limit($limit);
-            }
-            if (!\is_null($offset)) {
-                $queries[] = Query::offset($offset);
-            }
-            if (!\is_null($orderAfter)) {
-                $queries[] = Query::cursorAfter($orderAfter);
-            }
-
             return $this->db->find(
-                collection: $this->getCollection(),
+                collection: static::getCollection(),
                 queries: $queries,
             );
         });
@@ -370,19 +345,24 @@ abstract class Adapter
      *
      * @param string $resource
      * @param array<int,string> $events
+     * @param array<Query> $queries
      * @return int
      *
-     * @throws \Exception
+     * @throws DatabaseException
      */
-    public function countLogsByResourceAndEvents(string $resource, array $events): int
-    {
+    public function countLogsByResourceAndEvents(
+        string $resource,
+        array $events,
+        array $queries = [],
+    ): int {
         /** @var int $count */
-        $count = Authorization::skip(function () use ($resource, $events) {
+        $count = Authorization::skip(function () use ($resource, $events, $queries) {
             return $this->db->count(
-                collection: $this->getCollection(),
+                collection: static::getCollection(),
                 queries: [
                     Query::equal('resource', [$resource]),
                     Query::equal('event', $events),
+                    ...$queries,
                 ]
             );
         });
@@ -395,8 +375,10 @@ abstract class Adapter
      *
      * @param string $datetime
      * @return bool
-     *
      * @throws AuthorizationException
+     * @throws RestrictedException
+     * @throws DatabaseException
+     * @throws \Throwable
      */
     public function cleanup(string $datetime): bool
     {

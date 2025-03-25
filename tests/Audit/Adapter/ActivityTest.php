@@ -14,10 +14,6 @@ class ActivityTest extends Base
 {
     public function setUp(): void
     {
-        if (isset(static::$adapter)) {
-            return;
-        }
-
         $dbHost = 'mariadb';
         $dbPort = '3306';
         $dbUser = 'root';
@@ -39,7 +35,7 @@ class ActivityTest extends Base
 
         $database->create('utopiaTests');
 
-        $this->getAdapter()?->setup();
+        $this->getAdapter()->setup();
 
         $this->createLogs();
     }
