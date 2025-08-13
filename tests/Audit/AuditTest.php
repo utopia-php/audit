@@ -54,6 +54,7 @@ class AuditTest extends TestCase
         $this->assertTrue($this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
         $this->assertTrue($this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
         $this->assertTrue($this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
+        $this->assertTrue($this->audit->log(null, 'insert', 'user/null', $userAgent, $ip, $location, $data));
     }
 
     public function testGetLogsByUser(): void
@@ -144,6 +145,11 @@ class AuditTest extends TestCase
         $logs4 = $this->audit->getLogsByResource('database/document/2', [Query::limit(1), Query::offset(1)]);
         $this->assertEquals(1, \count($logs4));
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
+
+        $logs5 = $this->audit->getLogsByResource('user/null');
+        $this->assertEquals(1, \count($logs5));
+        $this->assertNull($logs5[0]['userId']);
+        $this->assertEquals('127.0.0.1', $logs5[0]['ip']);
     }
 
     public function testLogByBatch(): void
@@ -191,6 +197,16 @@ class AuditTest extends TestCase
                 'location' => $location,
                 'data' => ['key' => 'value3'],
                 'timestamp' => $timestamp3
+            ],
+            [
+                'userId' => null,
+                'event' => 'insert',
+                'resource' => 'user1/null',
+                'userAgent' => $userAgent,
+                'ip' => $ip,
+                'location' => $location,
+                'data' => ['key' => 'value4'],
+                'timestamp' => $timestamp3
             ]
         ];
 
@@ -215,6 +231,14 @@ class AuditTest extends TestCase
         $resourceLogs = $this->audit->getLogsByResource('database/document/batch2');
         $this->assertEquals(1, count($resourceLogs));
         $this->assertEquals('update', $resourceLogs[0]->getAttribute('event'));
+
+        // Test resource with userId null
+        $resourceLogs = $this->audit->getLogsByResource('user1/null');
+        $this->assertEquals(1, count($resourceLogs));
+        foreach ($resourceLogs as $log) {
+            $this->assertEquals('insert', $log->getAttribute('event'));
+            $this->assertNull($log['userId']);
+        }
 
         // Test event-based retrieval
         $eventLogs = $this->audit->getLogsByUserAndEvents($userId, ['create', 'delete']);
