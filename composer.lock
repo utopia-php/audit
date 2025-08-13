@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c47e405442ee96d19c9c4b97d1f69f12",
+    "content-hash": "1cf793dd6d053780a3cacb15266becb7",
     "packages": [
         {
             "name": "brick/math",
@@ -1877,7 +1877,7 @@
         },
         {
             "name": "utopia-php/database",
-            "version": "0.77.4",
+            "version": "1.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/database.git",
@@ -1927,7 +1927,7 @@
             ],
             "support": {
                 "issues": "https://github.com/utopia-php/database/issues",
-                "source": "https://github.com/utopia-php/database/tree/0.77.4"
+                "source": "https://github.com/utopia-php/database/tree/1.0.0"
             },
             "time": "2025-08-11T13:56:31+00:00"
         },
@@ -3997,12 +3997,12 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": [],
+    "stability-flags": {},
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
         "php": ">=8.0"
     },
-    "platform-dev": [],
+    "platform-dev": {},
     "plugin-api-version": "2.6.0"
 }
