@@ -157,7 +157,7 @@ class Audit
     /**
      * Add event log.
      *
-     * @param  ?string  $userId
+     * @param  string|null  $userId
      * @param  string  $event
      * @param  string  $resource
      * @param  string  $userAgent
@@ -194,7 +194,7 @@ class Audit
     /**
      * Add multiple event logs in batch.
      *
-     * @param array<array{userId: string, event: string, resource: string, userAgent: string, ip: string, location: string, timestamp: string, data?: array<string,mixed>}> $events
+     * @param array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, timestamp: string, data?: array<string,mixed>}> $events
      * @return bool
      *
      * @throws AuthorizationException
