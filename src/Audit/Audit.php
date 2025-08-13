@@ -22,7 +22,7 @@ class Audit
             '$id' => 'userId',
             'type' => Database::VAR_STRING,
             'size' => Database::LENGTH_KEY,
-            'required' => true,
+            'required' => false,
             'signed' => true,
             'array' => false,
             'filters' => [],
@@ -157,7 +157,7 @@ class Audit
     /**
      * Add event log.
      *
-     * @param  string  $userId
+     * @param  ?string  $userId
      * @param  string  $event
      * @param  string  $resource
      * @param  string  $userAgent
@@ -171,7 +171,7 @@ class Audit
      * @throws \Exception
      * @throws \Throwable
      */
-    public function log(string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): bool
+    public function log(?string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): bool
     {
         Authorization::skip(function () use ($userId, $event, $resource, $userAgent, $ip, $location, $data) {
             $this->db->createDocument(Audit::COLLECTION, new Document([
