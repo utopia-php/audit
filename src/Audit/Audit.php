@@ -295,7 +295,7 @@ class Audit
         array $queries = [],
     ): array {
         /** @var array<Document> $result */
-        $result = $this->db->getAuthorization(function () use ($queries, $resource) {
+        $result = $this->db->getAuthorization()->skip(function () use ($queries, $resource) {
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::orderDesc();
 
