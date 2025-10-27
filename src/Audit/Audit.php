@@ -172,7 +172,7 @@ class Audit
      */
     public function log(?string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): bool
     {
-        $this->db->getAutorization()->skip(function () use ($userId, $event, $resource, $userAgent, $ip, $location, $data) {
+        $this->db->getAuthorization()->skip(function () use ($userId, $event, $resource, $userAgent, $ip, $location, $data) {
             $this->db->createDocument(Audit::COLLECTION, new Document([
                 '$permissions' => [],
                 'userId' => $userId,
@@ -203,7 +203,7 @@ class Audit
      */
     public function logBatch(array $events): bool
     {
-        $this->db->getAutorization()->skip(function () use ($events) {
+        $this->db->getAuthorization()->skip(function () use ($events) {
             $documents = \array_map(function ($event) {
                 return new Document([
                     '$permissions' => [],
@@ -240,7 +240,7 @@ class Audit
         array $queries = []
     ): array {
         /** @var array<Document> $result */
-        $result = $this->db->getAutorization()->skip(function () use ($queries, $userId) {
+        $result = $this->db->getAuthorization()->skip(function () use ($queries, $userId) {
             $queries[] = Query::equal('userId', [$userId]);
             $queries[] = Query::orderDesc();
 
@@ -266,7 +266,7 @@ class Audit
         array $queries = []
     ): int {
         /** @var int $count */
-        $count = $this->db->getAutorization()->skip(function () use ($queries, $userId) {
+        $count = $this->db->getAuthorization()->skip(function () use ($queries, $userId) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [
@@ -295,7 +295,7 @@ class Audit
         array $queries = [],
     ): array {
         /** @var array<Document> $result */
-        $result = $this->db->getAutorization()->skip(function () use ($queries, $resource) {
+        $result = $this->db->getAuthorization()->skip(function () use ($queries, $resource) {
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::orderDesc();
 
@@ -322,7 +322,7 @@ class Audit
         array $queries = []
     ): int {
         /** @var int $count */
-        $count = $this->db->getAutorization()->skip(function () use ($resource, $queries) {
+        $count = $this->db->getAuthorization()->skip(function () use ($resource, $queries) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [
@@ -353,7 +353,7 @@ class Audit
         array $queries = [],
     ): array {
         /** @var array<Document> $result */
-        $result = $this->db->getAutorization()->skip(function () use ($userId, $events, $queries) {
+        $result = $this->db->getAuthorization()->skip(function () use ($userId, $events, $queries) {
             $queries[] = Query::equal('userId', [$userId]);
             $queries[] = Query::equal('event', $events);
             $queries[] = Query::orderDesc();
@@ -383,7 +383,7 @@ class Audit
         array $queries = [],
     ): int {
         /** @var int $count */
-        $count = $this->db->getAutorization()->skip(function () use ($userId, $events, $queries) {
+        $count = $this->db->getAuthorization()->skip(function () use ($userId, $events, $queries) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [
@@ -415,7 +415,7 @@ class Audit
         array $queries = [],
     ): array {
         /** @var array<Document> $result */
-        $result = $this->db->getAutorization()->skip(function () use ($resource, $events, $queries) {
+        $result = $this->db->getAuthorization()->skip(function () use ($resource, $events, $queries) {
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::equal('event', $events);
             $queries[] = Query::orderDesc();
@@ -445,7 +445,7 @@ class Audit
         array $queries = [],
     ): int {
         /** @var int $count */
-        $count = $this->db->getAutorization()->skip(function () use ($resource, $events, $queries) {
+        $count = $this->db->getAuthorization()->skip(function () use ($resource, $events, $queries) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [
@@ -470,7 +470,7 @@ class Audit
      */
     public function cleanup(string $datetime): bool
     {
-        $this->db->getAutorization()->skip(function () use ($datetime) {
+        $this->db->getAuthorization()->skip(function () use ($datetime) {
             do {
                 $documents = $this->db->find(
                     collection: Audit::COLLECTION,
