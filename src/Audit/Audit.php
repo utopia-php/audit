@@ -295,7 +295,7 @@ class Audit
         array $queries = [],
     ): array {
         /** @var array<Document> $result */
-        $result = $this->db->skipAuthorization(function () use ($queries, $resource) {
+        $result = $this->db->getAuthorization(function () use ($queries, $resource) {
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::orderDesc();
 
@@ -383,7 +383,7 @@ class Audit
         array $queries = [],
     ): int {
         /** @var int $count */
-        $count = $this->db->skipAuthorization(function () use ($userId, $events, $queries) {
+        $count = $this->db->getAuthorization()->skip(function () use ($userId, $events, $queries) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [
@@ -415,7 +415,7 @@ class Audit
         array $queries = [],
     ): array {
         /** @var array<Document> $result */
-        $result = $this->db->skipAuthorization(function () use ($resource, $events, $queries) {
+        $result = $this->db->getAuthorization()->skip(function () use ($resource, $events, $queries) {
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::equal('event', $events);
             $queries[] = Query::orderDesc();
@@ -445,7 +445,7 @@ class Audit
         array $queries = [],
     ): int {
         /** @var int $count */
-        $count = $this->db->skipAuthorization(function () use ($resource, $events, $queries) {
+        $count = $this->db->getAuthorization()->skip(function () use ($resource, $events, $queries) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [
@@ -470,7 +470,7 @@ class Audit
      */
     public function cleanup(string $datetime): bool
     {
-        $this->db->skipAuthorization(function () use ($datetime) {
+        $this->db->getAuthorization()->skip(function () use ($datetime) {
             do {
                 $documents = $this->db->find(
                     collection: Audit::COLLECTION,
