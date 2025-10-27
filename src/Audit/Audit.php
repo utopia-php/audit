@@ -172,7 +172,7 @@ class Audit
      */
     public function log(?string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): bool
     {
-        $this->db->skipAuthorization(function () use ($userId, $event, $resource, $userAgent, $ip, $location, $data) {
+        $this->db->getAuthorization()->skip(function () use ($userId, $event, $resource, $userAgent, $ip, $location, $data) {
             $this->db->createDocument(Audit::COLLECTION, new Document([
                 '$permissions' => [],
                 'userId' => $userId,
