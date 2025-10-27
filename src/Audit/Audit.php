@@ -203,7 +203,7 @@ class Audit
      */
     public function logBatch(array $events): bool
     {
-        $this->db->skipAuthorization(function () use ($events) {
+        $this->db->getAuthorization()->skip(function () use ($events) {
             $documents = \array_map(function ($event) {
                 return new Document([
                     '$permissions' => [],
@@ -240,7 +240,7 @@ class Audit
         array $queries = []
     ): array {
         /** @var array<Document> $result */
-        $result = $this->db->skipAuthorization(function () use ($queries, $userId) {
+        $result = $this->db->getAuthorization()->skip(function () use ($queries, $userId) {
             $queries[] = Query::equal('userId', [$userId]);
             $queries[] = Query::orderDesc();
 
@@ -266,7 +266,7 @@ class Audit
         array $queries = []
     ): int {
         /** @var int $count */
-        $count = $this->db->skipAuthorization(function () use ($queries, $userId) {
+        $count = $this->db->getAuthorization()->skip(function () use ($queries, $userId) {
             return $this->db->count(
                 collection: Audit::COLLECTION,
                 queries: [
