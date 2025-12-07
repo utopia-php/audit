@@ -18,17 +18,22 @@ class ClickHouse extends SQL
 
     private const DEFAULT_TABLE = 'audits';
 
+    private const DEFAULT_DATABASE = 'default';
+
     private string $host;
 
     private int $port;
 
-    private string $database;
+    private string $database = self::DEFAULT_DATABASE;
 
-    private string $table;
+    private string $table = self::DEFAULT_TABLE;
 
     private string $username;
 
     private string $password;
+
+    /** @var bool Whether to use HTTPS for ClickHouse HTTP interface */
+    private bool $secure = false;
 
     protected string $namespace = '';
 
@@ -38,26 +43,23 @@ class ClickHouse extends SQL
 
     /**
      * @param string $host ClickHouse host
-     * @param string $database ClickHouse database name
      * @param string $username ClickHouse username (default: 'default')
      * @param string $password ClickHouse password (default: '')
      * @param int $port ClickHouse HTTP port (default: 8123)
-     * @param string $table Table name for audit logs (default: 'audits')
+     * @param bool $secure Whether to use HTTPS (default: false)
      */
     public function __construct(
         string $host,
-        string $database,
         string $username = 'default',
         string $password = '',
         int $port = self::DEFAULT_PORT,
-        string $table = self::DEFAULT_TABLE
+        bool $secure = false
     ) {
         $this->host = $host;
         $this->port = $port;
-        $this->database = $database;
-        $this->table = $table;
         $this->username = $username;
         $this->password = $password;
+        $this->secure = $secure;
     }
 
     /**
@@ -78,6 +80,24 @@ class ClickHouse extends SQL
     public function setNamespace(string $namespace): self
     {
         $this->namespace = $namespace;
+        return $this;
+    }
+
+    /**
+     * Set the database name for subsequent operations.
+     */
+    public function setDatabase(string $database): self
+    {
+        $this->database = $database;
+        return $this;
+    }
+
+    /**
+     * Enable or disable HTTPS for ClickHouse HTTP interface.
+     */
+    public function setSecure(bool $secure): self
+    {
+        $this->secure = $secure;
         return $this;
     }
 
@@ -179,7 +199,8 @@ class ClickHouse extends SQL
      */
     private function query(string $sql, array $params = []): string
     {
-        $url = "http://{$this->host}:{$this->port}/";
+        $scheme = $this->secure ? 'https' : 'http';
+        $url = "{$scheme}://{$this->host}:{$this->port}/";
 
         // Replace parameters in query
         foreach ($params as $key => $value) {

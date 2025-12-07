@@ -19,12 +19,12 @@ class AuditClickHouseTest extends TestCase
     {
         $clickHouse = new ClickHouse(
             host: 'clickhouse',
-            database: 'default',
             username: 'default',
             password: 'clickhouse',
-            port: 8123,
-            table: 'audit_logs'
+            port: 8123
         );
+
+        $clickHouse->setDatabase('default');
 
         $this->audit = new Audit($clickHouse);
         $this->audit->setup();
