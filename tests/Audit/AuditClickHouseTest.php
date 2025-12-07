@@ -5,7 +5,6 @@ namespace Utopia\Tests;
 use PHPUnit\Framework\TestCase;
 use Utopia\Audit\Adapter\ClickHouse;
 use Utopia\Audit\Audit;
-use Utopia\Audit\Adapter;
 
 /**
  * ClickHouse Adapter Tests
