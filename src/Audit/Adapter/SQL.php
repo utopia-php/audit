@@ -126,7 +126,7 @@ abstract class SQL extends Adapter
      */
     protected function getAttributeDocuments(): array
     {
-        return array_map(static fn(array $attribute) => new Document($attribute), $this->getAttributes());
+        return array_map(static fn (array $attribute) => new Document($attribute), $this->getAttributes());
     }
 
     /**
@@ -172,7 +172,7 @@ abstract class SQL extends Adapter
      */
     protected function getIndexDocuments(): array
     {
-        return array_map(static fn(array $index) => new Document($index), $this->getIndexes());
+        return array_map(static fn (array $index) => new Document($index), $this->getIndexes());
     }
 
     /**
