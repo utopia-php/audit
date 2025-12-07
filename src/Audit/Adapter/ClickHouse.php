@@ -5,7 +5,6 @@ namespace Utopia\Audit\Adapter;
 use Exception;
 use Utopia\Database\Document;
 use Utopia\Fetch\Client;
-use Utopia\Fetch\FetchException;
 
 /**
  * ClickHouse Adapter for Audit
@@ -30,6 +29,12 @@ class ClickHouse extends SQL
     private string $username;
 
     private string $password;
+
+    protected string $namespace = '';
+
+    protected ?int $tenant = null;
+
+    protected bool $sharedTables = false;
 
     /**
      * @param string $host ClickHouse host
@@ -64,6 +69,92 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Set the namespace for multi-project support.
+     * Namespace is used as a prefix for table names.
+     *
+     * @param string $namespace
+     * @return self
+     */
+    public function setNamespace(string $namespace): self
+    {
+        $this->namespace = $namespace;
+        return $this;
+    }
+
+    /**
+     * Get the namespace.
+     *
+     * @return string
+     */
+    public function getNamespace(): string
+    {
+        return $this->namespace;
+    }
+
+    /**
+     * Set the tenant ID for multi-tenant support.
+     * Tenant is used to isolate audit logs by tenant.
+     *
+     * @param int|null $tenant
+     * @return self
+     */
+    public function setTenant(?int $tenant): self
+    {
+        $this->tenant = $tenant;
+        return $this;
+    }
+
+    /**
+     * Get the tenant ID.
+     *
+     * @return int|null
+     */
+    public function getTenant(): ?int
+    {
+        return $this->tenant;
+    }
+
+    /**
+     * Set whether tables are shared across tenants.
+     * When enabled, a tenant column is added to the table for data isolation.
+     *
+     * @param bool $sharedTables
+     * @return self
+     */
+    public function setSharedTables(bool $sharedTables): self
+    {
+        $this->sharedTables = $sharedTables;
+        return $this;
+    }
+
+    /**
+     * Get whether tables are shared across tenants.
+     *
+     * @return bool
+     */
+    public function isSharedTables(): bool
+    {
+        return $this->sharedTables;
+    }
+
+    /**
+     * Get the table name with namespace prefix.
+     * Namespace is used to isolate tables for different projects/applications.
+     *
+     * @return string
+     */
+    private function getTableName(): string
+    {
+        $tableName = $this->table;
+
+        if (!empty($this->namespace)) {
+            $tableName = $this->namespace . '_' . $tableName;
+        }
+
+        return $tableName;
+    }
+
+    /**
      * Execute a ClickHouse query via HTTP interface using Fetch Client.
      *
      * @throws Exception|FetchException
@@ -87,19 +178,17 @@ class ClickHouse extends SQL
         }
 
         // Build headers with authentication
-        $headers = [
-            'X-ClickHouse-User' => $this->username,
-            'X-ClickHouse-Key' => $this->password,
-            'X-ClickHouse-Database' => $this->database,
-        ];
+        $client = new Client();
+        $client->addHeader('X-ClickHouse-User', $this->username);
+        $client->addHeader('X-ClickHouse-Key', $this->password);
+        $client->addHeader('X-ClickHouse-Database', $this->database);
+        $client->setTimeout(30);
 
         try {
-            $response = Client::fetch(
+            $response = $client->fetch(
                 url: $url,
                 method: Client::METHOD_POST,
-                headers: $headers,
-                body: ['query' => $sql],
-                timeout: 30
+                body: ['query' => $sql]
             );
 
             if ($response->getStatusCode() !== 200) {
@@ -107,7 +196,7 @@ class ClickHouse extends SQL
             }
 
             return $response->getBody() ?: '';
-        } catch (FetchException $e) {
+        } catch (Exception $e) {
             throw new Exception("ClickHouse connection error: {$e->getMessage()}");
         }
     }
@@ -127,10 +216,15 @@ class ClickHouse extends SQL
         $this->query($createDbSql);
 
         // Build column definitions from base adapter schema
-        $columns = array_merge(
-            ['id String'],
-            $this->getAllColumnDefinitions()
-        );
+        $columns = [
+            'id String',
+            ...$this->getAllColumnDefinitions(),
+        ];
+
+        // Add tenant column only if tables are shared across tenants
+        if ($this->sharedTables) {
+            $columns[] = 'tenant Nullable(UInt64)';  // Supports 11-digit MySQL auto-increment IDs
+        }
 
         // Build indexes from base adapter schema
         $indexes = [];
@@ -141,9 +235,11 @@ class ClickHouse extends SQL
             $indexes[] = "INDEX {$indexName} ({$attributeList}) TYPE bloom_filter GRANULARITY 1";
         }
 
+        $tableName = $this->getTableName();
+
         // Create table with MergeTree engine for optimal performance
         $createTableSql = "
-            CREATE TABLE IF NOT EXISTS {$this->database}.{$this->table} (
+            CREATE TABLE IF NOT EXISTS {$this->database}.{$tableName} (
                 " . implode(",\n                ", $columns) . ",
                 " . implode(",\n                ", $indexes) . "
             )
@@ -166,21 +262,11 @@ class ClickHouse extends SQL
         $id = uniqid('audit_', true);
         $time = date('Y-m-d H:i:s.v');
 
-        $insertSql = "
-            INSERT INTO {$this->database}.{$this->table}
-            (id, userId, event, resource, userAgent, ip, location, time, data)
-            VALUES (
-                :id,
-                :userId,
-                :event,
-                :resource,
-                :userAgent,
-                :ip,
-                :location,
-                :time,
-                :data
-            )
-        ";
+        $tableName = $this->getTableName();
+
+        // Build column list and values based on sharedTables setting
+        $columns = ['id', 'userId', 'event', 'resource', 'userAgent', 'ip', 'location', 'time', 'data'];
+        $placeholders = [':id', ':userId', ':event', ':resource', ':userAgent', ':ip', ':location', ':time', ':data'];
 
         $params = [
             'id' => $id,
@@ -194,9 +280,23 @@ class ClickHouse extends SQL
             'data' => json_encode($log['data'] ?? []),
         ];
 
+        if ($this->sharedTables) {
+            $columns[] = 'tenant';
+            $placeholders[] = ':tenant';
+            $params['tenant'] = $this->tenant;
+        }
+
+        $insertSql = "
+            INSERT INTO {$this->database}.{$tableName}
+            (" . implode(', ', $columns) . ")
+            VALUES (
+                " . implode(", ", $placeholders) . "
+            )
+        ";
+
         $this->query($insertSql, $params);
 
-        return new Document([
+        $result = [
             '$id' => $id,
             'userId' => $log['userId'] ?? null,
             'event' => $log['event'],
@@ -206,7 +306,13 @@ class ClickHouse extends SQL
             'location' => $log['location'] ?? null,
             'time' => $time,
             'data' => $log['data'] ?? [],
-        ]);
+        ];
+
+        if ($this->sharedTables) {
+            $result['tenant'] = $this->tenant;
+        }
+
+        return new Document($result);
     }
 
     /**
@@ -230,23 +336,48 @@ class ClickHouse extends SQL
                 ? "'" . addslashes($log['location']) . "'"
                 : 'NULL';
 
-            $values[] = sprintf(
-                "('%s', %s, '%s', '%s', '%s', '%s', %s, '%s', '%s')",
-                $id,
-                $userId,
-                addslashes($log['event']),
-                addslashes($log['resource']),
-                addslashes($log['userAgent']),
-                addslashes($log['ip']),
-                $location,
-                $log['timestamp'],
-                addslashes(json_encode($log['data'] ?? []))
-            );
+            if ($this->sharedTables) {
+                $tenant = $this->tenant !== null ? (int) $this->tenant : 'NULL';
+                $values[] = sprintf(
+                    "('%s', %s, '%s', '%s', '%s', '%s', %s, '%s', '%s', %s)",
+                    $id,
+                    $userId,
+                    addslashes($log['event']),
+                    addslashes($log['resource']),
+                    addslashes($log['userAgent']),
+                    addslashes($log['ip']),
+                    $location,
+                    $log['timestamp'],
+                    addslashes(json_encode($log['data'] ?? [])),
+                    $tenant
+                );
+            } else {
+                $values[] = sprintf(
+                    "('%s', %s, '%s', '%s', '%s', '%s', %s, '%s', '%s')",
+                    $id,
+                    $userId,
+                    addslashes($log['event']),
+                    addslashes($log['resource']),
+                    addslashes($log['userAgent']),
+                    addslashes($log['ip']),
+                    $location,
+                    $log['timestamp'],
+                    addslashes(json_encode($log['data'] ?? []))
+                );
+            }
+        }
+
+        $tableName = $this->getTableName();
+
+        // Build column list based on sharedTables setting
+        $columns = 'id, userId, event, resource, userAgent, ip, location, time, data';
+        if ($this->sharedTables) {
+            $columns .= ', tenant';
         }
 
         $insertSql = "
-            INSERT INTO {$this->database}.{$this->table}
-            (id, userId, event, resource, userAgent, ip, location, time, data)
+            INSERT INTO {$this->database}.{$tableName}
+            ({$columns})
             VALUES " . implode(', ', $values);
 
         $this->query($insertSql);
@@ -254,7 +385,7 @@ class ClickHouse extends SQL
         // Return documents
         $documents = [];
         foreach ($logs as $log) {
-            $documents[] = new Document([
+            $result = [
                 '$id' => uniqid('audit_', true),
                 'userId' => $log['userId'] ?? null,
                 'event' => $log['event'],
@@ -264,7 +395,13 @@ class ClickHouse extends SQL
                 'location' => $log['location'] ?? null,
                 'time' => $log['timestamp'],
                 'data' => $log['data'] ?? [],
-            ]);
+            ];
+
+            if ($this->sharedTables) {
+                $result['tenant'] = $this->tenant;
+            }
+
+            $documents[] = new Document($result);
         }
 
         return $documents;
@@ -288,7 +425,7 @@ class ClickHouse extends SQL
             }
 
             $columns = explode("\t", $line);
-            if (count($columns) < 9) {
+            if (count($columns) < 10) {
                 continue;
             }
 
@@ -299,7 +436,7 @@ class ClickHouse extends SQL
                 $data = [];
             }
 
-            $documents[] = new Document([
+            $document = [
                 '$id' => $columns[0],
                 'userId' => $columns[1] === '\\N' ? null : $columns[1],
                 'event' => $columns[2],
@@ -309,12 +446,46 @@ class ClickHouse extends SQL
                 'location' => $columns[6] === '\\N' ? null : $columns[6],
                 'time' => $columns[7],
                 'data' => $data,
-            ]);
+            ];
+
+            // Add tenant only if sharedTables is enabled
+            if ($this->sharedTables && isset($columns[9])) {
+                $document['tenant'] = $columns[9] === '\\N' ? null : (int) $columns[9];
+            }
+
+            $documents[] = new Document($document);
         }
 
         return $documents;
     }
 
+    /**
+     * Get the SELECT column list for queries.
+     * Returns 9 columns if not using shared tables, 10 if using shared tables.
+     *
+     * @return string
+     */
+    private function getSelectColumns(): string
+    {
+        if ($this->sharedTables) {
+            return 'id, userId, event, resource, userAgent, ip, location, time, data, tenant';
+        }
+        return 'id, userId, event, resource, userAgent, ip, location, time, data';
+    }
+
+    /**
+     * Build tenant filter clause based on current tenant context.
+     *
+     * @return string
+     */
+    private function getTenantFilter(): string
+    {
+        if (!$this->sharedTables || $this->tenant === null) {
+            return '';
+        }
+
+        return " AND tenant = {$this->tenant}";
+    }
     /**
      * Get logs by user ID.
      *
@@ -336,10 +507,13 @@ class ClickHouse extends SQL
             }
         }
 
+        $tableName = $this->getTableName();
+        $tenantFilter = $this->getTenantFilter();
+
         $sql = "
-            SELECT id, userId, event, resource, userAgent, ip, location, time, data
-            FROM {$this->database}.{$this->table}
-            WHERE userId = :userId
+            SELECT " . $this->getSelectColumns() . "
+            FROM {$this->database}.{$tableName}
+            WHERE userId = :userId{$tenantFilter}
             ORDER BY time DESC
             LIMIT :limit OFFSET :offset
             FORMAT TabSeparated
@@ -361,10 +535,13 @@ class ClickHouse extends SQL
      */
     public function countByUser(string $userId, array $queries = []): int
     {
+        $tableName = $this->getTableName();
+        $tenantFilter = $this->getTenantFilter();
+
         $sql = "
             SELECT count() as count
-            FROM {$this->database}.{$this->table}
-            WHERE userId = :userId
+            FROM {$this->database}.{$tableName}
+            WHERE userId = :userId{$tenantFilter}
             FORMAT TabSeparated
         ";
 
@@ -393,10 +570,13 @@ class ClickHouse extends SQL
             }
         }
 
+        $tableName = $this->getTableName();
+        $tenantFilter = $this->getTenantFilter();
+
         $sql = "
-            SELECT id, userId, event, resource, userAgent, ip, location, time, data
-            FROM {$this->database}.{$this->table}
-            WHERE resource = :resource
+            SELECT " . $this->getSelectColumns() . "
+            FROM {$this->database}.{$tableName}
+            WHERE resource = :resource{$tenantFilter}
             ORDER BY time DESC
             LIMIT :limit OFFSET :offset
             FORMAT TabSeparated
@@ -418,10 +598,13 @@ class ClickHouse extends SQL
      */
     public function countByResource(string $resource, array $queries = []): int
     {
+        $tableName = $this->getTableName();
+        $tenantFilter = $this->getTenantFilter();
+
         $sql = "
             SELECT count() as count
-            FROM {$this->database}.{$this->table}
-            WHERE resource = :resource
+            FROM {$this->database}.{$tableName}
+            WHERE resource = :resource{$tenantFilter}
             FORMAT TabSeparated
         ";
 
@@ -451,11 +634,13 @@ class ClickHouse extends SQL
         }
 
         $eventsList = implode("', '", array_map('addslashes', $events));
+        $tableName = $this->getTableName();
+        $tenantFilter = $this->getTenantFilter();
 
         $sql = "
-            SELECT id, userId, event, resource, userAgent, ip, location, time, data
-            FROM {$this->database}.{$this->table}
-            WHERE userId = :userId AND event IN ('{$eventsList}')
+            SELECT " . $this->getSelectColumns() . "
+            FROM {$this->database}.{$tableName}
+            WHERE userId = :userId AND event IN ('{$eventsList}'){$tenantFilter}
             ORDER BY time DESC
             LIMIT :limit OFFSET :offset
             FORMAT TabSeparated
@@ -478,11 +663,13 @@ class ClickHouse extends SQL
     public function countByUserAndEvents(string $userId, array $events, array $queries = []): int
     {
         $eventsList = implode("', '", array_map('addslashes', $events));
+        $tableName = $this->getTableName();
+        $tenantFilter = $this->getTenantFilter();
 
         $sql = "
             SELECT count() as count
-            FROM {$this->database}.{$this->table}
-            WHERE userId = :userId AND event IN ('{$eventsList}')
+            FROM {$this->database}.{$tableName}
+            WHERE userId = :userId AND event IN ('{$eventsList}'){$tenantFilter}
             FORMAT TabSeparated
         ";
 
@@ -512,11 +699,13 @@ class ClickHouse extends SQL
         }
 
         $eventsList = implode("', '", array_map('addslashes', $events));
+        $tableName = $this->getTableName();
+        $tenantFilter = $this->getTenantFilter();
 
         $sql = "
-            SELECT id, userId, event, resource, userAgent, ip, location, time, data
-            FROM {$this->database}.{$this->table}
-            WHERE resource = :resource AND event IN ('{$eventsList}')
+            SELECT " . $this->getSelectColumns() . "
+            FROM {$this->database}.{$tableName}
+            WHERE resource = :resource AND event IN ('{$eventsList}'){$tenantFilter}
             ORDER BY time DESC
             LIMIT :limit OFFSET :offset
             FORMAT TabSeparated
@@ -539,11 +728,13 @@ class ClickHouse extends SQL
     public function countByResourceAndEvents(string $resource, array $events, array $queries = []): int
     {
         $eventsList = implode("', '", array_map('addslashes', $events));
+        $tableName = $this->getTableName();
+        $tenantFilter = $this->getTenantFilter();
 
         $sql = "
             SELECT count() as count
-            FROM {$this->database}.{$this->table}
-            WHERE resource = :resource AND event IN ('{$eventsList}')
+            FROM {$this->database}.{$tableName}
+            WHERE resource = :resource AND event IN ('{$eventsList}'){$tenantFilter}
             FORMAT TabSeparated
         ";
 
@@ -561,9 +752,12 @@ class ClickHouse extends SQL
      */
     public function cleanup(string $datetime): bool
     {
+        $tableName = $this->getTableName();
+        $tenantFilter = $this->getTenantFilter();
+
         $sql = "
-            ALTER TABLE {$this->database}.{$this->table}
-            DELETE WHERE time < :datetime
+            ALTER TABLE {$this->database}.{$tableName}
+            DELETE WHERE time < :datetime{$tenantFilter}
         ";
 
         $this->query($sql, ['datetime' => $datetime]);

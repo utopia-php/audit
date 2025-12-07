@@ -180,6 +180,56 @@ The Database adapter uses [utopia-php/database](https://github.com/utopia-php/da
 - MongoDB
 - And all other databases supported by utopia-php/database
 
+### ClickHouse Adapter
+
+The ClickHouse adapter uses [ClickHouse](https://clickhouse.com/) for high-performance analytical queries on massive amounts of log data. It communicates with ClickHouse via HTTP interface using cURL.
+
+**Features:**
+- Optimized for analytical queries and aggregations
+- Handles billions of log entries efficiently
+- Column-oriented storage for fast queries
+- Automatic partitioning by month
+- Bloom filter indexes for fast lookups
+
+**Usage:**
+
+```php
+<?php
+
+use Utopia\Audit\Audit;
+use Utopia\Audit\Adapter\ClickHouse;
+
+// Create ClickHouse adapter
+$adapter = new ClickHouse(
+    host: 'localhost',
+    database: 'audit',
+    username: 'default',
+    password: '',
+    port: 8123,
+    table: 'audit_logs'
+);
+
+$audit = Audit::withAdapter($adapter);
+$audit->setup(); // Creates database and table
+
+// Use as normal
+$document = $audit->log(
+    userId: 'user-123',
+    event: 'document.create',
+    resource: 'database/document/1',
+    userAgent: 'Mozilla/5.0...',
+    ip: '127.0.0.1',
+    location: 'US',
+    data: ['key' => 'value']
+);
+```
+
+**Performance Benefits:**
+- Ideal for high-volume logging (millions of events per day)
+- Fast aggregation queries (counts, analytics)
+- Efficient storage with compression
+- Automatic data partitioning and retention policies
+
 ### Creating Custom Adapters
 
 To create a custom adapter, extend the `Utopia\Audit\Adapter` abstract class and implement all required methods:
