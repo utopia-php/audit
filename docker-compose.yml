@@ -10,6 +10,23 @@ services:
     ports:
       - "9306:3306"
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    environment:
+      - CLICKHOUSE_DB=default
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+    networks:
+      - abuse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   tests:
     build:
       context: .
@@ -17,7 +34,10 @@ services:
     networks:
       - abuse
     depends_on:
-      - mariadb
+      mariadb:
+        condition: service_started
+      clickhouse:
+        condition: service_healthy
     volumes:
       - ./phpunit.xml:/code/phpunit.xml
       - ./src:/code/src
