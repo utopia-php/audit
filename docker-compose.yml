@@ -1,9 +1,9 @@
-version: '3'
+version: "3"
 
 services:
   mariadb:
     image: mariadb:10.11
-    environment: 
+    environment:
       - MYSQL_ROOT_PASSWORD=password
     networks:
       - abuse
@@ -11,21 +11,23 @@ services:
       - "9306:3306"
 
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
+    image: clickhouse/clickhouse-server:25.11-alpine
     environment:
       - CLICKHOUSE_DB=default
       - CLICKHOUSE_USER=default
-      - CLICKHOUSE_PASSWORD=
+      - CLICKHOUSE_PASSWORD=clickhouse
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
     networks:
       - abuse
     ports:
       - "8123:8123"
       - "9000:9000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8123/ping"]
+      test: ["CMD", "clickhouse-client", "--host=localhost", "--port=9000", "-q", "SELECT 1"]
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 15s
 
   tests:
     build:
