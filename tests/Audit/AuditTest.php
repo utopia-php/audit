@@ -29,7 +29,7 @@ class AuditTest extends TestCase
         $database->setDatabase('utopiaTests');
         $database->setNamespace('namespace');
 
-        $this->audit = new Audit($database);
+        $this->audit = Audit::withDatabase($database);
         if (! $database->exists('utopiaTests')) {
             $database->create();
             $this->audit->setup();
@@ -51,10 +51,10 @@ class AuditTest extends TestCase
         $location = 'US';
         $data = ['key1' => 'value1', 'key2' => 'value2'];
 
-        $this->assertTrue($this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
-        $this->assertTrue($this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
-        $this->assertTrue($this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
-        $this->assertTrue($this->audit->log(null, 'insert', 'user/null', $userAgent, $ip, $location, $data));
+        $this->assertInstanceOf('Utopia\\Database\\Document', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
+        $this->assertInstanceOf('Utopia\\Database\\Document', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
+        $this->assertInstanceOf('Utopia\\Database\\Document', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
+        $this->assertInstanceOf('Utopia\\Database\\Document', $this->audit->log(null, 'insert', 'user/null', $userAgent, $ip, $location, $data));
     }
 
     public function testGetLogsByUser(): void
@@ -211,7 +211,9 @@ class AuditTest extends TestCase
         ];
 
         // Test batch insertion
-        $this->assertTrue($this->audit->logBatch($batchEvents));
+        $result = $this->audit->logBatch($batchEvents);
+        $this->assertIsArray($result);
+        $this->assertEquals(4, count($result));
 
         // Verify the number of logs inserted
         $logs = $this->audit->getLogsByUser($userId);
@@ -272,11 +274,11 @@ class AuditTest extends TestCase
         $location = 'US';
         $data = ['key1' => 'value1', 'key2' => 'value2'];
 
-        $this->assertEquals($this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data), true);
+        $this->assertInstanceOf('Utopia\\Database\\Document', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
         sleep(5);
-        $this->assertEquals($this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data), true);
+        $this->assertInstanceOf('Utopia\\Database\\Document', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
         sleep(5);
-        $this->assertEquals($this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data), true);
+        $this->assertInstanceOf('Utopia\\Database\\Document', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
         sleep(5);
 
         // DELETE logs older than 11 seconds and check that status is true

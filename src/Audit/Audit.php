@@ -3,489 +3,257 @@
 namespace Utopia\Audit;
 
 use Utopia\Database\Database;
-use Utopia\Database\DateTime;
 use Utopia\Database\Document;
-use Utopia\Database\Exception\Authorization as AuthorizationException;
-use Utopia\Database\Exception\Duplicate as DuplicateException;
-use Utopia\Database\Exception\Structure as StructureException;
-use Utopia\Database\Exception\Timeout;
-use Utopia\Database\Query;
-use Utopia\Exception;
 
+/**
+ * Audit Log Manager
+ *
+ * This class manages audit logs using pluggable adapters.
+ * The default adapter is the Database adapter which stores logs in utopia-php/database.
+ * Custom adapters can be created by extending the Adapter abstract class.
+ */
 class Audit
 {
-    public const COLLECTION = 'audit';
+    private Adapter $adapter;
 
-    public const ATTRIBUTES = [
-        [
-            '$id' => 'userId',
-            'type' => Database::VAR_STRING,
-            'size' => Database::LENGTH_KEY,
-            'required' => false,
-            'signed' => true,
-            'array' => false,
-            'filters' => [],
-        ], [
-            '$id' => 'event',
-            'type' => Database::VAR_STRING,
-            'size' => 255,
-            'required' => true,
-            'signed' => true,
-            'array' => false,
-            'filters' => [],
-        ], [
-            '$id' => 'resource',
-            'type' => Database::VAR_STRING,
-            'size' => 255,
-            'required' => false,
-            'signed' => true,
-            'array' => false,
-            'filters' => [],
-        ], [
-            '$id' => 'userAgent',
-            'type' => Database::VAR_STRING,
-            'size' => 65534,
-            'required' => true,
-            'signed' => true,
-            'array' => false,
-            'filters' => [],
-        ], [
-            '$id' => 'ip',
-            'type' => Database::VAR_STRING,
-            'size' => 45,
-            'required' => true,
-            'signed' => true,
-            'array' => false,
-            'filters' => [],
-        ], [
-            '$id' => 'location',
-            'type' => Database::VAR_STRING,
-            'size' => 45,
-            'required' => false,
-            'signed' => true,
-            'array' => false,
-            'filters' => [],
-        ], [
-            '$id' => 'time',
-            'type' => Database::VAR_DATETIME,
-            'format' => '',
-            'size' => 0,
-            'signed' => true,
-            'required' => false,
-            'array' => false,
-            'filters' => ['datetime'],
-        ], [
-            '$id' => 'data',
-            'type' => Database::VAR_STRING,
-            'size' => 16777216,
-            'required' => false,
-            'signed' => true,
-            'array' => false,
-            'filters' => ['json'],
-        ],
-    ];
-
-    public const INDEXES = [
-        [
-            '$id' => 'index2',
-            'type' => Database::INDEX_KEY,
-            'attributes' => ['event'],
-            'lengths' => [],
-            'orders' => [],
-        ], [
-            '$id' => 'index4',
-            'type' => Database::INDEX_KEY,
-            'attributes' => ['userId', 'event'],
-            'lengths' => [],
-            'orders' => [],
-        ], [
-            '$id' => 'index5',
-            'type' => Database::INDEX_KEY,
-            'attributes' => ['resource', 'event'],
-            'lengths' => [],
-            'orders' => [],
-        ], [
-            '$id' => 'index-time',
-            'type' => Database::INDEX_KEY,
-            'attributes' => ['time'],
-            'lengths' => [],
-            'orders' => [Database::ORDER_DESC],
-        ],
-    ];
-
-    private Database $db;
-
-    public function __construct(Database $db)
+    /**
+     * Create a new Audit instance with the default Database adapter.
+     *
+     * @param Database $db The database instance
+     * @return self
+     */
+    public static function withDatabase(Database $db): self
     {
-        $this->db = $db;
+        return new self(new Adapter\Database($db));
     }
 
     /**
-     * Setup database structure.
+     * Create a new Audit instance with a custom adapter.
+     *
+     * @param Adapter $adapter The adapter to use
+     * @return self
+     */
+    public static function withAdapter(Adapter $adapter): self
+    {
+        return new self($adapter);
+    }
+
+    /**
+     * Constructor.
+     *
+     * @param Adapter $adapter The adapter to use for storing audit logs
+     */
+    public function __construct(Adapter $adapter)
+    {
+        $this->adapter = $adapter;
+    }
+
+    /**
+     * Get the current adapter.
+     *
+     * @return Adapter
+     */
+    public function getAdapter(): Adapter
+    {
+        return $this->adapter;
+    }
+
+    /**
+     * Setup the audit log storage.
      *
      * @return void
-     *
-     * @throws DuplicateException
      * @throws \Exception
      */
     public function setup(): void
     {
-        if (! $this->db->exists($this->db->getDatabase())) {
-            throw new Exception('You need to create the database before running Audit setup');
-        }
-
-        $attributes = \array_map(function ($attribute) {
-            return new Document($attribute);
-        }, self::ATTRIBUTES);
-
-        $indexes = \array_map(function ($index) {
-            return new Document($index);
-        }, self::INDEXES);
-
-        try {
-            $this->db->createCollection(
-                Audit::COLLECTION,
-                $attributes,
-                $indexes
-            );
-        } catch (DuplicateException) {
-            // Collection already exists
-        }
+        $this->adapter->setup();
     }
 
     /**
      * Add event log.
      *
-     * @param  string|null  $userId
-     * @param  string  $event
-     * @param  string  $resource
-     * @param  string  $userAgent
-     * @param  string  $ip
-     * @param  string  $location
-     * @param  array<string,mixed>  $data
-     * @return bool
+     * @param string|null $userId
+     * @param string $event
+     * @param string $resource
+     * @param string $userAgent
+     * @param string $ip
+     * @param string $location
+     * @param array<string, mixed> $data
+     * @return Document
      *
-     * @throws AuthorizationException
-     * @throws StructureException
      * @throws \Exception
-     * @throws \Throwable
      */
-    public function log(?string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): bool
+    public function log(?string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): Document
     {
-        $this->db->getAuthorization()->skip(function () use ($userId, $event, $resource, $userAgent, $ip, $location, $data) {
-            $this->db->createDocument(Audit::COLLECTION, new Document([
-                '$permissions' => [],
-                'userId' => $userId,
-                'event' => $event,
-                'resource' => $resource,
-                'userAgent' => $userAgent,
-                'ip' => $ip,
-                'location' => $location,
-                'data' => $data,
-                'time' => DateTime::now(),
-            ]));
-        });
-
-        return true;
+        return $this->adapter->create([
+            'userId' => $userId,
+            'event' => $event,
+            'resource' => $resource,
+            'userAgent' => $userAgent,
+            'ip' => $ip,
+            'location' => $location,
+            'data' => $data,
+        ]);
     }
-
 
     /**
      * Add multiple event logs in batch.
      *
-     * @param array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, timestamp: string, data?: array<string,mixed>}> $events
-     * @return bool
+     * @param array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, timestamp: string, data?: array<string, mixed>}> $events
+     * @return array<Document>
      *
-     * @throws AuthorizationException
-     * @throws StructureException
      * @throws \Exception
-     * @throws \Throwable
      */
-    public function logBatch(array $events): bool
+    public function logBatch(array $events): array
     {
-        $this->db->getAuthorization()->skip(function () use ($events) {
-            $documents = \array_map(function ($event) {
-                return new Document([
-                    '$permissions' => [],
-                    'userId' => $event['userId'],
-                    'event' => $event['event'],
-                    'resource' => $event['resource'],
-                    'userAgent' => $event['userAgent'],
-                    'ip' => $event['ip'],
-                    'location' => $event['location'],
-                    'data' => $event['data'] ?? [],
-                    'time' => $event['timestamp'],
-                ]);
-            }, $events);
-
-            $this->db->createDocuments(Audit::COLLECTION, $documents);
-        });
-
-        return true;
+        return $this->adapter->createBatch($events);
     }
 
     /**
      * Get all logs by user ID.
      *
      * @param string $userId
-     * @param array<Query> $queries
+     * @param array<mixed> $queries
      * @return array<Document>
      *
-     * @throws Timeout
-     * @throws \Utopia\Database\Exception
-     * @throws \Utopia\Database\Exception\Query
+     * @throws \Exception
      */
     public function getLogsByUser(
         string $userId,
         array $queries = []
     ): array {
-        /** @var array<Document> $result */
-        $result = $this->db->getAuthorization()->skip(function () use ($queries, $userId) {
-            $queries[] = Query::equal('userId', [$userId]);
-            $queries[] = Query::orderDesc();
-
-            return $this->db->find(
-                collection: Audit::COLLECTION,
-                queries: $queries,
-            );
-        });
-
-        return $result;
+        return $this->adapter->getByUser($userId, $queries);
     }
 
     /**
      * Count logs by user ID.
      *
      * @param string $userId
-     * @param array<Query> $queries
+     * @param array<mixed> $queries
      * @return int
-     * @throws \Utopia\Database\Exception
+     * @throws \Exception
      */
     public function countLogsByUser(
         string $userId,
         array $queries = []
     ): int {
-        /** @var int $count */
-        $count = $this->db->getAuthorization()->skip(function () use ($queries, $userId) {
-            return $this->db->count(
-                collection: Audit::COLLECTION,
-                queries: [
-                    Query::equal('userId', [$userId]),
-                    ...$queries,
-                ]
-            );
-        });
-
-        return $count;
+        return $this->adapter->countByUser($userId, $queries);
     }
 
     /**
      * Get all logs by resource.
      *
      * @param string $resource
-     * @param array<Query> $queries
+     * @param array<mixed> $queries
      * @return array<Document>
      *
-     * @throws Timeout
-     * @throws \Utopia\Database\Exception
-     * @throws \Utopia\Database\Exception\Query
+     * @throws \Exception
      */
     public function getLogsByResource(
         string $resource,
         array $queries = [],
     ): array {
-        /** @var array<Document> $result */
-        $result = $this->db->getAuthorization()->skip(function () use ($queries, $resource) {
-            $queries[] = Query::equal('resource', [$resource]);
-            $queries[] = Query::orderDesc();
-
-            return $this->db->find(
-                collection: Audit::COLLECTION,
-                queries: $queries,
-            );
-        });
-
-        return $result;
+        return $this->adapter->getByResource($resource, $queries);
     }
 
     /**
      * Count logs by resource.
      *
      * @param string $resource
-     * @param array<Query> $queries
+     * @param array<mixed> $queries
      * @return int
      *
-     * @throws \Utopia\Database\Exception
+     * @throws \Exception
      */
     public function countLogsByResource(
         string $resource,
         array $queries = []
     ): int {
-        /** @var int $count */
-        $count = $this->db->getAuthorization()->skip(function () use ($resource, $queries) {
-            return $this->db->count(
-                collection: Audit::COLLECTION,
-                queries: [
-                    Query::equal('resource', [$resource]),
-                    ...$queries,
-                ]
-            );
-        });
-
-        return $count;
+        return $this->adapter->countByResource($resource, $queries);
     }
 
     /**
      * Get logs by user and events.
      *
      * @param string $userId
-     * @param array<int,string> $events
-     * @param array<Query> $queries
+     * @param array<int, string> $events
+     * @param array<mixed> $queries
      * @return array<Document>
      *
-     * @throws Timeout
-     * @throws \Utopia\Database\Exception
-     * @throws \Utopia\Database\Exception\Query
+     * @throws \Exception
      */
     public function getLogsByUserAndEvents(
         string $userId,
         array $events,
         array $queries = [],
     ): array {
-        /** @var array<Document> $result */
-        $result = $this->db->getAuthorization()->skip(function () use ($userId, $events, $queries) {
-            $queries[] = Query::equal('userId', [$userId]);
-            $queries[] = Query::equal('event', $events);
-            $queries[] = Query::orderDesc();
-
-            return $this->db->find(
-                collection: Audit::COLLECTION,
-                queries: $queries,
-            );
-        });
-
-        return $result;
+        return $this->adapter->getByUserAndEvents($userId, $events, $queries);
     }
 
     /**
      * Count logs by user and events.
      *
      * @param string $userId
-     * @param array<int,string> $events
-     * @param array<Query> $queries
+     * @param array<int, string> $events
+     * @param array<mixed> $queries
      * @return int
      *
-     * @throws \Utopia\Database\Exception
+     * @throws \Exception
      */
     public function countLogsByUserAndEvents(
         string $userId,
         array $events,
         array $queries = [],
     ): int {
-        /** @var int $count */
-        $count = $this->db->getAuthorization()->skip(function () use ($userId, $events, $queries) {
-            return $this->db->count(
-                collection: Audit::COLLECTION,
-                queries: [
-                    Query::equal('userId', [$userId]),
-                    Query::equal('event', $events),
-                    ...$queries,
-                ]
-            );
-        });
-
-        return $count;
+        return $this->adapter->countByUserAndEvents($userId, $events, $queries);
     }
 
     /**
      * Get logs by resource and events.
      *
      * @param string $resource
-     * @param array<int,string> $events
-     * @param array<Query> $queries
+     * @param array<int, string> $events
+     * @param array<mixed> $queries
      * @return array<Document>
      *
-     * @throws Timeout
-     * @throws \Utopia\Database\Exception
-     * @throws \Utopia\Database\Exception\Query
+     * @throws \Exception
      */
     public function getLogsByResourceAndEvents(
         string $resource,
         array $events,
         array $queries = [],
     ): array {
-        /** @var array<Document> $result */
-        $result = $this->db->getAuthorization()->skip(function () use ($resource, $events, $queries) {
-            $queries[] = Query::equal('resource', [$resource]);
-            $queries[] = Query::equal('event', $events);
-            $queries[] = Query::orderDesc();
-
-            return $this->db->find(
-                collection: Audit::COLLECTION,
-                queries: $queries,
-            );
-        });
-
-        return $result;
+        return $this->adapter->getByResourceAndEvents($resource, $events, $queries);
     }
 
     /**
      * Count logs by resource and events.
      *
      * @param string $resource
-     * @param array<int,string> $events
-     * @param array<Query> $queries
+     * @param array<int, string> $events
+     * @param array<mixed> $queries
      * @return int
      *
-     * @throws \Utopia\Database\Exception
+     * @throws \Exception
      */
     public function countLogsByResourceAndEvents(
         string $resource,
         array $events,
         array $queries = [],
     ): int {
-        /** @var int $count */
-        $count = $this->db->getAuthorization()->skip(function () use ($resource, $events, $queries) {
-            return $this->db->count(
-                collection: Audit::COLLECTION,
-                queries: [
-                    Query::equal('resource', [$resource]),
-                    Query::equal('event', $events),
-                    ...$queries,
-                ]
-            );
-        });
-
-        return $count;
+        return $this->adapter->countByResourceAndEvents($resource, $events, $queries);
     }
 
     /**
-     * Delete all logs older than `$timestamp` seconds
+     * Delete all logs older than `$datetime` seconds
      *
-     * @param  string  $datetime
+     * @param string $datetime
      * @return bool
      *
-     * @throws AuthorizationException
      * @throws \Exception
      */
     public function cleanup(string $datetime): bool
     {
-        $this->db->getAuthorization()->skip(function () use ($datetime) {
-            do {
-                $documents = $this->db->find(
-                    collection: Audit::COLLECTION,
-                    queries: [
-                        Query::lessThan('time', $datetime),
-                    ]
-                );
-
-                foreach ($documents as $document) {
-                    $this->db->deleteDocument(Audit::COLLECTION, $document->getId());
-                }
-            } while (! empty($documents));
-        });
-
-        return true;
+        return $this->adapter->cleanup($datetime);
     }
-
 }

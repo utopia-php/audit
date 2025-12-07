@@ -8,6 +8,14 @@ Utopia framework audit library is simple and lite library for managing applicati
 
 Although this library is part of the [Utopia Framework](https://github.com/utopia-php/framework) project it is dependency free, and can be used as standalone with any other PHP project or framework.
 
+## Features
+
+- **Adapter Pattern**: Support for multiple storage backends through adapters
+- **Default Database Adapter**: Built-in support for utopia-php/database
+- **Extensible**: Easy to create custom adapters for different storage solutions
+- **Batch Operations**: Support for logging multiple events at once
+- **Query Support**: Rich querying capabilities for retrieving logs
+
 ## Getting Started
 
 Install using composer:
@@ -15,14 +23,17 @@ Install using composer:
 composer require utopia-php/audit
 ```
 
-Init the audit object:
+## Usage
+
+### Using the Database Adapter (Default)
+
+The simplest way to use Utopia Audit is with the built-in Database adapter:
 
 ```php
 <?php
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 
-use PDO;
 use PDO;
 use Utopia\Audit\Audit;
 use Utopia\Cache\Cache;
@@ -36,7 +47,7 @@ $dbPass = '';
 $dbPort = '3306';
 
 $pdo = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $dbPass, [
-    PDO::ATTR_TIMEOUT => 3, // Seconds
+    PDO::ATTR_TIMEOUT => 3,
     PDO::ATTR_PERSISTENT => true,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
@@ -46,12 +57,34 @@ $pdo = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $
         
 $cache = new Cache(new NoCache());
 
-$database = new Database(new MySQL($pdo),$cache);
+$database = new Database(new MySQL($pdo), $cache);
 $database->setNamespace('namespace');
 
-$audit = new Audit($database);
+// Create audit instance with Database adapter
+$audit = Audit::withDatabase($database);
 $audit->setup();
 ```
+
+### Using a Custom Adapter
+
+You can create custom adapters by extending the `Utopia\Audit\Adapter` abstract class:
+
+```php
+<?php
+
+use Utopia\Audit\Audit;
+use Utopia\Audit\Adapter\Database as DatabaseAdapter;
+use Utopia\Database\Database;
+
+// Using the Database adapter directly
+$adapter = new DatabaseAdapter($database);
+$audit = Audit::withAdapter($adapter);
+
+// Or using the static factory method
+$audit = Audit::withDatabase($database);
+```
+
+### Basic Operations
 
 **Create Log**
 
@@ -98,6 +131,103 @@ Fetch all logs by a given resource name
 $logs = $audit->getLogsByResource(
     'resource-name', // Resource Name
 ); // Returns an array of all logs for the specific resource
+```
+
+**Batch Logging**
+
+Log multiple events at once for better performance:
+
+```php
+use Utopia\Database\DateTime;
+
+$events = [
+    [
+        'userId' => 'user-1',
+        'event' => 'create',
+        'resource' => 'database/document/1',
+        'userAgent' => 'Mozilla/5.0...',
+        'ip' => '127.0.0.1',
+        'location' => 'US',
+        'data' => ['key' => 'value'],
+        'timestamp' => DateTime::now()
+    ],
+    [
+        'userId' => 'user-2',
+        'event' => 'update',
+        'resource' => 'database/document/2',
+        'userAgent' => 'Mozilla/5.0...',
+        'ip' => '192.168.1.1',
+        'location' => 'UK',
+        'data' => ['key' => 'value'],
+        'timestamp' => DateTime::now()
+    ]
+];
+
+$documents = $audit->logBatch($events);
+```
+
+## Adapters
+
+Utopia Audit uses an adapter pattern to support different storage backends. Currently available adapters:
+
+### Database Adapter (Default)
+
+The Database adapter uses [utopia-php/database](https://github.com/utopia-php/database) to store audit logs in a database.
+
+**Supported Databases:**
+- MySQL/MariaDB
+- PostgreSQL
+- MongoDB
+- And all other databases supported by utopia-php/database
+
+### Creating Custom Adapters
+
+To create a custom adapter, extend the `Utopia\Audit\Adapter` abstract class and implement all required methods:
+
+```php
+<?php
+
+namespace MyApp\Audit;
+
+use Utopia\Audit\Adapter;
+use Utopia\Database\Document;
+
+class CustomAdapter extends Adapter
+{
+    public function getName(): string
+    {
+        return 'Custom';
+    }
+
+    public function setup(): void
+    {
+        // Initialize your storage backend
+    }
+
+    public function create(array $log): Document
+    {
+        // Store a single log entry
+    }
+
+    public function createBatch(array $logs): array
+    {
+        // Store multiple log entries
+    }
+
+    public function getByUser(string $userId, array $queries = []): array
+    {
+        // Retrieve logs by user ID
+    }
+
+    // Implement other required methods...
+}
+```
+
+Then use your custom adapter:
+
+```php
+$adapter = new CustomAdapter();
+$audit = Audit::withAdapter($adapter);
 ```
 
 ## System Requirements
