@@ -2,42 +2,41 @@
 
 namespace Utopia\Tests;
 
-use PDO;
-use PHPUnit\Framework\TestCase;
 use Utopia\Audit\Audit;
-use Utopia\Cache\Adapter\None as NoCache;
-use Utopia\Cache\Cache;
-use Utopia\Database\Adapter\MariaDB;
-use Utopia\Database\Database;
 use Utopia\Database\DateTime;
 use Utopia\Database\Query;
 
-class AuditTest extends TestCase
+/**
+ * Audit Test Trait
+ *
+ * This trait contains all the common test methods that should work
+ * with any adapter (Database, ClickHouse, etc).
+ *
+ * Classes using this trait should implement initializeAudit() to initialize
+ * the appropriate adapter and set $this->audit.
+ */
+trait AuditBase
 {
     protected Audit $audit;
 
+    /**
+     * Classes using this trait must implement this to initialize the audit instance
+     * with their specific adapter configuration
+     */
+    abstract protected function initializeAudit(): void;
+
+    /**
+     * Classes should override if they need custom setup
+     */
     public function setUp(): void
     {
-        $dbHost = 'mariadb';
-        $dbPort = '3306';
-        $dbUser = 'root';
-        $dbPass = 'password';
-
-        $pdo = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $dbPass, MariaDB::getPdoAttributes());
-        $cache = new Cache(new NoCache());
-        $database = new Database(new MariaDB($pdo), $cache);
-        $database->setDatabase('utopiaTests');
-        $database->setNamespace('namespace');
-
-        $this->audit = Audit::withDatabase($database);
-        if (! $database->exists('utopiaTests')) {
-            $database->create();
-            $this->audit->setup();
-        }
-
+        $this->initializeAudit();
         $this->createLogs();
     }
 
+    /**
+     * Classes should override if they need custom teardown
+     */
     public function tearDown(): void
     {
         $this->audit->cleanup(DateTime::now());

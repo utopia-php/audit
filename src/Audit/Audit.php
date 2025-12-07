@@ -17,28 +17,6 @@ class Audit
     private Adapter $adapter;
 
     /**
-     * Create a new Audit instance with the default Database adapter.
-     *
-     * @param Database $db The database instance
-     * @return self
-     */
-    public static function withDatabase(Database $db): self
-    {
-        return new self(new Adapter\Database($db));
-    }
-
-    /**
-     * Create a new Audit instance with a custom adapter.
-     *
-     * @param Adapter $adapter The adapter to use
-     * @return self
-     */
-    public static function withAdapter(Adapter $adapter): self
-    {
-        return new self($adapter);
-    }
-
-    /**
      * Constructor.
      *
      * @param Adapter $adapter The adapter to use for storing audit logs
