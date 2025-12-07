@@ -29,7 +29,16 @@ abstract class SQL extends Adapter
     /**
      * Get attribute definitions for audit logs.
      *
-     * @return array<array<string, mixed>>
+     * Each attribute is an array with the following string keys:
+     * - $id: string (attribute identifier)
+     * - type: string
+     * - size: int
+     * - required: bool
+     * - signed: bool
+     * - array: bool
+     * - filters: array<string>
+     *
+     * @return array<int, array<string, mixed>>
      */
     protected function getAttributes(): array
     {
@@ -117,13 +126,18 @@ abstract class SQL extends Adapter
      */
     protected function getAttributeDocuments(): array
     {
-        return array_map(static fn (array $attribute) => new Document($attribute), $this->getAttributes());
+        return array_map(static fn(array $attribute) => new Document($attribute), $this->getAttributes());
     }
 
     /**
      * Get index definitions for audit logs.
      *
-     * @return array<array<string, mixed>>
+     * Each index is an array with the following string keys:
+     * - $id: string (index identifier)
+     * - type: string
+     * - attributes: array<string>
+     *
+     * @return array<int, array<string, mixed>>
      */
     protected function getIndexes(): array
     {
@@ -158,7 +172,7 @@ abstract class SQL extends Adapter
      */
     protected function getIndexDocuments(): array
     {
-        return array_map(static fn (array $index) => new Document($index), $this->getIndexes());
+        return array_map(static fn(array $index) => new Document($index), $this->getIndexes());
     }
 
     /**
@@ -212,7 +226,9 @@ abstract class SQL extends Adapter
     {
         $definitions = [];
         foreach ($this->getAttributes() as $attribute) {
-            $definitions[] = $this->getColumnDefinition($attribute['$id']);
+            /** @var string $id */
+            $id = $attribute['$id'];
+            $definitions[] = $this->getColumnDefinition($id);
         }
 
         return $definitions;

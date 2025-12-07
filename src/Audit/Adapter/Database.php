@@ -62,7 +62,7 @@ class Database extends SQL
     /**
      * Create an audit log entry.
      *
-     * @param array $log
+     * @param array<string, mixed> $log
      * @return Document
      * @throws AuthorizationException|\Exception
      */
@@ -86,7 +86,7 @@ class Database extends SQL
     /**
      * Create multiple audit log entries in batch.
      *
-     * @param array $logs
+     * @param array<int, array<string, mixed>> $logs
      * @return array<Document>
      * @throws AuthorizationException|\Exception
      */
@@ -113,12 +113,11 @@ class Database extends SQL
     }
 
     /**
-     * Get logs by user ID.
+     * Get audit logs by user ID.
      *
-     * @param string $userId
-     * @param array $queries
+     * @param array<int, Query> $queries
      * @return array<Document>
-     * @throws Timeout|\Utopia\Database\Exception|\Utopia\Database\Exception\Query
+     * @throws AuthorizationException|\Exception
      */
     public function getByUser(string $userId, array $queries = []): array
     {
@@ -134,12 +133,10 @@ class Database extends SQL
     }
 
     /**
-     * Count logs by user ID.
+     * Count audit logs by user ID.
      *
-     * @param string $userId
-     * @param array $queries
-     * @return int
-     * @throws \Utopia\Database\Exception
+     * @param array<int, Query> $queries
+     * @throws AuthorizationException|\Exception
      */
     public function countByUser(string $userId, array $queries = []): int
     {
@@ -158,7 +155,7 @@ class Database extends SQL
      * Get logs by resource.
      *
      * @param string $resource
-     * @param array $queries
+     * @param array<int, Query> $queries
      * @return array<Document>
      * @throws Timeout|\Utopia\Database\Exception|\Utopia\Database\Exception\Query
      */
@@ -179,7 +176,7 @@ class Database extends SQL
      * Count logs by resource.
      *
      * @param string $resource
-     * @param array $queries
+     * @param array<int, Query> $queries
      * @return int
      * @throws \Utopia\Database\Exception
      */
@@ -200,8 +197,8 @@ class Database extends SQL
      * Get logs by user and events.
      *
      * @param string $userId
-     * @param array $events
-     * @param array $queries
+     * @param array<int, string> $events
+     * @param array<int, Query> $queries
      * @return array<Document>
      * @throws Timeout|\Utopia\Database\Exception|\Utopia\Database\Exception\Query
      */
@@ -223,8 +220,8 @@ class Database extends SQL
      * Count logs by user and events.
      *
      * @param string $userId
-     * @param array $events
-     * @param array $queries
+     * @param array<int, string> $events
+     * @param array<int, Query> $queries
      * @return int
      * @throws \Utopia\Database\Exception
      */
@@ -246,8 +243,8 @@ class Database extends SQL
      * Get logs by resource and events.
      *
      * @param string $resource
-     * @param array $events
-     * @param array $queries
+     * @param array<int, string> $events
+     * @param array<int, Query> $queries
      * @return array<Document>
      * @throws Timeout|\Utopia\Database\Exception|\Utopia\Database\Exception\Query
      */
@@ -269,8 +266,8 @@ class Database extends SQL
      * Count logs by resource and events.
      *
      * @param string $resource
-     * @param array $events
-     * @param array $queries
+     * @param array<int, string> $events
+     * @param array<int, Query> $queries
      * @return int
      * @throws \Utopia\Database\Exception
      */

@@ -157,7 +157,8 @@ class ClickHouse extends SQL
     /**
      * Execute a ClickHouse query via HTTP interface using Fetch Client.
      *
-     * @throws Exception|FetchException
+     * @param array<string, mixed> $params
+     * @throws Exception
      */
     private function query(string $sql, array $params = []): string
     {
@@ -166,15 +167,23 @@ class ClickHouse extends SQL
         // Replace parameters in query
         foreach ($params as $key => $value) {
             if (is_string($value)) {
-                $value = "'" . addslashes($value) . "'";
+                $strValue = "'" . addslashes($value) . "'";
             } elseif (is_null($value)) {
-                $value = 'NULL';
+                $strValue = 'NULL';
             } elseif (is_bool($value)) {
-                $value = $value ? '1' : '0';
+                $strValue = $value ? '1' : '0';
             } elseif (is_array($value)) {
-                $value = "'" . addslashes(json_encode($value)) . "'";
+                $encoded = json_encode($value);
+                if (is_string($encoded)) {
+                    $strValue = "'" . addslashes($encoded) . "'";
+                } else {
+                    $strValue = 'NULL';
+                }
+            } else {
+                /** @var scalar $value */
+                $strValue = "'" . addslashes((string) $value) . "'";
             }
-            $sql = str_replace(":{$key}", (string) $value, $sql);
+            $sql = str_replace(":{$key}", $strValue, $sql);
         }
 
         // Build headers with authentication
@@ -192,10 +201,13 @@ class ClickHouse extends SQL
             );
 
             if ($response->getStatusCode() !== 200) {
-                throw new Exception("ClickHouse query failed (HTTP {$response->getStatusCode()}): {$response->getBody()}");
+                $body = $response->getBody();
+                $bodyStr = is_string($body) ? $body : '';
+                throw new Exception("ClickHouse query failed (HTTP {$response->getStatusCode()}): {$bodyStr}");
             }
 
-            return $response->getBody() ?: '';
+            $body = $response->getBody();
+            return is_string($body) ? $body : '';
         } catch (Exception $e) {
             throw new Exception("ClickHouse connection error: {$e->getMessage()}");
         }
@@ -229,7 +241,9 @@ class ClickHouse extends SQL
         // Build indexes from base adapter schema
         $indexes = [];
         foreach ($this->getIndexes() as $index) {
+            /** @var string $indexName */
             $indexName = $index['$id'];
+            /** @var array<string> $attributes */
             $attributes = $index['attributes'];
             $attributeList = implode(', ', $attributes);
             $indexes[] = "INDEX {$indexName} ({$attributeList}) TYPE bloom_filter GRANULARITY 1";
@@ -329,11 +343,13 @@ class ClickHouse extends SQL
         $values = [];
         foreach ($logs as $log) {
             $id = uniqid('audit_', true);
-            $userId = isset($log['userId']) && $log['userId'] !== null
-                ? "'" . addslashes($log['userId']) . "'"
+            $userIdVal = $log['userId'] ?? null;
+            $userId = ($userIdVal !== null)
+                ? "'" . addslashes((string) $userIdVal) . "'"
                 : 'NULL';
-            $location = isset($log['location']) && $log['location'] !== null
-                ? "'" . addslashes($log['location']) . "'"
+            $locationVal = $log['location'] ?? null;
+            $location = ($locationVal !== null)
+                ? "'" . addslashes((string) $locationVal) . "'"
                 : 'NULL';
 
             if ($this->sharedTables) {
@@ -342,13 +358,13 @@ class ClickHouse extends SQL
                     "('%s', %s, '%s', '%s', '%s', '%s', %s, '%s', '%s', %s)",
                     $id,
                     $userId,
-                    addslashes($log['event']),
-                    addslashes($log['resource']),
-                    addslashes($log['userAgent']),
-                    addslashes($log['ip']),
+                    addslashes((string) $log['event']),
+                    addslashes((string) $log['resource']),
+                    addslashes((string) $log['userAgent']),
+                    addslashes((string) $log['ip']),
                     $location,
                     $log['timestamp'],
-                    addslashes(json_encode($log['data'] ?? [])),
+                    addslashes((string) json_encode($log['data'] ?? [])),
                     $tenant
                 );
             } else {
@@ -356,13 +372,13 @@ class ClickHouse extends SQL
                     "('%s', %s, '%s', '%s', '%s', '%s', %s, '%s', '%s')",
                     $id,
                     $userId,
-                    addslashes($log['event']),
-                    addslashes($log['resource']),
-                    addslashes($log['userAgent']),
-                    addslashes($log['ip']),
+                    addslashes((string) $log['event']),
+                    addslashes((string) $log['resource']),
+                    addslashes((string) $log['userAgent']),
+                    addslashes((string) $log['ip']),
                     $location,
                     $log['timestamp'],
-                    addslashes(json_encode($log['data'] ?? []))
+                    addslashes((string) json_encode($log['data'] ?? []))
                 );
             }
         }
@@ -409,6 +425,8 @@ class ClickHouse extends SQL
 
     /**
      * Parse ClickHouse query result into Documents.
+     *
+     * @return array<int, Document>
      */
     private function parseResults(string $result): array
     {
@@ -429,12 +447,7 @@ class ClickHouse extends SQL
                 continue;
             }
 
-            $data = [];
-            try {
-                $data = json_decode($columns[8], true) ?? [];
-            } catch (\Exception $e) {
-                $data = [];
-            }
+            $data = json_decode($columns[8], true) ?? [];
 
             $document = [
                 '$id' => $columns[0],
@@ -498,11 +511,11 @@ class ClickHouse extends SQL
 
         // Parse simple limit/offset from queries (simplified version)
         foreach ($queries as $query) {
-            if (is_object($query) && method_exists($query, 'getMethod')) {
+            if (is_object($query) && method_exists($query, 'getMethod') && method_exists($query, 'getValue')) {
                 if ($query->getMethod() === 'limit') {
-                    $limit = $query->getValue();
+                    $limit = (int) $query->getValue();
                 } elseif ($query->getMethod() === 'offset') {
-                    $offset = $query->getValue();
+                    $offset = (int) $query->getValue();
                 }
             }
         }
@@ -561,11 +574,11 @@ class ClickHouse extends SQL
         $offset = 0;
 
         foreach ($queries as $query) {
-            if (is_object($query) && method_exists($query, 'getMethod')) {
+            if (is_object($query) && method_exists($query, 'getMethod') && method_exists($query, 'getValue')) {
                 if ($query->getMethod() === 'limit') {
-                    $limit = $query->getValue();
+                    $limit = (int) $query->getValue();
                 } elseif ($query->getMethod() === 'offset') {
-                    $offset = $query->getValue();
+                    $offset = (int) $query->getValue();
                 }
             }
         }
@@ -624,11 +637,11 @@ class ClickHouse extends SQL
         $offset = 0;
 
         foreach ($queries as $query) {
-            if (is_object($query) && method_exists($query, 'getMethod')) {
+            if (is_object($query) && method_exists($query, 'getMethod') && method_exists($query, 'getValue')) {
                 if ($query->getMethod() === 'limit') {
-                    $limit = $query->getValue();
+                    $limit = (int) $query->getValue();
                 } elseif ($query->getMethod() === 'offset') {
-                    $offset = $query->getValue();
+                    $offset = (int) $query->getValue();
                 }
             }
         }
@@ -689,11 +702,11 @@ class ClickHouse extends SQL
         $offset = 0;
 
         foreach ($queries as $query) {
-            if (is_object($query) && method_exists($query, 'getMethod')) {
+            if (is_object($query) && method_exists($query, 'getMethod') && method_exists($query, 'getValue')) {
                 if ($query->getMethod() === 'limit') {
-                    $limit = $query->getValue();
+                    $limit = (int) $query->getValue();
                 } elseif ($query->getMethod() === 'offset') {
-                    $offset = $query->getValue();
+                    $offset = (int) $query->getValue();
                 }
             }
         }
