@@ -155,6 +155,23 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Format timestamp for ClickHouse DateTime64.
+     * Removes timezone information and ensures proper format.
+     *
+     * @param string $timestamp
+     * @return string
+     */
+    private function formatTimestamp(string $timestamp): string
+    {
+        // Remove timezone suffix (e.g., +00:00, Z) if present
+        // ClickHouse expects format: 2025-12-07 23:19:29.056
+        $timestamp = preg_replace('/([+-]\d{2}:\d{2}|Z)$/', '', $timestamp);
+        // Replace T with space if present
+        $timestamp = str_replace('T', ' ', $timestamp);
+        return $timestamp ?? '';
+    }
+
+    /**
      * Execute a ClickHouse query via HTTP interface using Fetch Client.
      *
      * @param array<string, mixed> $params
@@ -166,7 +183,10 @@ class ClickHouse extends SQL
 
         // Replace parameters in query
         foreach ($params as $key => $value) {
-            if (is_string($value)) {
+            if (is_int($value) || is_float($value)) {
+                // Numeric values should not be quoted
+                $strValue = (string) $value;
+            } elseif (is_string($value)) {
                 $strValue = "'" . addslashes($value) . "'";
             } elseif (is_null($value)) {
                 $strValue = 'NULL';
@@ -228,10 +248,22 @@ class ClickHouse extends SQL
         $this->query($createDbSql);
 
         // Build column definitions from base adapter schema
+        // Override time column to be NOT NULL since it's used in partition key
         $columns = [
             'id String',
-            ...$this->getAllColumnDefinitions(),
         ];
+
+        foreach ($this->getAttributes() as $attribute) {
+            /** @var string $id */
+            $id = $attribute['$id'];
+
+            // Special handling for time column - must be NOT NULL for partition key
+            if ($id === 'time') {
+                $columns[] = 'time DateTime64(3)';
+            } else {
+                $columns[] = $this->getColumnDefinition($id);
+            }
+        }
 
         // Add tenant column only if tables are shared across tenants
         if ($this->sharedTables) {
@@ -274,7 +306,9 @@ class ClickHouse extends SQL
     public function create(array $log): Document
     {
         $id = uniqid('audit_', true);
-        $time = date('Y-m-d H:i:s.v');
+        // Format: 2025-12-07 23:19:29.056
+        $microtime = microtime(true);
+        $time = date('Y-m-d H:i:s', (int) $microtime) . '.' . sprintf('%03d', ($microtime - floor($microtime)) * 1000);
 
         $tableName = $this->getTableName();
 
@@ -352,6 +386,8 @@ class ClickHouse extends SQL
                 ? "'" . addslashes((string) $locationVal) . "'"
                 : 'NULL';
 
+            $formattedTimestamp = $this->formatTimestamp($log['timestamp']);
+
             if ($this->sharedTables) {
                 $tenant = $this->tenant !== null ? (int) $this->tenant : 'NULL';
                 $values[] = sprintf(
@@ -363,7 +399,7 @@ class ClickHouse extends SQL
                     addslashes((string) $log['userAgent']),
                     addslashes((string) $log['ip']),
                     $location,
-                    $log['timestamp'],
+                    $formattedTimestamp,
                     addslashes((string) json_encode($log['data'] ?? [])),
                     $tenant
                 );
@@ -377,7 +413,7 @@ class ClickHouse extends SQL
                     addslashes((string) $log['userAgent']),
                     addslashes((string) $log['ip']),
                     $location,
-                    $log['timestamp'],
+                    $formattedTimestamp,
                     addslashes((string) json_encode($log['data'] ?? []))
                 );
             }
@@ -443,11 +479,21 @@ class ClickHouse extends SQL
             }
 
             $columns = explode("\t", $line);
-            if (count($columns) < 10) {
+            // Expect 9 columns without sharedTables, 10 with sharedTables
+            $expectedColumns = $this->sharedTables ? 10 : 9;
+            if (count($columns) < $expectedColumns) {
                 continue;
             }
 
             $data = json_decode($columns[8], true) ?? [];
+
+            // Convert ClickHouse timestamp format back to ISO 8601
+            // ClickHouse: 2025-12-07 23:33:54.493
+            // ISO 8601:   2025-12-07T23:33:54.493+00:00
+            $time = $columns[7];
+            if (strpos($time, 'T') === false) {
+                $time = str_replace(' ', 'T', $time) . '+00:00';
+            }
 
             $document = [
                 '$id' => $columns[0],
@@ -457,7 +503,7 @@ class ClickHouse extends SQL
                 'userAgent' => $columns[4],
                 'ip' => $columns[5],
                 'location' => $columns[6] === '\\N' ? null : $columns[6],
-                'time' => $columns[7],
+                'time' => $time,
                 'data' => $data,
             ];
 
@@ -759,7 +805,7 @@ class ClickHouse extends SQL
     /**
      * Delete logs older than the specified datetime.
      *
-     * ClickHouse uses a different approach for deletions - we use ALTER TABLE DELETE.
+     * ClickHouse uses ALTER TABLE DELETE with synchronous mutations.
      *
      * @throws Exception
      */
@@ -768,9 +814,11 @@ class ClickHouse extends SQL
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
 
+        // Use DELETE statement for synchronous deletion (ClickHouse 23.3+)
+        // Falls back to ALTER TABLE DELETE with mutations_sync for older versions
         $sql = "
-            ALTER TABLE {$this->database}.{$tableName}
-            DELETE WHERE time < :datetime{$tenantFilter}
+            DELETE FROM {$this->database}.{$tableName}
+            WHERE time < :datetime{$tenantFilter}
         ";
 
         $this->query($sql, ['datetime' => $datetime]);

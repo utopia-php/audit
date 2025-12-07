@@ -21,7 +21,7 @@ class AuditClickHouseTest extends TestCase
             host: 'clickhouse',
             database: 'default',
             username: 'default',
-            password: '',
+            password: 'clickhouse',
             port: 8123,
             table: 'audit_logs'
         );
