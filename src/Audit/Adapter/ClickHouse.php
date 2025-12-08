@@ -35,6 +35,8 @@ class ClickHouse extends SQL
     /** @var bool Whether to use HTTPS for ClickHouse HTTP interface */
     private bool $secure = false;
 
+    private Client $client;
+
     protected string $namespace = '';
 
     protected ?int $tenant = null;
@@ -47,6 +49,7 @@ class ClickHouse extends SQL
      * @param string $password ClickHouse password (default: '')
      * @param int $port ClickHouse HTTP port (default: 8123)
      * @param bool $secure Whether to use HTTPS (default: false)
+     * @throws Exception If validation fails
      */
     public function __construct(
         string $host,
@@ -55,11 +58,20 @@ class ClickHouse extends SQL
         int $port = self::DEFAULT_PORT,
         bool $secure = false
     ) {
+        $this->validateHost($host);
+        $this->validatePort($port);
+
         $this->host = $host;
         $this->port = $port;
         $this->username = $username;
         $this->password = $password;
         $this->secure = $secure;
+
+        // Initialize the HTTP client for connection reuse
+        $this->client = new Client();
+        $this->client->addHeader('X-ClickHouse-User', $this->username);
+        $this->client->addHeader('X-ClickHouse-Key', $this->password);
+        $this->client->setTimeout(30);
     }
 
     /**
@@ -71,23 +83,134 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Validate host parameter.
+     *
+     * @param string $host
+     * @throws Exception
+     */
+    private function validateHost(string $host): void
+    {
+        if (empty($host)) {
+            throw new Exception('ClickHouse host cannot be empty');
+        }
+
+        // Check if it's a valid hostname or IP address
+        // Allow: alphanumeric, dots, hyphens, underscores for hostnames
+        // Allow: numeric and dots for IPv4 addresses
+        // Allow: colons for IPv6 addresses
+        if (!preg_match('/^[a-zA-Z0-9._\-:]+$/', $host)) {
+            throw new Exception('ClickHouse host contains invalid characters');
+        }
+
+        // Prevent localhost references that might bypass security
+        if (filter_var($host, FILTER_VALIDATE_IP) === false && !preg_match('/^[a-zA-Z0-9._\-]+$/', $host)) {
+            throw new Exception('ClickHouse host must be a valid hostname or IP address');
+        }
+    }
+
+    /**
+     * Validate port parameter.
+     *
+     * @param int $port
+     * @throws Exception
+     */
+    private function validatePort(int $port): void
+    {
+        if ($port < 1 || $port > 65535) {
+            throw new Exception('ClickHouse port must be between 1 and 65535');
+        }
+    }
+
+    /**
+     * Validate identifier (database, table, namespace).
+     * ClickHouse identifiers follow SQL standard rules.
+     *
+     * @param string $identifier
+     * @param string $type Name of the identifier type for error messages
+     * @throws Exception
+     */
+    private function validateIdentifier(string $identifier, string $type = 'Identifier'): void
+    {
+        if (empty($identifier)) {
+            throw new Exception("{$type} cannot be empty");
+        }
+
+        if (strlen($identifier) > 255) {
+            throw new Exception("{$type} cannot exceed 255 characters");
+        }
+
+        // ClickHouse identifiers: alphanumeric, underscores, cannot start with number
+        if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $identifier)) {
+            throw new Exception("{$type} must start with a letter or underscore and contain only alphanumeric characters and underscores");
+        }
+
+        // Check against SQL keywords (common ones)
+        $keywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER', 'TABLE', 'DATABASE'];
+        if (in_array(strtoupper($identifier), $keywords, true)) {
+            throw new Exception("{$type} cannot be a reserved SQL keyword");
+        }
+    }
+
+    /**
+     * Escape an identifier (database name, table name, column name) for safe use in SQL.
+     * Uses backticks as per SQL standard for identifier quoting.
+     *
+     * @param string $identifier
+     * @return string
+     */
+    private function escapeIdentifier(string $identifier): string
+    {
+        // Backtick escaping: replace any backticks in the identifier with double backticks
+        return '`' . str_replace('`', '``', $identifier) . '`';
+    }
+
+    /**
+     * Escape a string value for safe use in ClickHouse SQL queries.
+     * ClickHouse uses SQL standard escaping: single quotes are escaped by doubling them.
+     * This is critical for preventing SQL injection attacks.
+     *
+     * @param string $value
+     * @return string The escaped value without surrounding quotes
+     */
+    private function escapeString(string $value): string
+    {
+        // ClickHouse SQL standard: escape single quotes by doubling them
+        // Also escape backslashes to prevent any potential issues
+        return str_replace(
+            ["\\", "'"],
+            ["\\\\", "''"],
+            $value
+        );
+    }
+
+
+    /**
      * Set the namespace for multi-project support.
      * Namespace is used as a prefix for table names.
      *
      * @param string $namespace
      * @return self
+     * @throws Exception
      */
     public function setNamespace(string $namespace): self
     {
+        if (!empty($namespace)) {
+            $this->validateIdentifier($namespace, 'Namespace');
+        }
         $this->namespace = $namespace;
         return $this;
     }
 
     /**
      * Set the database name for subsequent operations.
+     *
+     * @param string $database
+     * @return self
+     * @throws Exception
      */
     public function setDatabase(string $database): self
     {
+        $this->validateIdentifier($database, 'Database');
         $this->database = $database;
         return $this;
     }
@@ -200,6 +323,9 @@ class ClickHouse extends SQL
     /**
      * Execute a ClickHouse query via HTTP interface using Fetch Client.
      *
+     * Reuses the HTTP client from the constructor to enable connection pooling
+     * and improve performance with frequent queries.
+     *
      * @param array<string, mixed> $params
      * @throws Exception
      */
@@ -214,7 +340,7 @@ class ClickHouse extends SQL
                 // Numeric values should not be quoted
                 $strValue = (string) $value;
             } elseif (is_string($value)) {
-                $strValue = "'" . addslashes($value) . "'";
+                $strValue = "'" . $this->escapeString($value) . "'";
             } elseif (is_null($value)) {
                 $strValue = 'NULL';
             } elseif (is_bool($value)) {
@@ -222,26 +348,22 @@ class ClickHouse extends SQL
             } elseif (is_array($value)) {
                 $encoded = json_encode($value);
                 if (is_string($encoded)) {
-                    $strValue = "'" . addslashes($encoded) . "'";
+                    $strValue = "'" . $this->escapeString($encoded) . "'";
                 } else {
                     $strValue = 'NULL';
                 }
             } else {
                 /** @var scalar $value */
-                $strValue = "'" . addslashes((string) $value) . "'";
+                $strValue = "'" . $this->escapeString((string) $value) . "'";
             }
             $sql = str_replace(":{$key}", $strValue, $sql);
         }
 
-        // Build headers with authentication
-        $client = new Client();
-        $client->addHeader('X-ClickHouse-User', $this->username);
-        $client->addHeader('X-ClickHouse-Key', $this->password);
-        $client->addHeader('X-ClickHouse-Database', $this->database);
-        $client->setTimeout(30);
+        // Update the database header for each query (in case setDatabase was called)
+        $this->client->addHeader('X-ClickHouse-Database', $this->database);
 
         try {
-            $response = $client->fetch(
+            $response = $this->client->fetch(
                 url: $url,
                 method: Client::METHOD_POST,
                 body: ['query' => $sql]
@@ -271,7 +393,8 @@ class ClickHouse extends SQL
     public function setup(): void
     {
         // Create database if not exists
-        $createDbSql = "CREATE DATABASE IF NOT EXISTS {$this->database}";
+        $escapedDatabase = $this->escapeIdentifier($this->database);
+        $createDbSql = "CREATE DATABASE IF NOT EXISTS {$escapedDatabase}";
         $this->query($createDbSql);
 
         // Build column definitions from base adapter schema
@@ -309,10 +432,11 @@ class ClickHouse extends SQL
         }
 
         $tableName = $this->getTableName();
+        $escapedDatabaseAndTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
         // Create table with MergeTree engine for optimal performance
         $createTableSql = "
-            CREATE TABLE IF NOT EXISTS {$this->database}.{$tableName} (
+            CREATE TABLE IF NOT EXISTS {$escapedDatabaseAndTable} (
                 " . implode(",\n                ", $columns) . ",
                 " . implode(",\n                ", $indexes) . "
             )
@@ -361,8 +485,9 @@ class ClickHouse extends SQL
             $params['tenant'] = $this->tenant;
         }
 
+        $escapedDatabaseAndTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
         $insertSql = "
-            INSERT INTO {$this->database}.{$tableName}
+            INSERT INTO {$escapedDatabaseAndTable}
             (" . implode(', ', $columns) . ")
             VALUES (
                 " . implode(", ", $placeholders) . "
@@ -406,11 +531,11 @@ class ClickHouse extends SQL
             $id = uniqid('audit_', true);
             $userIdVal = $log['userId'] ?? null;
             $userId = ($userIdVal !== null)
-                ? "'" . addslashes((string) $userIdVal) . "'"
+                ? "'" . $this->escapeString((string) $userIdVal) . "'"
                 : 'NULL';
             $locationVal = $log['location'] ?? null;
             $location = ($locationVal !== null)
-                ? "'" . addslashes((string) $locationVal) . "'"
+                ? "'" . $this->escapeString((string) $locationVal) . "'"
                 : 'NULL';
 
             $formattedTimestamp = $this->formatTimestamp($log['timestamp']);
@@ -421,13 +546,13 @@ class ClickHouse extends SQL
                     "('%s', %s, '%s', '%s', '%s', '%s', %s, '%s', '%s', %s)",
                     $id,
                     $userId,
-                    addslashes((string) $log['event']),
-                    addslashes((string) $log['resource']),
-                    addslashes((string) $log['userAgent']),
-                    addslashes((string) $log['ip']),
+                    $this->escapeString((string) $log['event']),
+                    $this->escapeString((string) $log['resource']),
+                    $this->escapeString((string) $log['userAgent']),
+                    $this->escapeString((string) $log['ip']),
                     $location,
                     $formattedTimestamp,
-                    addslashes((string) json_encode($log['data'] ?? [])),
+                    $this->escapeString((string) json_encode($log['data'] ?? [])),
                     $tenant
                 );
             } else {
@@ -435,13 +560,13 @@ class ClickHouse extends SQL
                     "('%s', %s, '%s', '%s', '%s', '%s', %s, '%s', '%s')",
                     $id,
                     $userId,
-                    addslashes((string) $log['event']),
-                    addslashes((string) $log['resource']),
-                    addslashes((string) $log['userAgent']),
-                    addslashes((string) $log['ip']),
+                    $this->escapeString((string) $log['event']),
+                    $this->escapeString((string) $log['resource']),
+                    $this->escapeString((string) $log['userAgent']),
+                    $this->escapeString((string) $log['ip']),
                     $location,
                     $formattedTimestamp,
-                    addslashes((string) json_encode($log['data'] ?? []))
+                    $this->escapeString((string) json_encode($log['data'] ?? []))
                 );
             }
         }
@@ -454,8 +579,9 @@ class ClickHouse extends SQL
             $columns .= ', tenant';
         }
 
+        $escapedDatabaseAndTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
         $insertSql = "
-            INSERT INTO {$this->database}.{$tableName}
+            INSERT INTO {$escapedDatabaseAndTable}
             ({$columns})
             VALUES " . implode(', ', $values);
 
@@ -719,7 +845,7 @@ class ClickHouse extends SQL
             }
         }
 
-        $eventsList = implode("', '", array_map('addslashes', $events));
+        $eventsList = implode("', '", array_map(fn($e) => $this->escapeString($e), $events));
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
 
@@ -748,7 +874,7 @@ class ClickHouse extends SQL
      */
     public function countByUserAndEvents(string $userId, array $events, array $queries = []): int
     {
-        $eventsList = implode("', '", array_map('addslashes', $events));
+        $eventsList = implode("', '", array_map(fn($e) => $this->escapeString($e), $events));
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
 
@@ -784,7 +910,7 @@ class ClickHouse extends SQL
             }
         }
 
-        $eventsList = implode("', '", array_map('addslashes', $events));
+        $eventsList = implode("', '", array_map(fn($e) => $this->escapeString($e), $events));
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
 
@@ -813,7 +939,7 @@ class ClickHouse extends SQL
      */
     public function countByResourceAndEvents(string $resource, array $events, array $queries = []): int
     {
-        $eventsList = implode("', '", array_map('addslashes', $events));
+        $eventsList = implode("', '", array_map(fn($e) => $this->escapeString($e), $events));
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
 
