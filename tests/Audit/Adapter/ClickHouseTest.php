@@ -1,17 +1,16 @@
 <?php
 
-namespace Utopia\Tests;
+namespace Utopia\Tests\Audit\Adapter;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Audit\Adapter\ClickHouse;
 use Utopia\Audit\Audit;
+use Utopia\Tests\Audit\AuditBase;
 
 /**
  * ClickHouse Adapter Tests
- *
- * Tests the Audit library using the ClickHouse adapter
  */
-class AuditClickHouseTest extends TestCase
+class ClickHouseTest extends TestCase
 {
     use AuditBase;
 

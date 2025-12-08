@@ -1,22 +1,21 @@
 <?php
 
-namespace Utopia\Tests;
+namespace Utopia\Tests\Audit\Adapter;
 
 use PDO;
 use PHPUnit\Framework\TestCase;
+use Utopia\Audit\Adapter;
 use Utopia\Audit\Audit;
 use Utopia\Cache\Adapter\None as NoCache;
 use Utopia\Cache\Cache;
 use Utopia\Database\Adapter\MariaDB;
 use Utopia\Database\Database;
-use Utopia\Audit\Adapter;
+use Utopia\Tests\Audit\AuditBase;
 
 /**
  * Database Adapter Tests
- *
- * Tests the Audit library using the Database adapter (MariaDB/MySQL)
  */
-class AuditDatabaseTest extends TestCase
+class DatabaseTest extends TestCase
 {
     use AuditBase;
 

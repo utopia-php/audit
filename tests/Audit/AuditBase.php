@@ -1,6 +1,6 @@
 <?php
 
-namespace Utopia\Tests;
+namespace Utopia\Tests\Audit;
 
 use Utopia\Audit\Audit;
 use Utopia\Database\DateTime;
