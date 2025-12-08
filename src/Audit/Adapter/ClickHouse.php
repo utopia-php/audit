@@ -372,13 +372,19 @@ class ClickHouse extends SQL
             if ($response->getStatusCode() !== 200) {
                 $body = $response->getBody();
                 $bodyStr = is_string($body) ? $body : '';
-                throw new Exception("ClickHouse query failed (HTTP {$response->getStatusCode()}): {$bodyStr}");
+                throw new Exception("ClickHouse query failed with HTTP {$response->getStatusCode()}: {$bodyStr}");
             }
 
             $body = $response->getBody();
             return is_string($body) ? $body : '';
         } catch (Exception $e) {
-            throw new Exception("ClickHouse connection error: {$e->getMessage()}");
+            // Preserve the original exception context for better debugging
+            // Re-throw with additional context while maintaining the original exception chain
+            throw new Exception(
+                "ClickHouse query execution failed: {$e->getMessage()}",
+                0,
+                $e
+            );
         }
     }
 
@@ -527,8 +533,10 @@ class ClickHouse extends SQL
         }
 
         $values = [];
+        $ids = [];
         foreach ($logs as $log) {
             $id = uniqid('', true);
+            $ids[] = $id;
             $userIdVal = $log['userId'] ?? null;
             $userId = ($userIdVal !== null)
                 ? "'" . $this->escapeString((string) $userIdVal) . "'"
@@ -587,11 +595,11 @@ class ClickHouse extends SQL
 
         $this->query($insertSql);
 
-        // Return documents
+        // Return documents using the same IDs that were inserted
         $documents = [];
-        foreach ($logs as $log) {
+        foreach ($logs as $index => $log) {
             $result = [
-                '$id' => uniqid('', true),
+                '$id' => $ids[$index],
                 'userId' => $log['userId'] ?? null,
                 'event' => $log['event'],
                 'resource' => $log['resource'],
@@ -698,17 +706,18 @@ class ClickHouse extends SQL
 
         return " AND tenant = {$this->tenant}";
     }
+
     /**
-     * Get logs by user ID.
+     * Parse limit and offset from query parameters.
      *
-     * @throws Exception
+     * @param array<int, mixed> $queries
+     * @return array<string, int>
      */
-    public function getByUser(string $userId, array $queries = []): array
+    private function parseQueryParams(array $queries): array
     {
         $limit = 25;
         $offset = 0;
 
-        // Parse simple limit/offset from queries (simplified version)
         foreach ($queries as $query) {
             if (is_object($query) && method_exists($query, 'getMethod') && method_exists($query, 'getValue')) {
                 if ($query->getMethod() === 'limit') {
@@ -718,6 +727,20 @@ class ClickHouse extends SQL
                 }
             }
         }
+
+        return ['limit' => $limit, 'offset' => $offset];
+    }
+
+    /**
+     * Get logs by user ID.
+     *
+     * @throws Exception
+     */
+    public function getByUser(string $userId, array $queries = []): array
+    {
+        $params = $this->parseQueryParams($queries);
+        $limit = $params['limit'];
+        $offset = $params['offset'];
 
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
@@ -769,18 +792,9 @@ class ClickHouse extends SQL
      */
     public function getByResource(string $resource, array $queries = []): array
     {
-        $limit = 25;
-        $offset = 0;
-
-        foreach ($queries as $query) {
-            if (is_object($query) && method_exists($query, 'getMethod') && method_exists($query, 'getValue')) {
-                if ($query->getMethod() === 'limit') {
-                    $limit = (int) $query->getValue();
-                } elseif ($query->getMethod() === 'offset') {
-                    $offset = (int) $query->getValue();
-                }
-            }
-        }
+        $params = $this->parseQueryParams($queries);
+        $limit = $params['limit'];
+        $offset = $params['offset'];
 
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
@@ -832,18 +846,9 @@ class ClickHouse extends SQL
      */
     public function getByUserAndEvents(string $userId, array $events, array $queries = []): array
     {
-        $limit = 25;
-        $offset = 0;
-
-        foreach ($queries as $query) {
-            if (is_object($query) && method_exists($query, 'getMethod') && method_exists($query, 'getValue')) {
-                if ($query->getMethod() === 'limit') {
-                    $limit = (int) $query->getValue();
-                } elseif ($query->getMethod() === 'offset') {
-                    $offset = (int) $query->getValue();
-                }
-            }
-        }
+        $params = $this->parseQueryParams($queries);
+        $limit = $params['limit'];
+        $offset = $params['offset'];
 
         $eventsList = implode("', '", array_map(fn($e) => $this->escapeString($e), $events));
         $tableName = $this->getTableName();
@@ -897,18 +902,9 @@ class ClickHouse extends SQL
      */
     public function getByResourceAndEvents(string $resource, array $events, array $queries = []): array
     {
-        $limit = 25;
-        $offset = 0;
-
-        foreach ($queries as $query) {
-            if (is_object($query) && method_exists($query, 'getMethod') && method_exists($query, 'getValue')) {
-                if ($query->getMethod() === 'limit') {
-                    $limit = (int) $query->getValue();
-                } elseif ($query->getMethod() === 'offset') {
-                    $offset = (int) $query->getValue();
-                }
-            }
-        }
+        $params = $this->parseQueryParams($queries);
+        $limit = $params['limit'];
+        $offset = $params['offset'];
 
         $eventsList = implode("', '", array_map(fn($e) => $this->escapeString($e), $events));
         $tableName = $this->getTableName();
