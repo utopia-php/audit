@@ -311,4 +311,38 @@ class Database extends SQL
 
         return true;
     }
+
+    /**
+     * Get database-agnostic column definition for a given attribute ID.
+     *
+     * For the Database adapter, this method is not actively used since the adapter
+     * delegates to utopia-php/database's native Document/Collection API which handles
+     * type mapping internally. However, this implementation is required to satisfy
+     * the abstract method declaration in the base SQL adapter.
+     *
+     * @param string $id Attribute identifier
+     * @return string Database-agnostic column description
+     * @throws Exception
+     */
+    protected function getColumnDefinition(string $id): string
+    {
+        $attribute = $this->getAttribute($id);
+
+        if (!$attribute) {
+            throw new Exception("Attribute {$id} not found");
+        }
+
+        // For the Database adapter, we use Utopia's VAR_* type constants internally
+        // This method provides a description for reference purposes
+        /** @var string $type */
+        $type = $attribute['type'];
+        /** @var int $size */
+        $size = $attribute['size'] ?? 0;
+
+        if ($size > 0) {
+            return "{$id}: {$type}({$size})";
+        }
+
+        return "{$id}: {$type}";
+    }
 }

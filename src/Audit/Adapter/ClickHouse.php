@@ -744,6 +744,33 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Get ClickHouse-specific SQL column definition for a given attribute ID.
+     *
+     * @param string $id Attribute identifier
+     * @return string ClickHouse column definition with appropriate types and nullability
+     * @throws Exception
+     */
+    protected function getColumnDefinition(string $id): string
+    {
+        $attribute = $this->getAttribute($id);
+
+        if (!$attribute) {
+            throw new Exception("Attribute {$id} not found");
+        }
+
+        // ClickHouse-specific type mapping
+        $type = match ($id) {
+            'userId', 'event', 'resource', 'userAgent', 'ip', 'location', 'data' => 'String',
+            'time' => 'DateTime64(3)',
+            default => 'String',
+        };
+
+        $nullable = !$attribute['required'] ? 'Nullable(' . $type . ')' : $type;
+
+        return "{$id} {$nullable}";
+    }
+
+    /**
      * Get logs by user ID.
      *
      * @throws Exception

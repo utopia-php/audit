@@ -194,31 +194,16 @@ abstract class SQL extends Adapter
 
     /**
      * Get SQL column definition for a given attribute ID.
+     * This method is database-specific and must be implemented by each concrete adapter.
      *
-     * @param string $id
-     * @return string
+     * @param string $id Attribute identifier
+     * @return string Database-specific column definition
      */
-    protected function getColumnDefinition(string $id): string
-    {
-        $attribute = $this->getAttribute($id);
-
-        if (! $attribute) {
-            throw new \Exception("Attribute {$id} not found");
-        }
-
-        $type = match ($id) {
-            'userId', 'event', 'resource', 'userAgent', 'ip', 'location', 'data' => 'String',
-            'time' => 'DateTime64(3)',
-            default => 'String',
-        };
-
-        $nullable = ! $attribute['required'] ? 'Nullable(' . $type . ')' : $type;
-
-        return "{$id} {$nullable}";
-    }
+    abstract protected function getColumnDefinition(string $id): string;
 
     /**
      * Get all SQL column definitions.
+     * Uses the concrete adapter's implementation of getColumnDefinition.
      *
      * @return array<string>
      */
