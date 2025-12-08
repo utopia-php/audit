@@ -185,10 +185,16 @@ class ClickHouse extends SQL
     {
         // Remove timezone suffix (e.g., +00:00, Z) if present
         // ClickHouse expects format: 2025-12-07 23:19:29.056
-        $timestamp = preg_replace('/([+-]\d{2}:\d{2}|Z)$/', '', $timestamp);
+        $normalized = preg_replace('/([+-]\d{2}:\d{2}|Z)$/', '', $timestamp);
+
+        if (!is_string($normalized)) {
+            return '';
+        }
+
         // Replace T with space if present
-        $timestamp = str_replace('T', ' ', $timestamp);
-        return $timestamp ?? '';
+        $normalized = str_replace('T', ' ', $normalized);
+
+        return $normalized;
     }
 
     /**
