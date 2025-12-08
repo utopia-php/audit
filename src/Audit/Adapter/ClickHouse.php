@@ -732,6 +732,18 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Build a formatted SQL IN list from an array of events.
+     * Properly escapes each event for safe SQL inclusion.
+     *
+     * @param array<int|string, string> $events
+     * @return string Formatted as 'event1', 'event2', 'event3'
+     */
+    private function buildEventsList(array $events): string
+    {
+        return implode("', '", array_map(fn ($e) => $this->escapeString($e), $events));
+    }
+
+    /**
      * Get logs by user ID.
      *
      * @throws Exception
@@ -850,7 +862,7 @@ class ClickHouse extends SQL
         $limit = $params['limit'];
         $offset = $params['offset'];
 
-        $eventsList = implode("', '", array_map(fn($e) => $this->escapeString($e), $events));
+        $eventsList = $this->buildEventsList($events);
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
 
@@ -879,7 +891,7 @@ class ClickHouse extends SQL
      */
     public function countByUserAndEvents(string $userId, array $events, array $queries = []): int
     {
-        $eventsList = implode("', '", array_map(fn($e) => $this->escapeString($e), $events));
+        $eventsList = $this->buildEventsList($events);
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
 
@@ -906,7 +918,7 @@ class ClickHouse extends SQL
         $limit = $params['limit'];
         $offset = $params['offset'];
 
-        $eventsList = implode("', '", array_map(fn($e) => $this->escapeString($e), $events));
+        $eventsList = $this->buildEventsList($events);
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
 
@@ -935,7 +947,7 @@ class ClickHouse extends SQL
      */
     public function countByResourceAndEvents(string $resource, array $events, array $queries = []): int
     {
-        $eventsList = implode("', '", array_map(fn($e) => $this->escapeString($e), $events));
+        $eventsList = $this->buildEventsList($events);
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
 
