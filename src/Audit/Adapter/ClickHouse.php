@@ -456,7 +456,7 @@ class ClickHouse extends SQL
      */
     public function create(array $log): Document
     {
-        $id = uniqid('audit_', true);
+        $id = uniqid('', true);
         // Format: 2025-12-07 23:19:29.056
         $microtime = microtime(true);
         $time = date('Y-m-d H:i:s', (int) $microtime) . '.' . sprintf('%03d', ($microtime - floor($microtime)) * 1000);
@@ -528,7 +528,7 @@ class ClickHouse extends SQL
 
         $values = [];
         foreach ($logs as $log) {
-            $id = uniqid('audit_', true);
+            $id = uniqid('', true);
             $userIdVal = $log['userId'] ?? null;
             $userId = ($userIdVal !== null)
                 ? "'" . $this->escapeString((string) $userIdVal) . "'"
@@ -591,7 +591,7 @@ class ClickHouse extends SQL
         $documents = [];
         foreach ($logs as $log) {
             $result = [
-                '$id' => uniqid('audit_', true),
+                '$id' => uniqid('', true),
                 'userId' => $log['userId'] ?? null,
                 'event' => $log['event'],
                 'resource' => $log['resource'],
