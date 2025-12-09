@@ -772,10 +772,11 @@ class ClickHouse extends SQL
 
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
         $sql = "
             SELECT " . $this->getSelectColumns() . "
-            FROM {$this->database}.{$tableName}
+            FROM {$escapedTable}
             WHERE userId = :userId{$tenantFilter}
             ORDER BY time DESC
             LIMIT :limit OFFSET :offset
@@ -800,10 +801,11 @@ class ClickHouse extends SQL
     {
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
         $sql = "
             SELECT count() as count
-            FROM {$this->database}.{$tableName}
+            FROM {$escapedTable}
             WHERE userId = :userId{$tenantFilter}
             FORMAT TabSeparated
         ";
@@ -826,10 +828,11 @@ class ClickHouse extends SQL
 
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
         $sql = "
             SELECT " . $this->getSelectColumns() . "
-            FROM {$this->database}.{$tableName}
+            FROM {$escapedTable}
             WHERE resource = :resource{$tenantFilter}
             ORDER BY time DESC
             LIMIT :limit OFFSET :offset
@@ -854,10 +857,11 @@ class ClickHouse extends SQL
     {
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
         $sql = "
             SELECT count() as count
-            FROM {$this->database}.{$tableName}
+            FROM {$escapedTable}
             WHERE resource = :resource{$tenantFilter}
             FORMAT TabSeparated
         ";
@@ -881,10 +885,11 @@ class ClickHouse extends SQL
         $eventsList = $this->buildEventsList($events);
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
         $sql = "
             SELECT " . $this->getSelectColumns() . "
-            FROM {$this->database}.{$tableName}
+            FROM {$escapedTable}
             WHERE userId = :userId AND event IN ('{$eventsList}'){$tenantFilter}
             ORDER BY time DESC
             LIMIT :limit OFFSET :offset
@@ -910,10 +915,11 @@ class ClickHouse extends SQL
         $eventsList = $this->buildEventsList($events);
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
         $sql = "
             SELECT count() as count
-            FROM {$this->database}.{$tableName}
+            FROM {$escapedTable}
             WHERE userId = :userId AND event IN ('{$eventsList}'){$tenantFilter}
             FORMAT TabSeparated
         ";
@@ -937,10 +943,11 @@ class ClickHouse extends SQL
         $eventsList = $this->buildEventsList($events);
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
         $sql = "
             SELECT " . $this->getSelectColumns() . "
-            FROM {$this->database}.{$tableName}
+            FROM {$escapedTable}
             WHERE resource = :resource AND event IN ('{$eventsList}'){$tenantFilter}
             ORDER BY time DESC
             LIMIT :limit OFFSET :offset
@@ -966,10 +973,11 @@ class ClickHouse extends SQL
         $eventsList = $this->buildEventsList($events);
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
         $sql = "
             SELECT count() as count
-            FROM {$this->database}.{$tableName}
+            FROM {$escapedTable}
             WHERE resource = :resource AND event IN ('{$eventsList}'){$tenantFilter}
             FORMAT TabSeparated
         ";
@@ -990,11 +998,12 @@ class ClickHouse extends SQL
     {
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
         // Use DELETE statement for synchronous deletion (ClickHouse 23.3+)
         // Falls back to ALTER TABLE DELETE with mutations_sync for older versions
         $sql = "
-            DELETE FROM {$this->database}.{$tableName}
+            DELETE FROM {$escapedTable}
             WHERE time < :datetime{$tenantFilter}
         ";
 
