@@ -52,7 +52,7 @@ abstract class Adapter
      *     userAgent: string,
      *     ip: string,
      *     location?: string,
-     *     timestamp: string,
+     *     time: string,
      *     data?: array<string, mixed>
      * }> $logs
      * @return array<Log>

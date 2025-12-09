@@ -535,7 +535,7 @@ class ClickHouse extends SQL
                 ? "'" . $this->escapeString((string) $locationVal) . "'"
                 : 'NULL';
 
-            $formattedTimestamp = $this->formatTimestamp($log['timestamp']);
+            $formattedTimestamp = $this->formatTimestamp($log['time']);
 
             if ($this->sharedTables) {
                 $tenant = $this->tenant !== null ? (int) $this->tenant : 'NULL';
@@ -595,7 +595,7 @@ class ClickHouse extends SQL
                 'userAgent' => $log['userAgent'],
                 'ip' => $log['ip'],
                 'location' => $log['location'] ?? null,
-                'time' => $log['timestamp'],
+                'time' => $log['time'],
                 'data' => $log['data'] ?? [],
             ];
 
