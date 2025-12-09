@@ -27,7 +27,7 @@ services:
       - "8123:8123"
       - "9000:9000"
     healthcheck:
-      test: ["CMD", "clickhouse-client", "--host=localhost", "--port=9000", "-q", "SELECT 1"]
+      test: ["CMD", "clickhouse-client", "--host=localhost", "--port=9000", "--query=SELECT 1", "--format=Null"]
       interval: 5s
       timeout: 3s
       retries: 10
