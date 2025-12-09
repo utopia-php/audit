@@ -3,6 +3,7 @@
 namespace Utopia\Tests\Audit;
 
 use Utopia\Audit\Audit;
+use Utopia\Audit\Log;
 use Utopia\Database\DateTime;
 use Utopia\Database\Query;
 
@@ -50,10 +51,10 @@ trait AuditBase
         $location = 'US';
         $data = ['key1' => 'value1', 'key2' => 'value2'];
 
-        $this->assertInstanceOf('Utopia\\Database\\Document', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
-        $this->assertInstanceOf('Utopia\\Database\\Document', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
-        $this->assertInstanceOf('Utopia\\Database\\Document', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
-        $this->assertInstanceOf('Utopia\\Database\\Document', $this->audit->log(null, 'insert', 'user/null', $userAgent, $ip, $location, $data));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log(null, 'insert', 'user/null', $userAgent, $ip, $location, $data));
     }
 
     public function testGetLogsByUser(): void
@@ -273,11 +274,11 @@ trait AuditBase
         $location = 'US';
         $data = ['key1' => 'value1', 'key2' => 'value2'];
 
-        $this->assertInstanceOf('Utopia\\Database\\Document', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
         sleep(5);
-        $this->assertInstanceOf('Utopia\\Database\\Document', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
         sleep(5);
-        $this->assertInstanceOf('Utopia\\Database\\Document', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
         sleep(5);
 
         // DELETE logs older than 11 seconds and check that status is true
