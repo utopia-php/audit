@@ -176,7 +176,7 @@ trait AuditBase
                 'ip' => $ip,
                 'location' => $location,
                 'data' => ['key' => 'value1'],
-                'timestamp' => $timestamp1
+                'time' => $timestamp1
             ],
             [
                 'userId' => $userId,
@@ -186,7 +186,7 @@ trait AuditBase
                 'ip' => $ip,
                 'location' => $location,
                 'data' => ['key' => 'value2'],
-                'timestamp' => $timestamp2
+                'time' => $timestamp2
             ],
             [
                 'userId' => $userId,
@@ -196,7 +196,7 @@ trait AuditBase
                 'ip' => $ip,
                 'location' => $location,
                 'data' => ['key' => 'value3'],
-                'timestamp' => $timestamp3
+                'time' => $timestamp3
             ],
             [
                 'userId' => null,
@@ -206,7 +206,7 @@ trait AuditBase
                 'ip' => $ip,
                 'location' => $location,
                 'data' => ['key' => 'value4'],
-                'timestamp' => $timestamp3
+                'time' => $timestamp3
             ]
         ];
 
