@@ -79,10 +79,7 @@ use Utopia\Database\Database;
 
 // Using the Database adapter directly
 $adapter = new DatabaseAdapter($database);
-$audit = Audit::withAdapter($adapter);
-
-// Or using the static factory method
-$audit = Audit::withDatabase($database);
+$audit = new Audit($adapter);
 ```
 
 ### Basic Operations
@@ -150,7 +147,7 @@ $events = [
         'ip' => '127.0.0.1',
         'location' => 'US',
         'data' => ['key' => 'value'],
-        'timestamp' => DateTime::now()
+        'time' => DateTime::now()
     ],
     [
         'userId' => 'user-2',
@@ -160,7 +157,7 @@ $events = [
         'ip' => '192.168.1.1',
         'location' => 'UK',
         'data' => ['key' => 'value'],
-        'timestamp' => DateTime::now()
+        'time' => DateTime::now()
     ]
 ];
 
@@ -175,15 +172,10 @@ Utopia Audit uses an adapter pattern to support different storage backends. Curr
 
 The Database adapter uses [utopia-php/database](https://github.com/utopia-php/database) to store audit logs in a database.
 
-**Supported Databases:**
-- MySQL/MariaDB
-- PostgreSQL
-- MongoDB
-- And all other databases supported by utopia-php/database
 
 ### ClickHouse Adapter
 
-The ClickHouse adapter uses [ClickHouse](https://clickhouse.com/) for high-performance analytical queries on massive amounts of log data. It communicates with ClickHouse via HTTP interface using cURL.
+The ClickHouse adapter uses [ClickHouse](https://clickhouse.com/) for high-performance analytical queries on massive amounts of log data. It communicates with ClickHouse via HTTP interface using Utopia Fetch.
 
 **Features:**
 - Optimized for analytical queries and aggregations
@@ -210,7 +202,7 @@ $adapter = new ClickHouse(
     table: 'audit_logs'
 );
 
-$audit = Audit::withAdapter($adapter);
+$audit = new Audit($adapter);
 $audit->setup(); // Creates database and table
 
 // Use as normal
@@ -278,7 +270,7 @@ Then use your custom adapter:
 
 ```php
 $adapter = new CustomAdapter();
-$audit = Audit::withAdapter($adapter);
+$audit = new Audit($adapter);
 ```
 
 ## System Requirements
