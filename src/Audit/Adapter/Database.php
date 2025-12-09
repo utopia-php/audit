@@ -307,16 +307,9 @@ class Database extends SQL
     {
         $this->db->getAuthorization()->skip(function () use ($datetime) {
             do {
-                $documents = $this->db->find(
-                    collection: $this->getCollectionName(),
-                    queries: [
-                        Query::lessThan('time', $datetime),
-                    ]
-                );
-
-                foreach ($documents as $document) {
-                    $this->db->deleteDocument($this->getCollectionName(), $document->getId());
-                }
+                $this->db->deleteDocuments($this->getCollectionName(), [
+                    Query::lessThan('time', $datetime),
+                ]);
             } while (! empty($documents));
         });
 
