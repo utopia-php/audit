@@ -3,7 +3,6 @@
 namespace Utopia\Audit;
 
 use Utopia\Database\Database;
-use Utopia\Database\Document;
 
 /**
  * Audit Log Manager
@@ -57,11 +56,11 @@ class Audit
      * @param string $ip
      * @param string $location
      * @param array<string, mixed> $data
-     * @return Document
+     * @return Log
      *
      * @throws \Exception
      */
-    public function log(?string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): Document
+    public function log(?string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): Log
     {
         return $this->adapter->create([
             'userId' => $userId,
@@ -78,7 +77,7 @@ class Audit
      * Add multiple event logs in batch.
      *
      * @param array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, timestamp: string, data?: array<string, mixed>}> $events
-     * @return array<Document>
+     * @return array<Log>
      *
      * @throws \Exception
      */
@@ -92,7 +91,7 @@ class Audit
      *
      * @param string $userId
      * @param array<mixed> $queries
-     * @return array<Document>
+     * @return array<Log>
      *
      * @throws \Exception
      */
@@ -123,7 +122,7 @@ class Audit
      *
      * @param string $resource
      * @param array<mixed> $queries
-     * @return array<Document>
+     * @return array<Log>
      *
      * @throws \Exception
      */
@@ -156,7 +155,7 @@ class Audit
      * @param string $userId
      * @param array<int, string> $events
      * @param array<mixed> $queries
-     * @return array<Document>
+     * @return array<Log>
      *
      * @throws \Exception
      */
@@ -192,7 +191,7 @@ class Audit
      * @param string $resource
      * @param array<int, string> $events
      * @param array<mixed> $queries
-     * @return array<Document>
+     * @return array<Log>
      *
      * @throws \Exception
      */

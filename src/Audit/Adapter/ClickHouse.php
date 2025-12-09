@@ -3,7 +3,7 @@
 namespace Utopia\Audit\Adapter;
 
 use Exception;
-use Utopia\Database\Document;
+use Utopia\Audit\Log;
 use Utopia\Fetch\Client;
 
 /**
@@ -460,7 +460,7 @@ class ClickHouse extends SQL
      *
      * @throws Exception
      */
-    public function create(array $log): Document
+    public function create(array $log): Log
     {
         $id = uniqid('', true);
         // Format: 2025-12-07 23:19:29.056
@@ -518,7 +518,7 @@ class ClickHouse extends SQL
             $result['tenant'] = $this->tenant;
         }
 
-        return new Document($result);
+        return new Log($result);
     }
 
     /**
@@ -614,16 +614,16 @@ class ClickHouse extends SQL
                 $result['tenant'] = $this->tenant;
             }
 
-            $documents[] = new Document($result);
+            $documents[] = new Log($result);
         }
 
         return $documents;
     }
 
     /**
-     * Parse ClickHouse query result into Documents.
+     * Parse ClickHouse query result into Log objects.
      *
-     * @return array<int, Document>
+     * @return array<int, Log>
      */
     private function parseResults(string $result): array
     {
@@ -673,7 +673,7 @@ class ClickHouse extends SQL
                 $document['tenant'] = $columns[9] === '\\N' ? null : (int) $columns[9];
             }
 
-            $documents[] = new Document($document);
+            $documents[] = new Log($document);
         }
 
         return $documents;

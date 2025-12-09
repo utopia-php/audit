@@ -2,8 +2,6 @@
 
 namespace Utopia\Audit;
 
-use Utopia\Database\Document;
-
 /**
  * Abstract Adapter class for Audit implementations
  *
@@ -38,11 +36,11 @@ abstract class Adapter
      *     location?: string,
      *     data?: array<string, mixed>
      * } $log
-     * @return Document The created document
+     * @return Log The created log entry
      *
      * @throws \Exception
      */
-    abstract public function create(array $log): Document;
+    abstract public function create(array $log): Log;
 
     /**
      * Create multiple audit log entries in batch.
@@ -57,7 +55,7 @@ abstract class Adapter
      *     timestamp: string,
      *     data?: array<string, mixed>
      * }> $logs
-     * @return array<Document>
+     * @return array<Log>
      *
      * @throws \Exception
      */
@@ -68,7 +66,7 @@ abstract class Adapter
      *
      * @param string $userId
      * @param array<mixed> $queries Additional query parameters
-     * @return array<Document>
+     * @return array<Log>
      *
      * @throws \Exception
      */
@@ -90,7 +88,7 @@ abstract class Adapter
      *
      * @param string $resource
      * @param array<mixed> $queries Additional query parameters
-     * @return array<Document>
+     * @return array<Log>
      *
      * @throws \Exception
      */
@@ -113,7 +111,7 @@ abstract class Adapter
      * @param string $userId
      * @param array<int, string> $events
      * @param array<mixed> $queries Additional query parameters
-     * @return array<Document>
+     * @return array<Log>
      *
      * @throws \Exception
      */
@@ -137,7 +135,7 @@ abstract class Adapter
      * @param string $resource
      * @param array<int, string> $events
      * @param array<mixed> $queries Additional query parameters
-     * @return array<Document>
+     * @return array<Log>
      *
      * @throws \Exception
      */

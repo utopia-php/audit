@@ -2,6 +2,7 @@
 
 namespace Utopia\Audit\Adapter;
 
+use Utopia\Audit\Log;
 use Utopia\Database\Database as DatabaseClient;
 use Utopia\Database\DateTime;
 use Utopia\Database\Document;
@@ -63,12 +64,12 @@ class Database extends SQL
      * Create an audit log entry.
      *
      * @param array<string, mixed> $log
-     * @return Document
+     * @return Log
      * @throws AuthorizationException|\Exception
      */
-    public function create(array $log): Document
+    public function create(array $log): Log
     {
-        return $this->db->getAuthorization()->skip(function () use ($log) {
+        $document = $this->db->getAuthorization()->skip(function () use ($log) {
             return $this->db->createDocument($this->getCollectionName(), new Document([
                 '$permissions' => [],
                 'userId' => $log['userId'] ?? null,
@@ -81,13 +82,15 @@ class Database extends SQL
                 'time' => DateTime::now(),
             ]));
         });
+
+        return $this->documentToLog($document);
     }
 
     /**
      * Create multiple audit log entries in batch.
      *
      * @param array<int, array<string, mixed>> $logs
-     * @return array<Document>
+     * @return array<Log>
      * @throws AuthorizationException|\Exception
      */
     public function createBatch(array $logs): array
@@ -109,19 +112,19 @@ class Database extends SQL
             }
         });
 
-        return $created;
+        return array_map(fn ($doc) => $this->documentToLog($doc), $created);
     }
 
     /**
      * Get audit logs by user ID.
      *
      * @param array<int, Query> $queries
-     * @return array<Document>
+     * @return array<Log>
      * @throws AuthorizationException|\Exception
      */
     public function getByUser(string $userId, array $queries = []): array
     {
-        return $this->db->getAuthorization()->skip(function () use ($userId, $queries) {
+        $documents = $this->db->getAuthorization()->skip(function () use ($userId, $queries) {
             $queries[] = Query::equal('userId', [$userId]);
             $queries[] = Query::orderDesc();
 
@@ -130,6 +133,8 @@ class Database extends SQL
                 queries: $queries,
             );
         });
+
+        return array_map(fn ($doc) => $this->documentToLog($doc), $documents);
     }
 
     /**
@@ -156,12 +161,12 @@ class Database extends SQL
      *
      * @param string $resource
      * @param array<int, Query> $queries
-     * @return array<Document>
+     * @return array<Log>
      * @throws Timeout|\Utopia\Database\Exception|\Utopia\Database\Exception\Query
      */
     public function getByResource(string $resource, array $queries = []): array
     {
-        return $this->db->getAuthorization()->skip(function () use ($resource, $queries) {
+        $documents = $this->db->getAuthorization()->skip(function () use ($resource, $queries) {
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::orderDesc();
 
@@ -170,6 +175,8 @@ class Database extends SQL
                 queries: $queries,
             );
         });
+
+        return array_map(fn ($doc) => $this->documentToLog($doc), $documents);
     }
 
     /**
@@ -199,12 +206,12 @@ class Database extends SQL
      * @param string $userId
      * @param array<int, string> $events
      * @param array<int, Query> $queries
-     * @return array<Document>
+     * @return array<Log>
      * @throws Timeout|\Utopia\Database\Exception|\Utopia\Database\Exception\Query
      */
     public function getByUserAndEvents(string $userId, array $events, array $queries = []): array
     {
-        return $this->db->getAuthorization()->skip(function () use ($userId, $events, $queries) {
+        $documents = $this->db->getAuthorization()->skip(function () use ($userId, $events, $queries) {
             $queries[] = Query::equal('userId', [$userId]);
             $queries[] = Query::equal('event', $events);
             $queries[] = Query::orderDesc();
@@ -214,6 +221,8 @@ class Database extends SQL
                 queries: $queries,
             );
         });
+
+        return array_map(fn ($doc) => $this->documentToLog($doc), $documents);
     }
 
     /**
@@ -245,12 +254,12 @@ class Database extends SQL
      * @param string $resource
      * @param array<int, string> $events
      * @param array<int, Query> $queries
-     * @return array<Document>
+     * @return array<Log>
      * @throws Timeout|\Utopia\Database\Exception|\Utopia\Database\Exception\Query
      */
     public function getByResourceAndEvents(string $resource, array $events, array $queries = []): array
     {
-        return $this->db->getAuthorization()->skip(function () use ($resource, $events, $queries) {
+        $documents = $this->db->getAuthorization()->skip(function () use ($resource, $events, $queries) {
             $queries[] = Query::equal('resource', [$resource]);
             $queries[] = Query::equal('event', $events);
             $queries[] = Query::orderDesc();
@@ -260,6 +269,8 @@ class Database extends SQL
                 queries: $queries,
             );
         });
+
+        return array_map(fn ($doc) => $this->documentToLog($doc), $documents);
     }
 
     /**
@@ -310,6 +321,27 @@ class Database extends SQL
         });
 
         return true;
+    }
+
+    /**
+     * Convert a Document to a Log object.
+     *
+     * @param Document $document
+     * @return Log
+     */
+    private function documentToLog(Document $document): Log
+    {
+        return new Log([
+            '$id' => $document->getId(),
+            'userId' => $document->getAttribute('userId'),
+            'event' => $document->getAttribute('event'),
+            'resource' => $document->getAttribute('resource'),
+            'userAgent' => $document->getAttribute('userAgent'),
+            'ip' => $document->getAttribute('ip'),
+            'location' => $document->getAttribute('location'),
+            'time' => $document->getAttribute('time'),
+            'data' => $document->getAttribute('data', []),
+        ]);
     }
 
     /**
