@@ -76,7 +76,7 @@ class Audit
     /**
      * Add multiple event logs in batch.
      *
-     * @param array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, timestamp: string, data?: array<string, mixed>}> $events
+     * @param array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, time: string, data?: array<string, mixed>}> $events
      * @return array<Log>
      *
      * @throws \Exception
