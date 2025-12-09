@@ -4,6 +4,7 @@ namespace Utopia\Audit\Adapter;
 
 use Utopia\Audit\Log;
 use Utopia\Database\Database as DatabaseClient;
+use Utopia\Database\DateTime;
 use Utopia\Database\Document;
 use Utopia\Database\Exception\Authorization as AuthorizationException;
 use Utopia\Database\Exception\Duplicate as DuplicateException;
@@ -68,6 +69,7 @@ class Database extends SQL
      */
     public function create(array $log): Log
     {
+        $log['time'] = $log['time'] ?? DateTime::now();
         $document = $this->db->getAuthorization()->skip(function () use ($log) {
             return $this->db->createDocument($this->getCollectionName(), new Document($log));
         });
@@ -91,7 +93,7 @@ class Database extends SQL
             }
         });
 
-        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $created);
+        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $created);
     }
 
     /**
@@ -113,7 +115,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -155,7 +157,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -201,7 +203,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -249,7 +251,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
