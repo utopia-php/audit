@@ -5,6 +5,7 @@ namespace Utopia\Audit\Adapter;
 use Exception;
 use Utopia\Audit\Log;
 use Utopia\Fetch\Client;
+use Utopia\Validator\Hostname;
 
 /**
  * ClickHouse Adapter for Audit
@@ -90,21 +91,9 @@ class ClickHouse extends SQL
      */
     private function validateHost(string $host): void
     {
-        if (empty($host)) {
-            throw new Exception('ClickHouse host cannot be empty');
-        }
-
-        // Check if it's a valid hostname or IP address
-        // Allow: alphanumeric, dots, hyphens, underscores for hostnames
-        // Allow: numeric and dots for IPv4 addresses
-        // Allow: colons for IPv6 addresses
-        if (!preg_match('/^[a-zA-Z0-9._\-:]+$/', $host)) {
-            throw new Exception('ClickHouse host contains invalid characters');
-        }
-
-        // Prevent localhost references that might bypass security
-        if (filter_var($host, FILTER_VALIDATE_IP) === false && !preg_match('/^[a-zA-Z0-9._\-]+$/', $host)) {
-            throw new Exception('ClickHouse host must be a valid hostname or IP address');
+        $validator = new Hostname();
+        if (!$validator->isValid($host)) {
+            throw new Exception('ClickHouse host is not a valid hostname or IP address');
         }
     }
 
