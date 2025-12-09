@@ -4,7 +4,6 @@ namespace Utopia\Audit\Adapter;
 
 use Utopia\Audit\Log;
 use Utopia\Database\Database as DatabaseClient;
-use Utopia\Database\DateTime;
 use Utopia\Database\Document;
 use Utopia\Database\Exception\Authorization as AuthorizationException;
 use Utopia\Database\Exception\Duplicate as DuplicateException;
@@ -70,20 +69,10 @@ class Database extends SQL
     public function create(array $log): Log
     {
         $document = $this->db->getAuthorization()->skip(function () use ($log) {
-            return $this->db->createDocument($this->getCollectionName(), new Document([
-                '$permissions' => [],
-                'userId' => $log['userId'] ?? null,
-                'event' => $log['event'],
-                'resource' => $log['resource'],
-                'userAgent' => $log['userAgent'],
-                'ip' => $log['ip'],
-                'location' => $log['location'] ?? null,
-                'data' => $log['data'] ?? [],
-                'time' => DateTime::now(),
-            ]));
+            return $this->db->createDocument($this->getCollectionName(), new Document($log));
         });
 
-        return $this->documentToLog($document);
+        return new Log($document->getArrayCopy());
     }
 
     /**
@@ -98,21 +87,11 @@ class Database extends SQL
         $created = [];
         $this->db->getAuthorization()->skip(function () use ($logs, &$created) {
             foreach ($logs as $log) {
-                $created[] = $this->db->createDocument($this->getCollectionName(), new Document([
-                    '$permissions' => [],
-                    'userId' => $log['userId'] ?? null,
-                    'event' => $log['event'],
-                    'resource' => $log['resource'],
-                    'userAgent' => $log['userAgent'],
-                    'ip' => $log['ip'],
-                    'location' => $log['location'] ?? null,
-                    'data' => $log['data'] ?? [],
-                    'time' => $log['timestamp'],
-                ]));
+                $created[] = $this->db->createDocument($this->getCollectionName(), new Document($log));
             }
         });
 
-        return array_map(fn ($doc) => $this->documentToLog($doc), $created);
+        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $created);
     }
 
     /**
@@ -134,7 +113,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn ($doc) => $this->documentToLog($doc), $documents);
+        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -176,7 +155,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn ($doc) => $this->documentToLog($doc), $documents);
+        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -222,7 +201,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn ($doc) => $this->documentToLog($doc), $documents);
+        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -270,7 +249,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn ($doc) => $this->documentToLog($doc), $documents);
+        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -314,27 +293,6 @@ class Database extends SQL
         });
 
         return true;
-    }
-
-    /**
-     * Convert a Document to a Log object.
-     *
-     * @param Document $document
-     * @return Log
-     */
-    private function documentToLog(Document $document): Log
-    {
-        return new Log([
-            '$id' => $document->getId(),
-            'userId' => $document->getAttribute('userId'),
-            'event' => $document->getAttribute('event'),
-            'resource' => $document->getAttribute('resource'),
-            'userAgent' => $document->getAttribute('userAgent'),
-            'ip' => $document->getAttribute('ip'),
-            'location' => $document->getAttribute('location'),
-            'time' => $document->getAttribute('time'),
-            'data' => $document->getAttribute('data', []),
-        ]);
     }
 
     /**
