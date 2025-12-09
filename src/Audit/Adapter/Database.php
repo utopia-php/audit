@@ -286,10 +286,10 @@ class Database extends SQL
     {
         $this->db->getAuthorization()->skip(function () use ($datetime) {
             do {
-                $this->db->deleteDocuments($this->getCollectionName(), [
+                $removed = $this->db->deleteDocuments($this->getCollectionName(), [
                     Query::lessThan('time', $datetime),
                 ]);
-            } while (! empty($documents));
+            } while ($removed > 0);
         });
 
         return true;

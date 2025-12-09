@@ -40,6 +40,7 @@ use Utopia\Cache\Cache;
 use Utopia\Cache\Adapter\None as NoCache;
 use Utopia\Database\Adapter\MySQL;
 use Utopia\Database\Database;
+use Utopia\Audit\Adapter\Database as DatabaseAdapter;
 
 $dbHost = '127.0.0.1';
 $dbUser = 'travis';
@@ -61,7 +62,7 @@ $database = new Database(new MySQL($pdo), $cache);
 $database->setNamespace('namespace');
 
 // Create audit instance with Database adapter
-$audit = Audit::withDatabase($database);
+$audit = new Audit(new DatabaseAdapter($database));
 $audit->setup();
 ```
 
