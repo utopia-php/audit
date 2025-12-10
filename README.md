@@ -102,33 +102,70 @@ $audit->log($userId, $event, $resource, $userAgent, $ip, $location, $data);
 
 **Get Logs By User**
 
-Fetch all logs by given user ID
+Fetch all logs by given user ID with optional filtering parameters:
 
 ```php
+// Basic usage
+$logs = $audit->getLogsByUser('userId');
+
+// With pagination
 $logs = $audit->getLogsByUser(
-    'userId' // User unique ID
-); // Returns an array of all logs for specific user
+    userId: 'userId',
+    limit: 10,
+    offset: 0
+);
+
+// With time filtering using DateTime objects
+$logs = $audit->getLogsByUser(
+    userId: 'userId',
+    after: new \DateTime('2024-01-01 00:00:00'),
+    before: new \DateTime('2024-12-31 23:59:59'),
+    limit: 25,
+    offset: 0,
+    ascending: false  // false = newest first (default), true = oldest first
+);
 ```
 
 **Get Logs By User and Action**
 
-Fetch all logs by given user ID and a specific event name
+Fetch all logs by given user ID and specific event names with optional filtering:
 
 ```php
-$logs = $audit->getLogsByUserAndEvents( 
-    'userId', // User unique ID
-    ['update', 'delete'] // List of selected event to fetch
-); // Returns an array of all logs for specific user filtered by given actions
+// Basic usage
+$logs = $audit->getLogsByUserAndEvents(
+    userId: 'userId',
+    events: ['update', 'delete']
+);
+
+// With time filtering and pagination
+$logs = $audit->getLogsByUserAndEvents(
+    userId: 'userId',
+    events: ['update', 'delete'],
+    after: new \DateTime('-7 days'),
+    before: new \DateTime('now'),
+    limit: 50,
+    offset: 0,
+    ascending: false
+);
 ```
 
 **Get Logs By Resource**
 
-Fetch all logs by a given resource name
+Fetch all logs by a given resource name with optional filtering:
 
 ```php
+// Basic usage
+$logs = $audit->getLogsByResource('database/document-1');
+
+// With time filtering and pagination
 $logs = $audit->getLogsByResource(
-    'resource-name', // Resource Name
-); // Returns an array of all logs for the specific resource
+    resource: 'database/document-1',
+    after: new \DateTime('-30 days'),
+    before: new \DateTime('now'),
+    limit: 100,
+    offset: 0,
+    ascending: true  // Get oldest logs first
+);
 ```
 
 **Batch Logging**
@@ -163,6 +200,63 @@ $events = [
 
 $documents = $audit->logBatch($events);
 ```
+
+**Counting Logs**
+
+All retrieval methods have corresponding count methods with the same filtering capabilities:
+
+```php
+// Count all logs for a user
+$count = $audit->countLogsByUser('userId');
+
+// Count logs within a time range
+$count = $audit->countLogsByUser(
+    userId: 'userId',
+    after: new \DateTime('-7 days'),
+    before: new \DateTime('now')
+);
+
+// Count logs by resource
+$count = $audit->countLogsByResource('database/document-1');
+
+// Count logs by user and events
+$count = $audit->countLogsByUserAndEvents(
+    userId: 'userId',
+    events: ['create', 'update', 'delete'],
+    after: new \DateTime('-30 days')
+);
+
+// Count logs by resource and events
+$count = $audit->countLogsByResourceAndEvents(
+    resource: 'database/document-1',
+    events: ['update', 'delete']
+);
+```
+
+**Advanced Filtering**
+
+Get logs by resource and specific events:
+
+```php
+$logs = $audit->getLogsByResourceAndEvents(
+    resource: 'database/document-1',
+    events: ['create', 'update'],
+    after: new \DateTime('-24 hours'),
+    limit: 20,
+    offset: 0,
+    ascending: false
+);
+```
+
+### Filtering Parameters
+
+All retrieval methods support the following optional parameters:
+
+- **after** (`?\DateTime`): Get logs created after this datetime
+- **before** (`?\DateTime`): Get logs created before this datetime  
+- **limit** (`int`, default: 25): Maximum number of logs to return
+- **offset** (`int`, default: 0): Number of logs to skip (for pagination)
+- **ascending** (`bool`, default: false): Sort order - false for newest first, true for oldest first
 
 ## Adapters
 
