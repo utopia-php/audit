@@ -93,7 +93,7 @@ class Database extends SQL
             }
         });
 
-        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $created);
+        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $created);
     }
 
     /**
@@ -156,7 +156,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -212,7 +212,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -273,7 +273,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -337,7 +337,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -370,13 +370,13 @@ class Database extends SQL
     /**
      * Delete logs older than the specified datetime.
      *
-     * @param string $datetime
+     * @param \DateTime $datetime
     /**
      * @throws AuthorizationException|\Exception
      */
     public function cleanup(\DateTime $datetime): bool
     {
-        $datetimeString = $datetime->format('Y-m-d\TH:i:s.vP');
+        $datetimeString = DateTime::format($datetime);
         $this->db->getAuthorization()->skip(function () use ($datetimeString) {
             do {
                 $removed = $this->db->deleteDocuments($this->getCollectionName(), [
