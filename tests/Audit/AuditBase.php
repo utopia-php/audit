@@ -254,6 +254,98 @@ trait AuditBase
         $this->assertEquals(3, \count($logs));
     }
 
+    public function testAscendingOrderRetrieval(): void
+    {
+        // Test ascending order retrieval
+        $logsDesc = $this->audit->getLogsByUser('userId', ascending: false);
+        $logsAsc = $this->audit->getLogsByUser('userId', ascending: true);
+
+        // Both should have same count
+        $this->assertEquals(\count($logsDesc), \count($logsAsc));
+
+        // Events should be in opposite order
+        if (\count($logsDesc) > 1) {
+            $descEvents = array_map(fn ($log) => $log->getAttribute('event'), $logsDesc);
+            $ascEvents = array_map(fn ($log) => $log->getAttribute('event'), $logsAsc);
+            $this->assertEquals($descEvents, array_reverse($ascEvents));
+        }
+    }
+
+    public function testLargeBatchInsert(): void
+    {
+        // Create a large batch (50 events)
+        $batchEvents = [];
+        $baseTime = DateTime::now();
+        for ($i = 0; $i < 50; $i++) {
+            $batchEvents[] = [
+                'userId' => 'largebatchuser',
+                'event' => 'event_' . $i,
+                'resource' => 'doc/' . $i,
+                'userAgent' => 'Mozilla',
+                'ip' => '127.0.0.1',
+                'location' => 'US',
+                'data' => ['index' => $i],
+                'time' => DateTime::formatTz($baseTime) ?? ''
+            ];
+        }
+
+        // Insert batch
+        $result = $this->audit->logBatch($batchEvents);
+        $this->assertEquals(50, \count($result));
+
+        // Verify all were inserted
+        $count = $this->audit->countLogsByUser('largebatchuser');
+        $this->assertEquals(50, $count);
+
+        // Test pagination
+        $page1 = $this->audit->getLogsByUser('largebatchuser', limit: 10, offset: 0);
+        $this->assertEquals(10, \count($page1));
+
+        $page2 = $this->audit->getLogsByUser('largebatchuser', limit: 10, offset: 10);
+        $this->assertEquals(10, \count($page2));
+    }
+
+    public function testTimeRangeFilters(): void
+    {
+        // Create logs with different timestamps
+        $old = DateTime::format(new \DateTime('2024-01-01 10:00:00'));
+        $recent = DateTime::now();
+
+        $batchEvents = [
+            [
+                'userId' => 'timerangeuser',
+                'event' => 'old_event',
+                'resource' => 'doc/1',
+                'userAgent' => 'Mozilla',
+                'ip' => '127.0.0.1',
+                'location' => 'US',
+                'data' => [],
+                'time' => $old
+            ],
+            [
+                'userId' => 'timerangeuser',
+                'event' => 'recent_event',
+                'resource' => 'doc/2',
+                'userAgent' => 'Mozilla',
+                'ip' => '127.0.0.1',
+                'location' => 'US',
+                'data' => [],
+                'time' => $recent
+            ]
+        ];
+
+        $this->audit->logBatch($batchEvents);
+
+        // Test getting all logs
+        $all = $this->audit->getLogsByUser('timerangeuser');
+        $this->assertGreaterThanOrEqual(2, \count($all));
+
+        // Test with before filter - should get both since they're both in the past relative to future
+        $beforeFuture = DateTime::format(new \DateTime('2099-12-31 23:59:59'));
+        $beforeLogs = $this->audit->getLogsByUser('timerangeuser', before: $beforeFuture);
+        $this->assertGreaterThanOrEqual(2, \count($beforeLogs));
+    }
+
     public function testCleanup(): void
     {
         sleep(3);
