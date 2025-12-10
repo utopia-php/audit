@@ -3,7 +3,6 @@
 namespace Utopia\Tests\Audit;
 
 use Utopia\Audit\Audit;
-use Utopia\Audit\Log;
 use Utopia\Database\DateTime;
 
 /**
@@ -31,6 +30,9 @@ trait AuditBase
     public function setUp(): void
     {
         $this->initializeAudit();
+        $cleanup = new \DateTime();
+        $cleanup = $cleanup->modify('+10 second');
+        $this->audit->cleanup(new \DateTime());
         $this->createLogs();
     }
 
@@ -39,6 +41,8 @@ trait AuditBase
      */
     public function tearDown(): void
     {
+        $cleanup = new \DateTime();
+        $cleanup = $cleanup->modify('+10 second');
         $this->audit->cleanup(new \DateTime());
     }
 
@@ -266,8 +270,8 @@ trait AuditBase
 
         // Events should be in opposite order
         if (\count($logsDesc) > 1) {
-            $descEvents = array_map(fn($log) => $log->getAttribute('event'), $logsDesc);
-            $ascEvents = array_map(fn($log) => $log->getAttribute('event'), $logsAsc);
+            $descEvents = array_map(fn ($log) => $log->getAttribute('event'), $logsDesc);
+            $ascEvents = array_map(fn ($log) => $log->getAttribute('event'), $logsAsc);
             $this->assertEquals($descEvents, array_reverse($ascEvents));
         }
     }
@@ -349,8 +353,6 @@ trait AuditBase
 
     public function testCleanup(): void
     {
-        sleep(3);
-        // First delete all the logs
         $status = $this->audit->cleanup(new \DateTime());
         $this->assertEquals($status, true);
 

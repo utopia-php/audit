@@ -266,29 +266,6 @@ class ClickHouse extends SQL
     }
 
     /**
-     * Format timestamp for ClickHouse DateTime64.
-     * Removes timezone information and ensures proper format.
-     *
-     * @param string $timestamp
-     * @return string
-     */
-    private function formatTimestamp(string $timestamp): string
-    {
-        // Remove timezone suffix (e.g., +00:00, Z) if present
-        // ClickHouse expects format: 2025-12-07 23:19:29.056
-        $normalized = preg_replace('/([+-]\d{2}:\d{2}|Z)$/', '', $timestamp);
-
-        if (!is_string($normalized)) {
-            return '';
-        }
-
-        // Replace T with space if present
-        $normalized = str_replace('T', ' ', $normalized);
-
-        return $normalized;
-    }
-
-    /**
      * Execute a ClickHouse query via HTTP interface using Fetch Client.
      *
      * Uses ClickHouse query parameters (sent as POST multipart form data) to prevent SQL injection.
@@ -462,9 +439,7 @@ class ClickHouse extends SQL
     public function create(array $log): Log
     {
         $id = uniqid('', true);
-        // Format: 2025-12-07 23:19:29.056
-        $microtime = microtime(true);
-        $time = date('Y-m-d H:i:s', (int) $microtime) . '.' . sprintf('%03d', ($microtime - floor($microtime)) * 1000);
+        $time = (new \DateTime())->format('Y-m-d H:i:s.v');
 
         $tableName = $this->getTableName();
 
@@ -569,7 +544,12 @@ class ClickHouse extends SQL
             $params[$paramKeys[4]] = $log['userAgent'];
             $params[$paramKeys[5]] = $log['ip'];
             $params[$paramKeys[6]] = $log['location'] ?? null;
-            $params[$paramKeys[7]] = $this->formatTimestamp($log['time']);
+
+            $time = $log['time'] ?? new \DateTime();
+            if (is_string($time)) {
+                $time = new \DateTime($time);
+            }
+            $params[$paramKeys[7]] = $time->format('Y-m-d H:i:s.v');
             $params[$paramKeys[8]] = json_encode($log['data'] ?? []);
 
             if ($this->sharedTables) {
@@ -1116,7 +1096,7 @@ class ClickHouse extends SQL
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
         // Convert DateTime to string format expected by ClickHouse
-        $datetimeString = $datetime->format('Y-m-d H:i:s');
+        $datetimeString = $datetime->format('Y-m-d H:i:s.v');
 
         // Use DELETE statement for synchronous deletion (ClickHouse 23.3+)
         // Falls back to ALTER TABLE DELETE with mutations_sync for older versions
