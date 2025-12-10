@@ -1,4 +1,4 @@
-FROM composer:2.0 as step0
+FROM composer:2.8 AS step0
 
 WORKDIR /src/
 
@@ -8,7 +8,7 @@ COPY composer.json /src/
 RUN composer install --ignore-platform-reqs --optimize-autoloader \
     --no-plugins --no-scripts --prefer-dist
 
-FROM php:8.3.3-cli-alpine3.19 as  final
+FROM php:8.3.3-cli-alpine3.19 AS  final
 
 LABEL maintainer="team@appwrite.io"
 
