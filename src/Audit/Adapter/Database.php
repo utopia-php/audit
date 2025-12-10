@@ -371,15 +371,16 @@ class Database extends SQL
      * Delete logs older than the specified datetime.
      *
      * @param string $datetime
-     * @return bool
+    /**
      * @throws AuthorizationException|\Exception
      */
-    public function cleanup(string $datetime): bool
+    public function cleanup(\DateTime $datetime): bool
     {
-        $this->db->getAuthorization()->skip(function () use ($datetime) {
+        $datetimeString = $datetime->format('Y-m-d\TH:i:s.vP');
+        $this->db->getAuthorization()->skip(function () use ($datetimeString) {
             do {
                 $removed = $this->db->deleteDocuments($this->getCollectionName(), [
-                    Query::lessThan('time', $datetime),
+                    Query::lessThan('time', $datetimeString),
                 ]);
             } while ($removed > 0);
         });

@@ -39,7 +39,7 @@ trait AuditBase
      */
     public function tearDown(): void
     {
-        $this->audit->cleanup(DateTime::now());
+        $this->audit->cleanup(new \DateTime());
     }
 
     public function createLogs(): void
@@ -154,7 +154,7 @@ trait AuditBase
     public function testLogByBatch(): void
     {
         // First cleanup existing logs
-        $this->audit->cleanup(DateTime::now());
+        $this->audit->cleanup(new \DateTime());
 
         $userId = 'batchUserId';
         $userAgent = 'Mozilla/5.0 (Test User Agent)';
@@ -351,7 +351,7 @@ trait AuditBase
     {
         sleep(3);
         // First delete all the logs
-        $status = $this->audit->cleanup(DateTime::now());
+        $status = $this->audit->cleanup(new \DateTime());
         $this->assertEquals($status, true);
 
         // Check that all logs have been deleted
@@ -373,7 +373,9 @@ trait AuditBase
         sleep(5);
 
         // DELETE logs older than 11 seconds and check that status is true
-        $status = $this->audit->cleanup(DateTime::addSeconds(new \DateTime(), -11));
+        $datetime = new \DateTime();
+        $datetime->modify('-11 seconds');
+        $status = $this->audit->cleanup($datetime);
         $this->assertEquals($status, true);
 
         // Check if 1 log has been deleted
@@ -387,7 +389,7 @@ trait AuditBase
     public function testRetrievalParameters(): void
     {
         // Setup: Create logs with specific timestamps for testing
-        $this->audit->cleanup(DateTime::now());
+        $this->audit->cleanup(new \DateTime());
 
         $userId = 'paramtestuser';
         $userAgent = 'Mozilla/5.0';

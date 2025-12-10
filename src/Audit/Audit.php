@@ -232,14 +232,14 @@ class Audit
     }
 
     /**
-     * Delete all logs older than `$datetime` seconds
+     * Delete all logs older than the specified datetime
      *
-     * @param string $datetime
+     * @param \DateTime $datetime
      * @return bool
      *
      * @throws \Exception
      */
-    public function cleanup(string $datetime): bool
+    public function cleanup(\DateTime $datetime): bool
     {
         return $this->adapter->cleanup($datetime);
     }

@@ -196,10 +196,10 @@ abstract class Adapter
     /**
      * Delete logs older than the specified datetime.
      *
-     * @param string $datetime ISO 8601 datetime string
+     * @param \DateTime $datetime
      * @return bool
      *
      * @throws \Exception
      */
-    abstract public function cleanup(string $datetime): bool;
+    abstract public function cleanup(\DateTime $datetime): bool;
 }

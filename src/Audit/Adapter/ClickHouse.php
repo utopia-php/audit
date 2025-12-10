@@ -1109,11 +1109,14 @@ class ClickHouse extends SQL
      *
      * @throws Exception
      */
-    public function cleanup(string $datetime): bool
+    public function cleanup(\DateTime $datetime): bool
     {
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+
+        // Convert DateTime to string format expected by ClickHouse
+        $datetimeString = $datetime->format('Y-m-d H:i:s');
 
         // Use DELETE statement for synchronous deletion (ClickHouse 23.3+)
         // Falls back to ALTER TABLE DELETE with mutations_sync for older versions
@@ -1122,7 +1125,7 @@ class ClickHouse extends SQL
             WHERE time < {datetime:String}{$tenantFilter}
         ";
 
-        $this->query($sql, ['datetime' => $datetime]);
+        $this->query($sql, ['datetime' => $datetimeString]);
 
         return true;
     }

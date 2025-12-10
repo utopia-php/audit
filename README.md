@@ -327,7 +327,7 @@ To create a custom adapter, extend the `Utopia\Audit\Adapter` abstract class and
 namespace MyApp\Audit;
 
 use Utopia\Audit\Adapter;
-use Utopia\Database\Document;
+use Utopia\Audit\Log;
 
 class CustomAdapter extends Adapter
 {
@@ -338,25 +338,104 @@ class CustomAdapter extends Adapter
 
     public function setup(): void
     {
-        // Initialize your storage backend
+        // Initialize your storage backend (create tables, indexes, etc.)
     }
 
-    public function create(array $log): Document
+    public function create(array $log): Log
     {
-        // Store a single log entry
+        // Store a single log entry and return a Log object
     }
 
     public function createBatch(array $logs): array
     {
-        // Store multiple log entries
+        // Store multiple log entries and return array of Log objects
     }
 
-    public function getByUser(string $userId, array $queries = []): array
+    public function getByUser(
+        string $userId,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
+    ): array {
+        // Retrieve logs by user ID with optional filtering
+    }
+
+    public function countByUser(
+        string $userId,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
+    ): int {
+        // Count logs by user ID with optional time filtering
+    }
+
+    public function getByResource(
+        string $resource,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
+    ): array {
+        // Retrieve logs by resource with optional filtering
+    }
+
+    public function countByResource(
+        string $resource,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
+    ): int {
+        // Count logs by resource with optional time filtering
+    }
+
+    public function getByUserAndEvents(
+        string $userId,
+        array $events,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
+    ): array {
+        // Retrieve logs by user ID and specific events with optional filtering
+    }
+
+    public function countByUserAndEvents(
+        string $userId,
+        array $events,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
+    ): int {
+        // Count logs by user ID and events with optional time filtering
+    }
+
+    public function getByResourceAndEvents(
+        string $resource,
+        array $events,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
+    ): array {
+        // Retrieve logs by resource and specific events with optional filtering
+    }
+
+    public function countByResourceAndEvents(
+        string $resource,
+        array $events,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
+    ): int {
+        // Count logs by resource and events with optional time filtering
+    }
+
+    public function cleanup(\DateTime $datetime): bool
     {
-        // Retrieve logs by user ID
+        // Delete logs older than the specified datetime
+        // Return true on success, false otherwise
     }
-
-    // Implement other required methods...
 }
 ```
 
