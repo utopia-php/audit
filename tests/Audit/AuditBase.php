@@ -266,8 +266,8 @@ trait AuditBase
 
         // Events should be in opposite order
         if (\count($logsDesc) > 1) {
-            $descEvents = array_map(fn ($log) => $log->getAttribute('event'), $logsDesc);
-            $ascEvents = array_map(fn ($log) => $log->getAttribute('event'), $logsAsc);
+            $descEvents = array_map(fn($log) => $log->getAttribute('event'), $logsDesc);
+            $ascEvents = array_map(fn($log) => $log->getAttribute('event'), $logsAsc);
             $this->assertEquals($descEvents, array_reverse($ascEvents));
         }
     }

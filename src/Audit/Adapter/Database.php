@@ -93,7 +93,7 @@ class Database extends SQL
             }
         });
 
-        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $created);
+        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $created);
     }
 
     /**
@@ -156,7 +156,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -212,7 +212,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -273,7 +273,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -337,7 +337,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
