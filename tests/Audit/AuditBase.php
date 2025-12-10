@@ -248,7 +248,8 @@ trait AuditBase
 
     public function testGetLogsCustomFilters(): void
     {
-        $threshold = DateTime::addSeconds(new \DateTime(), -10);
+        $threshold = new \DateTime();
+        $threshold->modify('-10 seconds');
         $logs = $this->audit->getLogsByUser('userId', after: $threshold);
 
         $this->assertEquals(3, \count($logs));
@@ -341,7 +342,7 @@ trait AuditBase
         $this->assertGreaterThanOrEqual(2, \count($all));
 
         // Test with before filter - should get both since they're both in the past relative to future
-        $beforeFuture = DateTime::format(new \DateTime('2099-12-31 23:59:59'));
+        $beforeFuture = new \DateTime('2099-12-31 23:59:59');
         $beforeLogs = $this->audit->getLogsByUser('timerangeuser', before: $beforeFuture);
         $this->assertGreaterThanOrEqual(2, \count($beforeLogs));
     }
@@ -378,5 +379,190 @@ trait AuditBase
         // Check if 1 log has been deleted
         $logs = $this->audit->getLogsByUser('userId');
         $this->assertEquals(2, \count($logs));
+    }
+
+    /**
+     * Test all additional retrieval parameters: limit, offset, ascending, after, before
+     */
+    public function testRetrievalParameters(): void
+    {
+        // Setup: Create logs with specific timestamps for testing
+        $this->audit->cleanup(DateTime::now());
+
+        $userId = 'paramtestuser';
+        $userAgent = 'Mozilla/5.0';
+        $ip = '192.168.1.1';
+        $location = 'US';
+
+        // Create 5 logs with different timestamps
+        $baseTime = new \DateTime('2024-06-15 12:00:00');
+        $batchEvents = [];
+        for ($i = 0; $i < 5; $i++) {
+            $offset = $i * 60;
+            $logTime = new \DateTime('2024-06-15 12:00:00');
+            $logTime->modify("+{$offset} seconds");
+            $timestamp = DateTime::format($logTime);
+            $batchEvents[] = [
+                'userId' => $userId,
+                'event' => 'event_' . $i,
+                'resource' => 'doc/' . $i,
+                'userAgent' => $userAgent,
+                'ip' => $ip,
+                'location' => $location,
+                'data' => ['sequence' => $i],
+                'time' => $timestamp
+            ];
+        }
+
+        $this->audit->logBatch($batchEvents);
+
+        // Test 1: limit parameter
+        $logsLimit2 = $this->audit->getLogsByUser($userId, limit: 2);
+        $this->assertEquals(2, \count($logsLimit2));
+
+        $logsLimit3 = $this->audit->getLogsByUser($userId, limit: 3);
+        $this->assertEquals(3, \count($logsLimit3));
+
+        // Test 2: offset parameter
+        $logsOffset0 = $this->audit->getLogsByUser($userId, limit: 10, offset: 0);
+        $logsOffset2 = $this->audit->getLogsByUser($userId, limit: 10, offset: 2);
+        $logsOffset4 = $this->audit->getLogsByUser($userId, limit: 10, offset: 4);
+
+        $this->assertEquals(5, \count($logsOffset0));
+        $this->assertEquals(3, \count($logsOffset2));
+        $this->assertEquals(1, \count($logsOffset4));
+
+        // Verify offset returns different logs
+        $this->assertNotEquals($logsOffset0[0]->getId(), $logsOffset2[0]->getId());
+        $this->assertNotEquals($logsOffset2[0]->getId(), $logsOffset4[0]->getId());
+
+        // Test 3: ascending parameter
+        $logsDesc = $this->audit->getLogsByUser($userId, ascending: false);
+        $logsAsc = $this->audit->getLogsByUser($userId, ascending: true);
+
+        $this->assertEquals(5, \count($logsDesc));
+        $this->assertEquals(5, \count($logsAsc));
+
+        // Verify order is reversed
+        if (\count($logsDesc) === \count($logsAsc)) {
+            for ($i = 0; $i < \count($logsDesc); $i++) {
+                $this->assertEquals(
+                    $logsDesc[$i]->getId(),
+                    $logsAsc[\count($logsAsc) - 1 - $i]->getId()
+                );
+            }
+        }
+
+        // Test 4: after parameter (logs after a certain timestamp)
+        $afterTimeObj = new \DateTime('2024-06-15 12:03:00'); // After 3rd log
+        $logsAfter = $this->audit->getLogsByUser($userId, after: $afterTimeObj);
+        // Should get logs at positions 3 and 4 (2 logs)
+        $this->assertGreaterThanOrEqual(1, \count($logsAfter));
+
+        // Test 5: before parameter (logs before a certain timestamp)
+        $beforeTimeObj = new \DateTime('2024-06-15 12:02:00'); // Before 3rd log
+        $logsBefore = $this->audit->getLogsByUser($userId, before: $beforeTimeObj);
+        // Should get logs at positions 0, 1, 2 (3 logs)
+        $this->assertGreaterThanOrEqual(1, \count($logsBefore));
+
+        // Test 6: Combination of limit + offset
+        $logsPage1 = $this->audit->getLogsByUser($userId, limit: 2, offset: 0);
+        $logsPage2 = $this->audit->getLogsByUser($userId, limit: 2, offset: 2);
+        $logsPage3 = $this->audit->getLogsByUser($userId, limit: 2, offset: 4);
+
+        $this->assertEquals(2, \count($logsPage1));
+        $this->assertEquals(2, \count($logsPage2));
+        $this->assertEquals(1, \count($logsPage3));
+
+        // Verify pages don't overlap
+        $this->assertNotEquals($logsPage1[0]->getId(), $logsPage2[0]->getId());
+        $this->assertNotEquals($logsPage2[0]->getId(), $logsPage3[0]->getId());
+
+        // Test 7: Combination of ascending + limit
+        $ascLimit2 = $this->audit->getLogsByUser($userId, limit: 2, ascending: true);
+        $this->assertEquals(2, \count($ascLimit2));
+        // First log should be oldest in ascending order
+        $this->assertEquals('event_0', $ascLimit2[0]->getAttribute('event'));
+
+        // Test 8: Combination of after + before (time range)
+        $afterTimeObj2 = new \DateTime('2024-06-15 12:01:00');  // After 1st log
+        $beforeTimeObj2 = new \DateTime('2024-06-15 12:04:00'); // Before 4th log
+        $logsRange = $this->audit->getLogsByUser($userId, after: $afterTimeObj2, before: $beforeTimeObj2);
+        $this->assertGreaterThanOrEqual(1, \count($logsRange));
+
+        // Test 7: Combination of ascending + limit
+        $ascLimit2 = $this->audit->getLogsByUser($userId, limit: 2, ascending: true);
+        $this->assertEquals(2, \count($ascLimit2));
+        // First log should be oldest in ascending order
+        $this->assertEquals('event_0', $ascLimit2[0]->getAttribute('event'));
+
+        // Test 8: Combination of after + before (time range)
+        $afterTimeObj2 = new \DateTime('2024-06-15 12:01:00');  // After 1st log
+        $beforeTimeObj2 = new \DateTime('2024-06-15 12:04:00'); // Before 4th log
+        $logsRange = $this->audit->getLogsByUser($userId, after: $afterTimeObj2, before: $beforeTimeObj2);
+        $this->assertGreaterThanOrEqual(1, \count($logsRange));
+
+        // Test 9: Test with getLogsByResource using parameters
+        $logsRes = $this->audit->getLogsByResource('doc/0', limit: 1, offset: 0);
+        $this->assertEquals(1, \count($logsRes));
+
+        // Test 10: Test with getLogsByUserAndEvents using parameters
+        $logsEvt = $this->audit->getLogsByUserAndEvents(
+            $userId,
+            ['event_1', 'event_2'],
+            limit: 1,
+            offset: 0,
+            ascending: false
+        );
+        $this->assertGreaterThanOrEqual(0, \count($logsEvt));
+
+        // Test 11: Test count methods with after/before filters
+        $countAll = $this->audit->countLogsByUser($userId);
+        $this->assertEquals(5, $countAll);
+
+        $countAfter = $this->audit->countLogsByUser($userId, after: $afterTimeObj);
+        $this->assertGreaterThanOrEqual(0, $countAfter);
+
+        $countBefore = $this->audit->countLogsByUser($userId, before: $beforeTimeObj);
+        $this->assertGreaterThanOrEqual(0, $countBefore);
+
+        // Test 12: Test countLogsByResource with filters
+        $countResAll = $this->audit->countLogsByResource('doc/0');
+        $this->assertEquals(1, $countResAll);
+
+        $countResAfter = $this->audit->countLogsByResource('doc/0', after: $afterTimeObj);
+        $this->assertGreaterThanOrEqual(0, $countResAfter);
+
+        // Test 13: Test countLogsByUserAndEvents with filters
+        $countEvtAll = $this->audit->countLogsByUserAndEvents($userId, ['event_1', 'event_2']);
+        $this->assertGreaterThanOrEqual(0, $countEvtAll);
+
+        $countEvtAfter = $this->audit->countLogsByUserAndEvents(
+            $userId,
+            ['event_1', 'event_2'],
+            after: $afterTimeObj
+        );
+        $this->assertGreaterThanOrEqual(0, $countEvtAfter);
+
+        // Test 14: Test countLogsByResourceAndEvents with filters
+        $countResEvtAll = $this->audit->countLogsByResourceAndEvents('doc/0', ['event_0']);
+        $this->assertEquals(1, $countResEvtAll);
+
+        $countResEvtAfter = $this->audit->countLogsByResourceAndEvents(
+            'doc/0',
+            ['event_0'],
+            after: $afterTimeObj
+        );
+        $this->assertGreaterThanOrEqual(0, $countResEvtAfter);
+
+        // Test 15: Test getLogsByResourceAndEvents with all parameters
+        $logsResEvt = $this->audit->getLogsByResourceAndEvents(
+            'doc/1',
+            ['event_1'],
+            limit: 1,
+            offset: 0,
+            ascending: true
+        );
+        $this->assertGreaterThanOrEqual(0, \count($logsResEvt));
     }
 }

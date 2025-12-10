@@ -99,25 +99,28 @@ class Database extends SQL
     /**
      * Build time-related query conditions.
      *
-     * @param string|null $after
-     * @param string|null $before
+     * @param \DateTime|null $after
+     * @param \DateTime|null $before
      * @return array<int, Query>
      */
-    private function buildTimeQueries(?string $after, ?string $before): array
+    private function buildTimeQueries(?\DateTime $after, ?\DateTime $before): array
     {
         $queries = [];
 
-        if ($after !== null && $before !== null) {
-            $queries[] = Query::between('time', $after, $before);
+        $afterStr = $after ? DateTime::format($after) : null;
+        $beforeStr = $before ? DateTime::format($before) : null;
+
+        if ($afterStr !== null && $beforeStr !== null) {
+            $queries[] = Query::between('time', $afterStr, $beforeStr);
             return $queries;
         }
 
-        if ($after !== null) {
-            $queries[] = Query::greaterThan('time', $after);
+        if ($afterStr !== null) {
+            $queries[] = Query::greaterThan('time', $afterStr);
         }
 
-        if ($before !== null) {
-            $queries[] = Query::lessThan('time', $before);
+        if ($beforeStr !== null) {
+            $queries[] = Query::lessThan('time', $beforeStr);
         }
 
         return $queries;
@@ -131,8 +134,8 @@ class Database extends SQL
      */
     public function getByUser(
         string $userId,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
         int $limit = 25,
         int $offset = 0,
         bool $ascending = false,
@@ -163,8 +166,8 @@ class Database extends SQL
      */
     public function countByUser(
         string $userId,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
     ): int {
         $timeQueries = $this->buildTimeQueries($after, $before);
         return $this->db->getAuthorization()->skip(function () use ($userId, $timeQueries) {
@@ -187,8 +190,8 @@ class Database extends SQL
      */
     public function getByResource(
         string $resource,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
         int $limit = 25,
         int $offset = 0,
         bool $ascending = false,
@@ -221,8 +224,8 @@ class Database extends SQL
      */
     public function countByResource(
         string $resource,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
     ): int {
         $timeQueries = $this->buildTimeQueries($after, $before);
         return $this->db->getAuthorization()->skip(function () use ($resource, $timeQueries) {
@@ -247,8 +250,8 @@ class Database extends SQL
     public function getByUserAndEvents(
         string $userId,
         array $events,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
         int $limit = 25,
         int $offset = 0,
         bool $ascending = false,
@@ -284,8 +287,8 @@ class Database extends SQL
     public function countByUserAndEvents(
         string $userId,
         array $events,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
     ): int {
         $timeQueries = $this->buildTimeQueries($after, $before);
         return $this->db->getAuthorization()->skip(function () use ($userId, $events, $timeQueries) {
@@ -311,8 +314,8 @@ class Database extends SQL
     public function getByResourceAndEvents(
         string $resource,
         array $events,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
         int $limit = 25,
         int $offset = 0,
         bool $ascending = false,
@@ -348,8 +351,8 @@ class Database extends SQL
     public function countByResourceAndEvents(
         string $resource,
         array $events,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
     ): int {
         $timeQueries = $this->buildTimeQueries($after, $before);
         return $this->db->getAuthorization()->skip(function () use ($resource, $events, $timeQueries) {

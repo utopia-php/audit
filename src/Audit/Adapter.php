@@ -71,8 +71,8 @@ abstract class Adapter
      */
     abstract public function getByUser(
         string $userId,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
         int $limit = 25,
         int $offset = 0,
         bool $ascending = false,
@@ -88,8 +88,8 @@ abstract class Adapter
      */
     abstract public function countByUser(
         string $userId,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
     ): int;
 
     /**
@@ -102,8 +102,8 @@ abstract class Adapter
      */
     abstract public function getByResource(
         string $resource,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
         int $limit = 25,
         int $offset = 0,
         bool $ascending = false,
@@ -119,8 +119,8 @@ abstract class Adapter
      */
     abstract public function countByResource(
         string $resource,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
     ): int;
 
     /**
@@ -135,8 +135,8 @@ abstract class Adapter
     abstract public function getByUserAndEvents(
         string $userId,
         array $events,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
         int $limit = 25,
         int $offset = 0,
         bool $ascending = false,
@@ -154,8 +154,8 @@ abstract class Adapter
     abstract public function countByUserAndEvents(
         string $userId,
         array $events,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
     ): int;
 
     /**
@@ -170,8 +170,8 @@ abstract class Adapter
     abstract public function getByResourceAndEvents(
         string $resource,
         array $events,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
         int $limit = 25,
         int $offset = 0,
         bool $ascending = false,
@@ -189,8 +189,8 @@ abstract class Adapter
     abstract public function countByResourceAndEvents(
         string $resource,
         array $events,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
     ): int;
 
     /**

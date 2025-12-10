@@ -96,8 +96,8 @@ class Audit
      */
     public function getLogsByUser(
         string $userId,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
         int $limit = 25,
         int $offset = 0,
         bool $ascending = false,
@@ -114,8 +114,8 @@ class Audit
      */
     public function countLogsByUser(
         string $userId,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
     ): int {
         return $this->adapter->countByUser($userId, $after, $before);
     }
@@ -130,8 +130,8 @@ class Audit
      */
     public function getLogsByResource(
         string $resource,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
         int $limit = 25,
         int $offset = 0,
         bool $ascending = false,
@@ -149,8 +149,8 @@ class Audit
      */
     public function countLogsByResource(
         string $resource,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
     ): int {
         return $this->adapter->countByResource($resource, $after, $before);
     }
@@ -167,8 +167,8 @@ class Audit
     public function getLogsByUserAndEvents(
         string $userId,
         array $events,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
         int $limit = 25,
         int $offset = 0,
         bool $ascending = false,
@@ -188,8 +188,8 @@ class Audit
     public function countLogsByUserAndEvents(
         string $userId,
         array $events,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
     ): int {
         return $this->adapter->countByUserAndEvents($userId, $events, $after, $before);
     }
@@ -206,8 +206,8 @@ class Audit
     public function getLogsByResourceAndEvents(
         string $resource,
         array $events,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
         int $limit = 25,
         int $offset = 0,
         bool $ascending = false,
@@ -227,8 +227,8 @@ class Audit
     public function countLogsByResourceAndEvents(
         string $resource,
         array $events,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
     ): int {
         return $this->adapter->countByResourceAndEvents($resource, $events, $after, $before);
     }

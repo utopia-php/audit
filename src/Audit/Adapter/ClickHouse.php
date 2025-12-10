@@ -724,31 +724,44 @@ class ClickHouse extends SQL
     /**
      * Build time WHERE clause and parameters with safe parameter placeholders.
      *
-     * @param string|null $after
-     * @param string|null $before
+     * @param \DateTime|null $after
+     * @param \DateTime|null $before
      * @return array{clause: string, params: array<string, mixed>}
      */
-    private function buildTimeClause(?string $after, ?string $before): array
+    private function buildTimeClause(?\DateTime $after, ?\DateTime $before): array
     {
         $params = [];
         $conditions = [];
 
-        if ($after !== null && $before !== null) {
+        $afterStr = null;
+        $beforeStr = null;
+
+        if ($after !== null) {
+            /** @var \DateTime $after */
+            $afterStr = \Utopia\Database\DateTime::format($after);
+        }
+
+        if ($before !== null) {
+            /** @var \DateTime $before */
+            $beforeStr = \Utopia\Database\DateTime::format($before);
+        }
+
+        if ($afterStr !== null && $beforeStr !== null) {
             $conditions[] = 'time BETWEEN {after:String} AND {before:String}';
-            $params['after'] = $after;
-            $params['before'] = $before;
+            $params['after'] = $afterStr;
+            $params['before'] = $beforeStr;
 
             return ['clause' => ' AND ' . $conditions[0], 'params' => $params];
         }
 
-        if ($after !== null) {
+        if ($afterStr !== null) {
             $conditions[] = 'time > {after:String}';
-            $params['after'] = $after;
+            $params['after'] = $afterStr;
         }
 
-        if ($before !== null) {
+        if ($beforeStr !== null) {
             $conditions[] = 'time < {before:String}';
-            $params['before'] = $before;
+            $params['before'] = $beforeStr;
         }
 
         if ($conditions === []) {
@@ -820,8 +833,8 @@ class ClickHouse extends SQL
      */
     public function getByUser(
         string $userId,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
         int $limit = 25,
         int $offset = 0,
         bool $ascending = false,
@@ -858,8 +871,8 @@ class ClickHouse extends SQL
      */
     public function countByUser(
         string $userId,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
     ): int {
         $time = $this->buildTimeClause($after, $before);
 
@@ -888,8 +901,8 @@ class ClickHouse extends SQL
      */
     public function getByResource(
         string $resource,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
         int $limit = 25,
         int $offset = 0,
         bool $ascending = false,
@@ -926,8 +939,8 @@ class ClickHouse extends SQL
      */
     public function countByResource(
         string $resource,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
     ): int {
         $time = $this->buildTimeClause($after, $before);
 
@@ -957,8 +970,8 @@ class ClickHouse extends SQL
     public function getByUserAndEvents(
         string $userId,
         array $events,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
         int $limit = 25,
         int $offset = 0,
         bool $ascending = false,
@@ -996,8 +1009,8 @@ class ClickHouse extends SQL
     public function countByUserAndEvents(
         string $userId,
         array $events,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
     ): int {
         $time = $this->buildTimeClause($after, $before);
         $eventList = $this->buildEventsList($events, 0);
@@ -1027,8 +1040,8 @@ class ClickHouse extends SQL
     public function getByResourceAndEvents(
         string $resource,
         array $events,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
         int $limit = 25,
         int $offset = 0,
         bool $ascending = false,
@@ -1066,8 +1079,8 @@ class ClickHouse extends SQL
     public function countByResourceAndEvents(
         string $resource,
         array $events,
-        ?string $after = null,
-        ?string $before = null,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
     ): int {
         $time = $this->buildTimeClause($after, $before);
         $eventList = $this->buildEventsList($events, 0);
