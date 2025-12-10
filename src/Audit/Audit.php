@@ -2,8 +2,6 @@
 
 namespace Utopia\Audit;
 
-use Utopia\Database\Database;
-
 /**
  * Audit Log Manager
  *
