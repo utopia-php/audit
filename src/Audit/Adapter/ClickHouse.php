@@ -152,27 +152,6 @@ class ClickHouse extends SQL
         // Backtick escaping: replace any backticks in the identifier with double backticks
         return '`' . str_replace('`', '``', $identifier) . '`';
     }
-
-    /**
-     * Escape a string value for safe use in ClickHouse SQL queries.
-     * ClickHouse uses SQL standard escaping: single quotes are escaped by doubling them.
-     * This is critical for preventing SQL injection attacks.
-     *
-     * @param string $value
-     * @return string The escaped value without surrounding quotes
-     */
-    private function escapeString(string $value): string
-    {
-        // ClickHouse SQL standard: escape single quotes by doubling them
-        // Also escape backslashes to prevent any potential issues
-        return str_replace(
-            ["\\", "'"],
-            ["\\\\", "''"],
-            $value
-        );
-    }
-
-
     /**
      * Set the namespace for multi-project support.
      * Namespace is used as a prefix for table names.
@@ -312,10 +291,20 @@ class ClickHouse extends SQL
     /**
      * Execute a ClickHouse query via HTTP interface using Fetch Client.
      *
-     * Reuses the HTTP client from the constructor to enable connection pooling
-     * and improve performance with frequent queries.
+     * Uses ClickHouse query parameters (sent as POST multipart form data) to prevent SQL injection.
+     * This is ClickHouse's native parameter mechanism - parameters are safely
+     * transmitted separately from the query structure.
      *
-     * @param array<string, mixed> $params
+     * Parameters are referenced in the SQL using the syntax: {paramName:Type}.
+     * For example: SELECT * WHERE id = {id:String}
+     *
+     * ClickHouse handles all parameter escaping and type conversion internally,
+     * making this approach fully injection-safe without needing manual escaping.
+     *
+     * Using POST body avoids URL length limits for batch operations with many parameters.
+     * Equivalent to: curl -X POST -F 'query=...' -F 'param_key=value' http://host/
+     *
+     * @param array<string, mixed> $params Key-value pairs for query parameters
      * @throws Exception
      */
     private function query(string $sql, array $params = []): string
@@ -323,44 +312,25 @@ class ClickHouse extends SQL
         $scheme = $this->secure ? 'https' : 'http';
         $url = "{$scheme}://{$this->host}:{$this->port}/";
 
-        // Replace parameters in query
-        foreach ($params as $key => $value) {
-            if (is_int($value) || is_float($value)) {
-                // Numeric values should not be quoted
-                $strValue = (string) $value;
-            } elseif (is_string($value)) {
-                $strValue = "'" . $this->escapeString($value) . "'";
-            } elseif (is_null($value)) {
-                $strValue = 'NULL';
-            } elseif (is_bool($value)) {
-                $strValue = $value ? '1' : '0';
-            } elseif (is_array($value)) {
-                $encoded = json_encode($value);
-                if (is_string($encoded)) {
-                    $strValue = "'" . $this->escapeString($encoded) . "'";
-                } else {
-                    $strValue = 'NULL';
-                }
-            } else {
-                /** @var scalar $value */
-                $strValue = "'" . $this->escapeString((string) $value) . "'";
-            }
-            $sql = str_replace(":{$key}", $strValue, $sql);
-        }
-
         // Update the database header for each query (in case setDatabase was called)
         $this->client->addHeader('X-ClickHouse-Database', $this->database);
+
+        // Build multipart form data body with query and parameters
+        // The Fetch client will automatically encode arrays as multipart/form-data
+        $body = ['query' => $sql];
+        foreach ($params as $key => $value) {
+            $body['param_' . $key] = $this->formatParamValue($value);
+        }
 
         try {
             $response = $this->client->fetch(
                 url: $url,
                 method: Client::METHOD_POST,
-                body: ['query' => $sql]
+                body: $body
             );
-
             if ($response->getStatusCode() !== 200) {
-                $body = $response->getBody();
-                $bodyStr = is_string($body) ? $body : '';
+                $bodyStr = $response->getBody();
+                $bodyStr = is_string($bodyStr) ? $bodyStr : '';
                 throw new Exception("ClickHouse query failed with HTTP {$response->getStatusCode()}: {$bodyStr}");
             }
 
@@ -375,6 +345,46 @@ class ClickHouse extends SQL
                 $e
             );
         }
+    }
+
+    /**
+     * Format a parameter value for safe transmission to ClickHouse.
+     *
+     * Converts PHP values to their string representation without SQL quoting.
+     * ClickHouse's query parameter mechanism handles type conversion and escaping.
+     *
+     * @param mixed $value
+     * @return string
+     */
+    private function formatParamValue(mixed $value): string
+    {
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+
+        if ($value === null) {
+            return '';
+        }
+
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+
+        if (is_array($value)) {
+            $encoded = json_encode($value);
+            return is_string($encoded) ? $encoded : '';
+        }
+
+        if (is_string($value)) {
+            return $value;
+        }
+
+        // For objects or other types, attempt to convert to string
+        if (is_object($value) && method_exists($value, '__toString')) {
+            return (string) $value;
+        }
+
+        return '';
     }
 
     /**
@@ -460,7 +470,7 @@ class ClickHouse extends SQL
 
         // Build column list and values based on sharedTables setting
         $columns = ['id', 'userId', 'event', 'resource', 'userAgent', 'ip', 'location', 'time', 'data'];
-        $placeholders = [':id', ':userId', ':event', ':resource', ':userAgent', ':ip', ':location', ':time', ':data'];
+        $placeholders = ['{id:String}', '{userId:Nullable(String)}', '{event:String}', '{resource:String}', '{userAgent:String}', '{ip:String}', '{location:Nullable(String)}', '{time:String}', '{data:String}'];
 
         $params = [
             'id' => $id,
@@ -476,7 +486,7 @@ class ClickHouse extends SQL
 
         if ($this->sharedTables) {
             $columns[] = 'tenant';
-            $placeholders[] = ':tenant';
+            $placeholders[] = '{tenant:Nullable(UInt64)}';
             $params['tenant'] = $this->tenant;
         }
 
@@ -521,68 +531,74 @@ class ClickHouse extends SQL
             return [];
         }
 
-        $values = [];
+        $tableName = $this->getTableName();
+        $escapedDatabaseAndTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+
+        // Build column list based on sharedTables setting
+        $columns = ['id', 'userId', 'event', 'resource', 'userAgent', 'ip', 'location', 'time', 'data'];
+        if ($this->sharedTables) {
+            $columns[] = 'tenant';
+        }
+
         $ids = [];
+        $paramCounter = 0;
+        $params = [];
+        $valueClauses = [];
+
         foreach ($logs as $log) {
             $id = uniqid('', true);
             $ids[] = $id;
-            $userIdVal = $log['userId'] ?? null;
-            $userId = ($userIdVal !== null)
-                ? "'" . $this->escapeString((string) $userIdVal) . "'"
-                : 'NULL';
-            $locationVal = $log['location'] ?? null;
-            $location = ($locationVal !== null)
-                ? "'" . $this->escapeString((string) $locationVal) . "'"
-                : 'NULL';
 
-            $formattedTimestamp = $this->formatTimestamp($log['time']);
+            // Create parameter placeholders for this row
+            $paramKeys = [];
+            $paramKeys[] = 'id_' . $paramCounter;
+            $paramKeys[] = 'userId_' . $paramCounter;
+            $paramKeys[] = 'event_' . $paramCounter;
+            $paramKeys[] = 'resource_' . $paramCounter;
+            $paramKeys[] = 'userAgent_' . $paramCounter;
+            $paramKeys[] = 'ip_' . $paramCounter;
+            $paramKeys[] = 'location_' . $paramCounter;
+            $paramKeys[] = 'time_' . $paramCounter;
+            $paramKeys[] = 'data_' . $paramCounter;
+
+            // Set parameter values
+            $params[$paramKeys[0]] = $id;
+            $params[$paramKeys[1]] = $log['userId'] ?? null;
+            $params[$paramKeys[2]] = $log['event'];
+            $params[$paramKeys[3]] = $log['resource'];
+            $params[$paramKeys[4]] = $log['userAgent'];
+            $params[$paramKeys[5]] = $log['ip'];
+            $params[$paramKeys[6]] = $log['location'] ?? null;
+            $params[$paramKeys[7]] = $this->formatTimestamp($log['time']);
+            $params[$paramKeys[8]] = json_encode($log['data'] ?? []);
 
             if ($this->sharedTables) {
-                $tenant = $this->tenant !== null ? (int) $this->tenant : 'NULL';
-                $values[] = sprintf(
-                    "('%s', %s, '%s', '%s', '%s', '%s', %s, '%s', '%s', %s)",
-                    $id,
-                    $userId,
-                    $this->escapeString((string) $log['event']),
-                    $this->escapeString((string) $log['resource']),
-                    $this->escapeString((string) $log['userAgent']),
-                    $this->escapeString((string) $log['ip']),
-                    $location,
-                    $formattedTimestamp,
-                    $this->escapeString((string) json_encode($log['data'] ?? [])),
-                    $tenant
-                );
-            } else {
-                $values[] = sprintf(
-                    "('%s', %s, '%s', '%s', '%s', '%s', %s, '%s', '%s')",
-                    $id,
-                    $userId,
-                    $this->escapeString((string) $log['event']),
-                    $this->escapeString((string) $log['resource']),
-                    $this->escapeString((string) $log['userAgent']),
-                    $this->escapeString((string) $log['ip']),
-                    $location,
-                    $formattedTimestamp,
-                    $this->escapeString((string) json_encode($log['data'] ?? []))
-                );
+                $paramKeys[] = 'tenant_' . $paramCounter;
+                $params[$paramKeys[9]] = $this->tenant;
             }
+
+            // Build placeholder string for this row
+            $placeholders = [];
+            for ($i = 0; $i < count($paramKeys); $i++) {
+                if ($i === 1 || $i === 6) { // userId and location are nullable
+                    $placeholders[] = '{' . $paramKeys[$i] . ':Nullable(String)}';
+                } elseif ($this->sharedTables && $i === 9) { // tenant is nullable UInt64
+                    $placeholders[] = '{' . $paramKeys[$i] . ':Nullable(UInt64)}';
+                } else {
+                    $placeholders[] = '{' . $paramKeys[$i] . ':String}';
+                }
+            }
+
+            $valueClauses[] = '(' . implode(', ', $placeholders) . ')';
+            $paramCounter++;
         }
 
-        $tableName = $this->getTableName();
-
-        // Build column list based on sharedTables setting
-        $columns = 'id, userId, event, resource, userAgent, ip, location, time, data';
-        if ($this->sharedTables) {
-            $columns .= ', tenant';
-        }
-
-        $escapedDatabaseAndTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
         $insertSql = "
             INSERT INTO {$escapedDatabaseAndTable}
-            ({$columns})
-            VALUES " . implode(', ', $values);
+            (" . implode(', ', $columns) . ")
+            VALUES " . implode(', ', $valueClauses);
 
-        $this->query($insertSql);
+        $this->query($insertSql, $params);
 
         // Return documents using the same IDs that were inserted
         $documents = [];
@@ -645,21 +661,30 @@ class ClickHouse extends SQL
                 $time = str_replace(' ', 'T', $time) . '+00:00';
             }
 
+            // Helper function to parse nullable string fields
+            // ClickHouse TabSeparated format uses \N for NULL, but empty strings are also treated as null for nullable fields
+            $parseNullableString = static function ($value): ?string {
+                if ($value === '\\N' || $value === '') {
+                    return null;
+                }
+                return $value;
+            };
+
             $document = [
                 '$id' => $columns[0],
-                'userId' => $columns[1] === '\\N' ? null : $columns[1],
+                'userId' => $parseNullableString($columns[1]),
                 'event' => $columns[2],
                 'resource' => $columns[3],
                 'userAgent' => $columns[4],
                 'ip' => $columns[5],
-                'location' => $columns[6] === '\\N' ? null : $columns[6],
+                'location' => $parseNullableString($columns[6]),
                 'time' => $time,
                 'data' => $data,
             ];
 
             // Add tenant only if sharedTables is enabled
             if ($this->sharedTables && isset($columns[9])) {
-                $document['tenant'] = $columns[9] === '\\N' ? null : (int) $columns[9];
+                $document['tenant'] = $columns[9] === '\\N' || $columns[9] === '' ? null : (int) $columns[9];
             }
 
             $documents[] = new Log($document);
@@ -697,7 +722,7 @@ class ClickHouse extends SQL
     }
 
     /**
-     * Build time WHERE clause and parameters.
+     * Build time WHERE clause and parameters with safe parameter placeholders.
      *
      * @param string|null $after
      * @param string|null $before
@@ -709,7 +734,7 @@ class ClickHouse extends SQL
         $conditions = [];
 
         if ($after !== null && $before !== null) {
-            $conditions[] = 'time BETWEEN :after AND :before';
+            $conditions[] = 'time BETWEEN {after:String} AND {before:String}';
             $params['after'] = $after;
             $params['before'] = $before;
 
@@ -717,12 +742,12 @@ class ClickHouse extends SQL
         }
 
         if ($after !== null) {
-            $conditions[] = 'time > :after';
+            $conditions[] = 'time > {after:String}';
             $params['after'] = $after;
         }
 
         if ($before !== null) {
-            $conditions[] = 'time < :before';
+            $conditions[] = 'time < {before:String}';
             $params['before'] = $before;
         }
 
@@ -738,14 +763,27 @@ class ClickHouse extends SQL
 
     /**
      * Build a formatted SQL IN list from an array of events.
-     * Properly escapes each event for safe SQL inclusion.
+     * Events are parameterized for safe SQL inclusion.
      *
      * @param array<int|string, string> $events
-     * @return string Formatted as 'event1', 'event2', 'event3'
+     * @param int $paramOffset Base parameter number for creating unique param names
+     * @return array{clause: string, params: array<string, string>}
      */
-    private function buildEventsList(array $events): string
+    private function buildEventsList(array $events, int $paramOffset = 0): array
     {
-        return implode("', '", array_map(fn($e) => $this->escapeString($e), $events));
+        $placeholders = [];
+        $params = [];
+
+        foreach ($events as $index => $event) {
+            /** @var int $paramNumber */
+            $paramNumber = $paramOffset + (int) $index;
+            $paramName = 'event_' . (string) $paramNumber;
+            $placeholders[] = '{' . $paramName . ':String}';
+            $params[$paramName] = $event;
+        }
+
+        $clause = implode(', ', $placeholders);
+        return ['clause' => $clause, 'params' => $params];
     }
 
     /**
@@ -798,9 +836,9 @@ class ClickHouse extends SQL
         $sql = "
             SELECT " . $this->getSelectColumns() . "
             FROM {$escapedTable}
-            WHERE userId = :userId{$tenantFilter}{$time['clause']}
+            WHERE userId = {userId:String}{$tenantFilter}{$time['clause']}
             ORDER BY time {$order}
-            LIMIT :limit OFFSET :offset
+            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
             FORMAT TabSeparated
         ";
 
@@ -830,9 +868,9 @@ class ClickHouse extends SQL
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
         $sql = "
-            SELECT count() as count
+            SELECT count()
             FROM {$escapedTable}
-            WHERE userId = :userId{$tenantFilter}{$time['clause']}
+            WHERE userId = {userId:String}{$tenantFilter}{$time['clause']}
             FORMAT TabSeparated
         ";
 
@@ -866,9 +904,9 @@ class ClickHouse extends SQL
         $sql = "
             SELECT " . $this->getSelectColumns() . "
             FROM {$escapedTable}
-            WHERE resource = :resource{$tenantFilter}{$time['clause']}
+            WHERE resource = {resource:String}{$tenantFilter}{$time['clause']}
             ORDER BY time {$order}
-            LIMIT :limit OFFSET :offset
+            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
             FORMAT TabSeparated
         ";
 
@@ -898,9 +936,9 @@ class ClickHouse extends SQL
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
         $sql = "
-            SELECT count() as count
+            SELECT count()
             FROM {$escapedTable}
-            WHERE resource = :resource{$tenantFilter}{$time['clause']}
+            WHERE resource = {resource:String}{$tenantFilter}{$time['clause']}
             FORMAT TabSeparated
         ";
 
@@ -927,7 +965,7 @@ class ClickHouse extends SQL
     ): array {
         $time = $this->buildTimeClause($after, $before);
         $order = $ascending ? 'ASC' : 'DESC';
-        $eventsList = $this->buildEventsList($events);
+        $eventList = $this->buildEventsList($events, 0);
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
@@ -935,9 +973,9 @@ class ClickHouse extends SQL
         $sql = "
             SELECT " . $this->getSelectColumns() . "
             FROM {$escapedTable}
-            WHERE userId = :userId AND event IN ('{$eventsList}'){$tenantFilter}{$time['clause']}
+            WHERE userId = {userId:String} AND event IN ({$eventList['clause']}){$tenantFilter}{$time['clause']}
             ORDER BY time {$order}
-            LIMIT :limit OFFSET :offset
+            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
             FORMAT TabSeparated
         ";
 
@@ -945,7 +983,7 @@ class ClickHouse extends SQL
             'userId' => $userId,
             'limit' => $limit,
             'offset' => $offset,
-        ], $time['params']));
+        ], $eventList['params'], $time['params']));
 
         return $this->parseResults($result);
     }
@@ -962,7 +1000,7 @@ class ClickHouse extends SQL
         ?string $before = null,
     ): int {
         $time = $this->buildTimeClause($after, $before);
-        $eventsList = $this->buildEventsList($events);
+        $eventList = $this->buildEventsList($events, 0);
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
@@ -970,13 +1008,13 @@ class ClickHouse extends SQL
         $sql = "
             SELECT count()
             FROM {$escapedTable}
-            WHERE userId = :userId AND event IN ('{$eventsList}'){$tenantFilter}{$time['clause']}
+            WHERE userId = {userId:String} AND event IN ({$eventList['clause']}){$tenantFilter}{$time['clause']}
             FORMAT TabSeparated
         ";
 
         $result = $this->query($sql, array_merge([
             'userId' => $userId,
-        ], $time['params']));
+        ], $eventList['params'], $time['params']));
 
         return (int) trim($result);
     }
@@ -997,7 +1035,7 @@ class ClickHouse extends SQL
     ): array {
         $time = $this->buildTimeClause($after, $before);
         $order = $ascending ? 'ASC' : 'DESC';
-        $eventsList = $this->buildEventsList($events);
+        $eventList = $this->buildEventsList($events, 0);
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
@@ -1005,9 +1043,9 @@ class ClickHouse extends SQL
         $sql = "
             SELECT " . $this->getSelectColumns() . "
             FROM {$escapedTable}
-            WHERE resource = :resource AND event IN ('{$eventsList}'){$tenantFilter}{$time['clause']}
+            WHERE resource = {resource:String} AND event IN ({$eventList['clause']}){$tenantFilter}{$time['clause']}
             ORDER BY time {$order}
-            LIMIT :limit OFFSET :offset
+            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
             FORMAT TabSeparated
         ";
 
@@ -1015,7 +1053,7 @@ class ClickHouse extends SQL
             'resource' => $resource,
             'limit' => $limit,
             'offset' => $offset,
-        ], $time['params']));
+        ], $eventList['params'], $time['params']));
 
         return $this->parseResults($result);
     }
@@ -1032,7 +1070,7 @@ class ClickHouse extends SQL
         ?string $before = null,
     ): int {
         $time = $this->buildTimeClause($after, $before);
-        $eventsList = $this->buildEventsList($events);
+        $eventList = $this->buildEventsList($events, 0);
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
@@ -1040,13 +1078,13 @@ class ClickHouse extends SQL
         $sql = "
             SELECT count()
             FROM {$escapedTable}
-            WHERE resource = :resource AND event IN ('{$eventsList}'){$tenantFilter}{$time['clause']}
+            WHERE resource = {resource:String} AND event IN ({$eventList['clause']}){$tenantFilter}{$time['clause']}
             FORMAT TabSeparated
         ";
 
         $result = $this->query($sql, array_merge([
             'resource' => $resource,
-        ], $time['params']));
+        ], $eventList['params'], $time['params']));
 
         return (int) trim($result);
     }
@@ -1068,7 +1106,7 @@ class ClickHouse extends SQL
         // Falls back to ALTER TABLE DELETE with mutations_sync for older versions
         $sql = "
             DELETE FROM {$escapedTable}
-            WHERE time < :datetime{$tenantFilter}
+            WHERE time < {datetime:String}{$tenantFilter}
         ";
 
         $this->query($sql, ['datetime' => $datetime]);
