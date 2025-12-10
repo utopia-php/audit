@@ -697,27 +697,43 @@ class ClickHouse extends SQL
     }
 
     /**
-     * Parse limit and offset from query parameters.
+     * Build time WHERE clause and parameters.
      *
-     * @param array<int, mixed> $queries
-     * @return array<string, int>
+     * @param string|null $after
+     * @param string|null $before
+     * @return array{clause: string, params: array<string, mixed>}
      */
-    private function parseQueryParams(array $queries): array
+    private function buildTimeClause(?string $after, ?string $before): array
     {
-        $limit = 25;
-        $offset = 0;
+        $params = [];
+        $conditions = [];
 
-        foreach ($queries as $query) {
-            if (is_object($query) && method_exists($query, 'getMethod') && method_exists($query, 'getValue')) {
-                if ($query->getMethod() === 'limit') {
-                    $limit = (int) $query->getValue();
-                } elseif ($query->getMethod() === 'offset') {
-                    $offset = (int) $query->getValue();
-                }
-            }
+        if ($after !== null && $before !== null) {
+            $conditions[] = 'time BETWEEN :after AND :before';
+            $params['after'] = $after;
+            $params['before'] = $before;
+
+            return ['clause' => ' AND ' . $conditions[0], 'params' => $params];
         }
 
-        return ['limit' => $limit, 'offset' => $offset];
+        if ($after !== null) {
+            $conditions[] = 'time > :after';
+            $params['after'] = $after;
+        }
+
+        if ($before !== null) {
+            $conditions[] = 'time < :before';
+            $params['before'] = $before;
+        }
+
+        if ($conditions === []) {
+            return ['clause' => '', 'params' => []];
+        }
+
+        return [
+            'clause' => ' AND ' . implode(' AND ', $conditions),
+            'params' => $params,
+        ];
     }
 
     /**
@@ -729,7 +745,7 @@ class ClickHouse extends SQL
      */
     private function buildEventsList(array $events): string
     {
-        return implode("', '", array_map(fn ($e) => $this->escapeString($e), $events));
+        return implode("', '", array_map(fn($e) => $this->escapeString($e), $events));
     }
 
     /**
@@ -764,11 +780,16 @@ class ClickHouse extends SQL
      *
      * @throws Exception
      */
-    public function getByUser(string $userId, array $queries = []): array
-    {
-        $params = $this->parseQueryParams($queries);
-        $limit = $params['limit'];
-        $offset = $params['offset'];
+    public function getByUser(
+        string $userId,
+        ?string $after = null,
+        ?string $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
+    ): array {
+        $time = $this->buildTimeClause($after, $before);
+        $order = $ascending ? 'ASC' : 'DESC';
 
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
@@ -777,17 +798,17 @@ class ClickHouse extends SQL
         $sql = "
             SELECT " . $this->getSelectColumns() . "
             FROM {$escapedTable}
-            WHERE userId = :userId{$tenantFilter}
-            ORDER BY time DESC
+            WHERE userId = :userId{$tenantFilter}{$time['clause']}
+            ORDER BY time {$order}
             LIMIT :limit OFFSET :offset
             FORMAT TabSeparated
         ";
 
-        $result = $this->query($sql, [
+        $result = $this->query($sql, array_merge([
             'userId' => $userId,
             'limit' => $limit,
             'offset' => $offset,
-        ]);
+        ], $time['params']));
 
         return $this->parseResults($result);
     }
@@ -797,8 +818,13 @@ class ClickHouse extends SQL
      *
      * @throws Exception
      */
-    public function countByUser(string $userId, array $queries = []): int
-    {
+    public function countByUser(
+        string $userId,
+        ?string $after = null,
+        ?string $before = null,
+    ): int {
+        $time = $this->buildTimeClause($after, $before);
+
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
@@ -806,11 +832,13 @@ class ClickHouse extends SQL
         $sql = "
             SELECT count() as count
             FROM {$escapedTable}
-            WHERE userId = :userId{$tenantFilter}
+            WHERE userId = :userId{$tenantFilter}{$time['clause']}
             FORMAT TabSeparated
         ";
 
-        $result = $this->query($sql, ['userId' => $userId]);
+        $result = $this->query($sql, array_merge([
+            'userId' => $userId,
+        ], $time['params']));
 
         return (int) trim($result);
     }
@@ -820,11 +848,16 @@ class ClickHouse extends SQL
      *
      * @throws Exception
      */
-    public function getByResource(string $resource, array $queries = []): array
-    {
-        $params = $this->parseQueryParams($queries);
-        $limit = $params['limit'];
-        $offset = $params['offset'];
+    public function getByResource(
+        string $resource,
+        ?string $after = null,
+        ?string $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
+    ): array {
+        $time = $this->buildTimeClause($after, $before);
+        $order = $ascending ? 'ASC' : 'DESC';
 
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
@@ -833,17 +866,17 @@ class ClickHouse extends SQL
         $sql = "
             SELECT " . $this->getSelectColumns() . "
             FROM {$escapedTable}
-            WHERE resource = :resource{$tenantFilter}
-            ORDER BY time DESC
+            WHERE resource = :resource{$tenantFilter}{$time['clause']}
+            ORDER BY time {$order}
             LIMIT :limit OFFSET :offset
             FORMAT TabSeparated
         ";
 
-        $result = $this->query($sql, [
+        $result = $this->query($sql, array_merge([
             'resource' => $resource,
             'limit' => $limit,
             'offset' => $offset,
-        ]);
+        ], $time['params']));
 
         return $this->parseResults($result);
     }
@@ -853,8 +886,13 @@ class ClickHouse extends SQL
      *
      * @throws Exception
      */
-    public function countByResource(string $resource, array $queries = []): int
-    {
+    public function countByResource(
+        string $resource,
+        ?string $after = null,
+        ?string $before = null,
+    ): int {
+        $time = $this->buildTimeClause($after, $before);
+
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
@@ -862,11 +900,13 @@ class ClickHouse extends SQL
         $sql = "
             SELECT count() as count
             FROM {$escapedTable}
-            WHERE resource = :resource{$tenantFilter}
+            WHERE resource = :resource{$tenantFilter}{$time['clause']}
             FORMAT TabSeparated
         ";
 
-        $result = $this->query($sql, ['resource' => $resource]);
+        $result = $this->query($sql, array_merge([
+            'resource' => $resource,
+        ], $time['params']));
 
         return (int) trim($result);
     }
@@ -876,12 +916,17 @@ class ClickHouse extends SQL
      *
      * @throws Exception
      */
-    public function getByUserAndEvents(string $userId, array $events, array $queries = []): array
-    {
-        $params = $this->parseQueryParams($queries);
-        $limit = $params['limit'];
-        $offset = $params['offset'];
-
+    public function getByUserAndEvents(
+        string $userId,
+        array $events,
+        ?string $after = null,
+        ?string $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
+    ): array {
+        $time = $this->buildTimeClause($after, $before);
+        $order = $ascending ? 'ASC' : 'DESC';
         $eventsList = $this->buildEventsList($events);
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
@@ -890,17 +935,17 @@ class ClickHouse extends SQL
         $sql = "
             SELECT " . $this->getSelectColumns() . "
             FROM {$escapedTable}
-            WHERE userId = :userId AND event IN ('{$eventsList}'){$tenantFilter}
-            ORDER BY time DESC
+            WHERE userId = :userId AND event IN ('{$eventsList}'){$tenantFilter}{$time['clause']}
+            ORDER BY time {$order}
             LIMIT :limit OFFSET :offset
             FORMAT TabSeparated
         ";
 
-        $result = $this->query($sql, [
+        $result = $this->query($sql, array_merge([
             'userId' => $userId,
             'limit' => $limit,
             'offset' => $offset,
-        ]);
+        ], $time['params']));
 
         return $this->parseResults($result);
     }
@@ -910,21 +955,28 @@ class ClickHouse extends SQL
      *
      * @throws Exception
      */
-    public function countByUserAndEvents(string $userId, array $events, array $queries = []): int
-    {
+    public function countByUserAndEvents(
+        string $userId,
+        array $events,
+        ?string $after = null,
+        ?string $before = null,
+    ): int {
+        $time = $this->buildTimeClause($after, $before);
         $eventsList = $this->buildEventsList($events);
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
         $sql = "
-            SELECT count() as count
+            SELECT count()
             FROM {$escapedTable}
-            WHERE userId = :userId AND event IN ('{$eventsList}'){$tenantFilter}
+            WHERE userId = :userId AND event IN ('{$eventsList}'){$tenantFilter}{$time['clause']}
             FORMAT TabSeparated
         ";
 
-        $result = $this->query($sql, ['userId' => $userId]);
+        $result = $this->query($sql, array_merge([
+            'userId' => $userId,
+        ], $time['params']));
 
         return (int) trim($result);
     }
@@ -934,12 +986,17 @@ class ClickHouse extends SQL
      *
      * @throws Exception
      */
-    public function getByResourceAndEvents(string $resource, array $events, array $queries = []): array
-    {
-        $params = $this->parseQueryParams($queries);
-        $limit = $params['limit'];
-        $offset = $params['offset'];
-
+    public function getByResourceAndEvents(
+        string $resource,
+        array $events,
+        ?string $after = null,
+        ?string $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
+    ): array {
+        $time = $this->buildTimeClause($after, $before);
+        $order = $ascending ? 'ASC' : 'DESC';
         $eventsList = $this->buildEventsList($events);
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
@@ -948,17 +1005,17 @@ class ClickHouse extends SQL
         $sql = "
             SELECT " . $this->getSelectColumns() . "
             FROM {$escapedTable}
-            WHERE resource = :resource AND event IN ('{$eventsList}'){$tenantFilter}
-            ORDER BY time DESC
+            WHERE resource = :resource AND event IN ('{$eventsList}'){$tenantFilter}{$time['clause']}
+            ORDER BY time {$order}
             LIMIT :limit OFFSET :offset
             FORMAT TabSeparated
         ";
 
-        $result = $this->query($sql, [
+        $result = $this->query($sql, array_merge([
             'resource' => $resource,
             'limit' => $limit,
             'offset' => $offset,
-        ]);
+        ], $time['params']));
 
         return $this->parseResults($result);
     }
@@ -968,21 +1025,28 @@ class ClickHouse extends SQL
      *
      * @throws Exception
      */
-    public function countByResourceAndEvents(string $resource, array $events, array $queries = []): int
-    {
+    public function countByResourceAndEvents(
+        string $resource,
+        array $events,
+        ?string $after = null,
+        ?string $before = null,
+    ): int {
+        $time = $this->buildTimeClause($after, $before);
         $eventsList = $this->buildEventsList($events);
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
         $sql = "
-            SELECT count() as count
+            SELECT count()
             FROM {$escapedTable}
-            WHERE resource = :resource AND event IN ('{$eventsList}'){$tenantFilter}
+            WHERE resource = :resource AND event IN ('{$eventsList}'){$tenantFilter}{$time['clause']}
             FORMAT TabSeparated
         ";
 
-        $result = $this->query($sql, ['resource' => $resource]);
+        $result = $this->query($sql, array_merge([
+            'resource' => $resource,
+        ], $time['params']));
 
         return (int) trim($result);
     }

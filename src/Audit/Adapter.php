@@ -65,93 +65,133 @@ abstract class Adapter
      * Get logs by user ID.
      *
      * @param string $userId
-     * @param array<mixed> $queries Additional query parameters
      * @return array<Log>
      *
      * @throws \Exception
      */
-    abstract public function getByUser(string $userId, array $queries = []): array;
+    abstract public function getByUser(
+        string $userId,
+        ?string $after = null,
+        ?string $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
+    ): array;
 
     /**
      * Count logs by user ID.
      *
      * @param string $userId
-     * @param array<mixed> $queries Additional query parameters
      * @return int
      *
      * @throws \Exception
      */
-    abstract public function countByUser(string $userId, array $queries = []): int;
+    abstract public function countByUser(
+        string $userId,
+        ?string $after = null,
+        ?string $before = null,
+    ): int;
 
     /**
      * Get logs by resource.
      *
      * @param string $resource
-     * @param array<mixed> $queries Additional query parameters
      * @return array<Log>
      *
      * @throws \Exception
      */
-    abstract public function getByResource(string $resource, array $queries = []): array;
+    abstract public function getByResource(
+        string $resource,
+        ?string $after = null,
+        ?string $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
+    ): array;
 
     /**
      * Count logs by resource.
      *
      * @param string $resource
-     * @param array<mixed> $queries Additional query parameters
      * @return int
      *
      * @throws \Exception
      */
-    abstract public function countByResource(string $resource, array $queries = []): int;
+    abstract public function countByResource(
+        string $resource,
+        ?string $after = null,
+        ?string $before = null,
+    ): int;
 
     /**
      * Get logs by user and events.
      *
      * @param string $userId
      * @param array<int, string> $events
-     * @param array<mixed> $queries Additional query parameters
      * @return array<Log>
      *
      * @throws \Exception
      */
-    abstract public function getByUserAndEvents(string $userId, array $events, array $queries = []): array;
+    abstract public function getByUserAndEvents(
+        string $userId,
+        array $events,
+        ?string $after = null,
+        ?string $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
+    ): array;
 
     /**
      * Count logs by user and events.
      *
      * @param string $userId
      * @param array<int, string> $events
-     * @param array<mixed> $queries Additional query parameters
      * @return int
      *
      * @throws \Exception
      */
-    abstract public function countByUserAndEvents(string $userId, array $events, array $queries = []): int;
+    abstract public function countByUserAndEvents(
+        string $userId,
+        array $events,
+        ?string $after = null,
+        ?string $before = null,
+    ): int;
 
     /**
      * Get logs by resource and events.
      *
      * @param string $resource
      * @param array<int, string> $events
-     * @param array<mixed> $queries Additional query parameters
      * @return array<Log>
      *
      * @throws \Exception
      */
-    abstract public function getByResourceAndEvents(string $resource, array $events, array $queries = []): array;
+    abstract public function getByResourceAndEvents(
+        string $resource,
+        array $events,
+        ?string $after = null,
+        ?string $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
+    ): array;
 
     /**
      * Count logs by resource and events.
      *
      * @param string $resource
      * @param array<int, string> $events
-     * @param array<mixed> $queries Additional query parameters
      * @return int
      *
      * @throws \Exception
      */
-    abstract public function countByResourceAndEvents(string $resource, array $events, array $queries = []): int;
+    abstract public function countByResourceAndEvents(
+        string $resource,
+        array $events,
+        ?string $after = null,
+        ?string $before = null,
+    ): int;
 
     /**
      * Delete logs older than the specified datetime.

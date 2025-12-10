@@ -5,7 +5,6 @@ namespace Utopia\Tests\Audit;
 use Utopia\Audit\Audit;
 use Utopia\Audit\Log;
 use Utopia\Database\DateTime;
-use Utopia\Database\Query;
 
 /**
  * Audit Test Trait
@@ -65,11 +64,11 @@ trait AuditBase
         $logsCount = $this->audit->countLogsByUser('userId');
         $this->assertEquals(3, $logsCount);
 
-        $logs1 = $this->audit->getLogsByUser('userId', [Query::limit(1), Query::offset(1)]);
+        $logs1 = $this->audit->getLogsByUser('userId', limit: 1, offset: 1);
         $this->assertEquals(1, \count($logs1));
         $this->assertEquals($logs1[0]->getId(), $logs[1]->getId());
 
-        $logs2 = $this->audit->getLogsByUser('userId', [Query::limit(1), Query::offset(1)]);
+        $logs2 = $this->audit->getLogsByUser('userId', limit: 1, offset: 1);
         $this->assertEquals(1, \count($logs2));
         $this->assertEquals($logs2[0]->getId(), $logs[1]->getId());
     }
@@ -88,12 +87,12 @@ trait AuditBase
         $this->assertEquals(2, $logsCount1);
         $this->assertEquals(3, $logsCount2);
 
-        $logs3 = $this->audit->getLogsByUserAndEvents('userId', ['update', 'delete'], [Query::limit(1), Query::offset(1)]);
+        $logs3 = $this->audit->getLogsByUserAndEvents('userId', ['update', 'delete'], limit: 1, offset: 1);
 
         $this->assertEquals(1, \count($logs3));
         $this->assertEquals($logs3[0]->getId(), $logs2[1]->getId());
 
-        $logs4 = $this->audit->getLogsByUserAndEvents('userId', ['update', 'delete'], [Query::limit(1), Query::offset(1)]);
+        $logs4 = $this->audit->getLogsByUserAndEvents('userId', ['update', 'delete'], limit: 1, offset: 1);
 
         $this->assertEquals(1, \count($logs4));
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
@@ -113,12 +112,12 @@ trait AuditBase
         $this->assertEquals(1, $logsCount1);
         $this->assertEquals(2, $logsCount2);
 
-        $logs3 = $this->audit->getLogsByResourceAndEvents('database/document/2', ['update', 'delete'], [Query::limit(1), Query::offset(1)]);
+        $logs3 = $this->audit->getLogsByResourceAndEvents('database/document/2', ['update', 'delete'], limit: 1, offset: 1);
 
         $this->assertEquals(1, \count($logs3));
         $this->assertEquals($logs3[0]->getId(), $logs2[1]->getId());
 
-        $logs4 = $this->audit->getLogsByResourceAndEvents('database/document/2', ['update', 'delete'], [Query::limit(1), Query::offset(1)]);
+        $logs4 = $this->audit->getLogsByResourceAndEvents('database/document/2', ['update', 'delete'], limit: 1, offset: 1);
 
         $this->assertEquals(1, \count($logs4));
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
@@ -138,11 +137,11 @@ trait AuditBase
         $this->assertEquals(1, $logsCount1);
         $this->assertEquals(2, $logsCount2);
 
-        $logs3 = $this->audit->getLogsByResource('database/document/2', [Query::limit(1), Query::offset(1)]);
+        $logs3 = $this->audit->getLogsByResource('database/document/2', limit: 1, offset: 1);
         $this->assertEquals(1, \count($logs3));
         $this->assertEquals($logs3[0]->getId(), $logs2[1]->getId());
 
-        $logs4 = $this->audit->getLogsByResource('database/document/2', [Query::limit(1), Query::offset(1)]);
+        $logs4 = $this->audit->getLogsByResource('database/document/2', limit: 1, offset: 1);
         $this->assertEquals(1, \count($logs4));
         $this->assertEquals($logs4[0]->getId(), $logs2[1]->getId());
 
@@ -249,9 +248,8 @@ trait AuditBase
 
     public function testGetLogsCustomFilters(): void
     {
-        $logs = $this->audit->getLogsByUser('userId', queries: [
-            Query::greaterThan('time', DateTime::addSeconds(new \DateTime(), -10))
-        ]);
+        $threshold = DateTime::addSeconds(new \DateTime(), -10);
+        $logs = $this->audit->getLogsByUser('userId', after: $threshold);
 
         $this->assertEquals(3, \count($logs));
     }

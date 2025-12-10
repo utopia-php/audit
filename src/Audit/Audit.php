@@ -90,63 +90,69 @@ class Audit
      * Get all logs by user ID.
      *
      * @param string $userId
-     * @param array<mixed> $queries
      * @return array<Log>
      *
      * @throws \Exception
      */
     public function getLogsByUser(
         string $userId,
-        array $queries = []
+        ?string $after = null,
+        ?string $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
     ): array {
-        return $this->adapter->getByUser($userId, $queries);
+        return $this->adapter->getByUser($userId, $after, $before, $limit, $offset, $ascending);
     }
 
     /**
      * Count logs by user ID.
      *
      * @param string $userId
-     * @param array<mixed> $queries
      * @return int
      * @throws \Exception
      */
     public function countLogsByUser(
         string $userId,
-        array $queries = []
+        ?string $after = null,
+        ?string $before = null,
     ): int {
-        return $this->adapter->countByUser($userId, $queries);
+        return $this->adapter->countByUser($userId, $after, $before);
     }
 
     /**
      * Get all logs by resource.
      *
      * @param string $resource
-     * @param array<mixed> $queries
      * @return array<Log>
      *
      * @throws \Exception
      */
     public function getLogsByResource(
         string $resource,
-        array $queries = [],
+        ?string $after = null,
+        ?string $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
     ): array {
-        return $this->adapter->getByResource($resource, $queries);
+        return $this->adapter->getByResource($resource, $after, $before, $limit, $offset, $ascending);
     }
 
     /**
      * Count logs by resource.
      *
      * @param string $resource
-     * @param array<mixed> $queries
      * @return int
      *
      * @throws \Exception
      */
     public function countLogsByResource(
         string $resource,
-        array $queries = []
+        ?string $after = null,
+        ?string $before = null,
     ): int {
-        return $this->adapter->countByResource($resource, $queries);
+        return $this->adapter->countByResource($resource, $after, $before);
     }
 
     /**
@@ -154,7 +160,6 @@ class Audit
      *
      * @param string $userId
      * @param array<int, string> $events
-     * @param array<mixed> $queries
      * @return array<Log>
      *
      * @throws \Exception
@@ -162,9 +167,13 @@ class Audit
     public function getLogsByUserAndEvents(
         string $userId,
         array $events,
-        array $queries = [],
+        ?string $after = null,
+        ?string $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
     ): array {
-        return $this->adapter->getByUserAndEvents($userId, $events, $queries);
+        return $this->adapter->getByUserAndEvents($userId, $events, $after, $before, $limit, $offset, $ascending);
     }
 
     /**
@@ -172,7 +181,6 @@ class Audit
      *
      * @param string $userId
      * @param array<int, string> $events
-     * @param array<mixed> $queries
      * @return int
      *
      * @throws \Exception
@@ -180,9 +188,10 @@ class Audit
     public function countLogsByUserAndEvents(
         string $userId,
         array $events,
-        array $queries = [],
+        ?string $after = null,
+        ?string $before = null,
     ): int {
-        return $this->adapter->countByUserAndEvents($userId, $events, $queries);
+        return $this->adapter->countByUserAndEvents($userId, $events, $after, $before);
     }
 
     /**
@@ -190,7 +199,6 @@ class Audit
      *
      * @param string $resource
      * @param array<int, string> $events
-     * @param array<mixed> $queries
      * @return array<Log>
      *
      * @throws \Exception
@@ -198,9 +206,13 @@ class Audit
     public function getLogsByResourceAndEvents(
         string $resource,
         array $events,
-        array $queries = [],
+        ?string $after = null,
+        ?string $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
     ): array {
-        return $this->adapter->getByResourceAndEvents($resource, $events, $queries);
+        return $this->adapter->getByResourceAndEvents($resource, $events, $after, $before, $limit, $offset, $ascending);
     }
 
     /**
@@ -208,7 +220,6 @@ class Audit
      *
      * @param string $resource
      * @param array<int, string> $events
-     * @param array<mixed> $queries
      * @return int
      *
      * @throws \Exception
@@ -216,9 +227,10 @@ class Audit
     public function countLogsByResourceAndEvents(
         string $resource,
         array $events,
-        array $queries = [],
+        ?string $after = null,
+        ?string $before = null,
     ): int {
-        return $this->adapter->countByResourceAndEvents($resource, $events, $queries);
+        return $this->adapter->countByResourceAndEvents($resource, $events, $after, $before);
     }
 
     /**
