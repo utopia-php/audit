@@ -94,6 +94,7 @@ class Database extends SQL
                 if (is_string($time)) {
                     $time = new \DateTime($time);
                 }
+                assert($time instanceof \DateTime);
                 $log['time'] = DateTime::format($time);
                 $created[] = $this->db->createDocument($this->getCollectionName(), new Document($log));
             }
