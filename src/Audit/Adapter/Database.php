@@ -87,8 +87,14 @@ class Database extends SQL
     public function createBatch(array $logs): array
     {
         $created = [];
+
         $this->db->getAuthorization()->skip(function () use ($logs, &$created) {
             foreach ($logs as $log) {
+                $time = $log['time'] ?? new \DateTime();
+                if (is_string($time)) {
+                    $time = new \DateTime($time);
+                }
+                $log['time'] = DateTime::format($time);
                 $created[] = $this->db->createDocument($this->getCollectionName(), new Document($log));
             }
         });
