@@ -494,18 +494,6 @@ trait AuditBase
         $logsRange = $this->audit->getLogsByUser($userId, after: $afterTimeObj2, before: $beforeTimeObj2);
         $this->assertGreaterThanOrEqual(1, \count($logsRange));
 
-        // Test 7: Combination of ascending + limit
-        $ascLimit2 = $this->audit->getLogsByUser($userId, limit: 2, ascending: true);
-        $this->assertEquals(2, \count($ascLimit2));
-        // First log should be oldest in ascending order
-        $this->assertEquals('event_0', $ascLimit2[0]->getAttribute('event'));
-
-        // Test 8: Combination of after + before (time range)
-        $afterTimeObj2 = new \DateTime('2024-06-15 12:01:00');  // After 1st log
-        $beforeTimeObj2 = new \DateTime('2024-06-15 12:04:00'); // Before 4th log
-        $logsRange = $this->audit->getLogsByUser($userId, after: $afterTimeObj2, before: $beforeTimeObj2);
-        $this->assertGreaterThanOrEqual(1, \count($logsRange));
-
         // Test 9: Test with getLogsByResource using parameters
         $logsRes = $this->audit->getLogsByResource('doc/0', limit: 1, offset: 0);
         $this->assertEquals(1, \count($logsRes));
