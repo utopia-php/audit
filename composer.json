@@ -2,7 +2,13 @@
     "name": "utopia-php/audit",
     "description": "A simple audit library to manage application users logs",
     "type": "library",
-    "keywords": ["php","framework", "upf", "utopia", "audit"],
+    "keywords": [
+        "php",
+        "framework",
+        "upf",
+        "utopia",
+        "audit"
+    ],
     "license": "MIT",
     "minimum-stability": "stable",
     "scripts": {
@@ -11,14 +17,20 @@
         "check": "./vendor/bin/phpstan analyse --level max src tests"
     },
     "autoload": {
-        "psr-4": {"Utopia\\Audit\\": "src/Audit"}
+        "psr-4": {
+            "Utopia\\Audit\\": "src/Audit"
+        }
     },
     "autoload-dev": {
-        "psr-4": {"Utopia\\Tests\\": "tests/Audit"}
+        "psr-4": {
+            "Utopia\\Tests\\": "tests"
+        }
     },
     "require": {
         "php": ">=8.0",
-        "utopia-php/database": "4.*"
+        "utopia-php/database": "4.*",
+        "utopia-php/fetch": "^0.4.2",
+        "utopia-php/validators": "^0.1.0"
     },
     "require-dev": {
         "phpunit/phpunit": "9.*",

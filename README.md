@@ -8,6 +8,14 @@ Utopia framework audit library is simple and lite library for managing applicati
 
 Although this library is part of the [Utopia Framework](https://github.com/utopia-php/framework) project it is dependency free, and can be used as standalone with any other PHP project or framework.
 
+## Features
+
+- **Adapter Pattern**: Support for multiple storage backends through adapters
+- **Default Database Adapter**: Built-in support for utopia-php/database
+- **Extensible**: Easy to create custom adapters for different storage solutions
+- **Batch Operations**: Support for logging multiple events at once
+- **Query Support**: Rich querying capabilities for retrieving logs
+
 ## Getting Started
 
 Install using composer:
@@ -15,7 +23,11 @@ Install using composer:
 composer require utopia-php/audit
 ```
 
-Init the audit object:
+## Usage
+
+### Using the Database Adapter (Default)
+
+The simplest way to use Utopia Audit is with the built-in Database adapter:
 
 ```php
 <?php
@@ -23,12 +35,12 @@ Init the audit object:
 require_once __DIR__ . '/../../vendor/autoload.php';
 
 use PDO;
-use PDO;
 use Utopia\Audit\Audit;
 use Utopia\Cache\Cache;
 use Utopia\Cache\Adapter\None as NoCache;
 use Utopia\Database\Adapter\MySQL;
 use Utopia\Database\Database;
+use Utopia\Audit\Adapter\Database as DatabaseAdapter;
 
 $dbHost = '127.0.0.1';
 $dbUser = 'travis';
@@ -36,7 +48,7 @@ $dbPass = '';
 $dbPort = '3306';
 
 $pdo = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $dbPass, [
-    PDO::ATTR_TIMEOUT => 3, // Seconds
+    PDO::ATTR_TIMEOUT => 3,
     PDO::ATTR_PERSISTENT => true,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
@@ -46,12 +58,31 @@ $pdo = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $
         
 $cache = new Cache(new NoCache());
 
-$database = new Database(new MySQL($pdo),$cache);
+$database = new Database(new MySQL($pdo), $cache);
 $database->setNamespace('namespace');
 
-$audit = new Audit($database);
+// Create audit instance with Database adapter
+$audit = new Audit(new DatabaseAdapter($database));
 $audit->setup();
 ```
+
+### Using a Custom Adapter
+
+You can create custom adapters by extending the `Utopia\Audit\Adapter` abstract class:
+
+```php
+<?php
+
+use Utopia\Audit\Audit;
+use Utopia\Audit\Adapter\Database as DatabaseAdapter;
+use Utopia\Database\Database;
+
+// Using the Database adapter directly
+$adapter = new DatabaseAdapter($database);
+$audit = new Audit($adapter);
+```
+
+### Basic Operations
 
 **Create Log**
 
@@ -71,33 +102,348 @@ $audit->log($userId, $event, $resource, $userAgent, $ip, $location, $data);
 
 **Get Logs By User**
 
-Fetch all logs by given user ID
+Fetch all logs by given user ID with optional filtering parameters:
 
 ```php
+// Basic usage
+$logs = $audit->getLogsByUser('userId');
+
+// With pagination
 $logs = $audit->getLogsByUser(
-    'userId' // User unique ID
-); // Returns an array of all logs for specific user
+    userId: 'userId',
+    limit: 10,
+    offset: 0
+);
+
+// With time filtering using DateTime objects
+$logs = $audit->getLogsByUser(
+    userId: 'userId',
+    after: new \DateTime('2024-01-01 00:00:00'),
+    before: new \DateTime('2024-12-31 23:59:59'),
+    limit: 25,
+    offset: 0,
+    ascending: false  // false = newest first (default), true = oldest first
+);
 ```
 
 **Get Logs By User and Action**
 
-Fetch all logs by given user ID and a specific event name
+Fetch all logs by given user ID and specific event names with optional filtering:
 
 ```php
-$logs = $audit->getLogsByUserAndEvents( 
-    'userId', // User unique ID
-    ['update', 'delete'] // List of selected event to fetch
-); // Returns an array of all logs for specific user filtered by given actions
+// Basic usage
+$logs = $audit->getLogsByUserAndEvents(
+    userId: 'userId',
+    events: ['update', 'delete']
+);
+
+// With time filtering and pagination
+$logs = $audit->getLogsByUserAndEvents(
+    userId: 'userId',
+    events: ['update', 'delete'],
+    after: new \DateTime('-7 days'),
+    before: new \DateTime('now'),
+    limit: 50,
+    offset: 0,
+    ascending: false
+);
 ```
 
 **Get Logs By Resource**
 
-Fetch all logs by a given resource name
+Fetch all logs by a given resource name with optional filtering:
 
 ```php
+// Basic usage
+$logs = $audit->getLogsByResource('database/document-1');
+
+// With time filtering and pagination
 $logs = $audit->getLogsByResource(
-    'resource-name', // Resource Name
-); // Returns an array of all logs for the specific resource
+    resource: 'database/document-1',
+    after: new \DateTime('-30 days'),
+    before: new \DateTime('now'),
+    limit: 100,
+    offset: 0,
+    ascending: true  // Get oldest logs first
+);
+```
+
+**Batch Logging**
+
+Log multiple events at once for better performance:
+
+```php
+use Utopia\Database\DateTime;
+
+$events = [
+    [
+        'userId' => 'user-1',
+        'event' => 'create',
+        'resource' => 'database/document/1',
+        'userAgent' => 'Mozilla/5.0...',
+        'ip' => '127.0.0.1',
+        'location' => 'US',
+        'data' => ['key' => 'value'],
+        'time' => DateTime::now()
+    ],
+    [
+        'userId' => 'user-2',
+        'event' => 'update',
+        'resource' => 'database/document/2',
+        'userAgent' => 'Mozilla/5.0...',
+        'ip' => '192.168.1.1',
+        'location' => 'UK',
+        'data' => ['key' => 'value'],
+        'time' => DateTime::now()
+    ]
+];
+
+$documents = $audit->logBatch($events);
+```
+
+**Counting Logs**
+
+All retrieval methods have corresponding count methods with the same filtering capabilities:
+
+```php
+// Count all logs for a user
+$count = $audit->countLogsByUser('userId');
+
+// Count logs within a time range
+$count = $audit->countLogsByUser(
+    userId: 'userId',
+    after: new \DateTime('-7 days'),
+    before: new \DateTime('now')
+);
+
+// Count logs by resource
+$count = $audit->countLogsByResource('database/document-1');
+
+// Count logs by user and events
+$count = $audit->countLogsByUserAndEvents(
+    userId: 'userId',
+    events: ['create', 'update', 'delete'],
+    after: new \DateTime('-30 days')
+);
+
+// Count logs by resource and events
+$count = $audit->countLogsByResourceAndEvents(
+    resource: 'database/document-1',
+    events: ['update', 'delete']
+);
+```
+
+**Advanced Filtering**
+
+Get logs by resource and specific events:
+
+```php
+$logs = $audit->getLogsByResourceAndEvents(
+    resource: 'database/document-1',
+    events: ['create', 'update'],
+    after: new \DateTime('-24 hours'),
+    limit: 20,
+    offset: 0,
+    ascending: false
+);
+```
+
+### Filtering Parameters
+
+All retrieval methods support the following optional parameters:
+
+- **after** (`?\DateTime`): Get logs created after this datetime
+- **before** (`?\DateTime`): Get logs created before this datetime  
+- **limit** (`int`, default: 25): Maximum number of logs to return
+- **offset** (`int`, default: 0): Number of logs to skip (for pagination)
+- **ascending** (`bool`, default: false): Sort order - false for newest first, true for oldest first
+
+## Adapters
+
+Utopia Audit uses an adapter pattern to support different storage backends. Currently available adapters:
+
+### Database Adapter (Default)
+
+The Database adapter uses [utopia-php/database](https://github.com/utopia-php/database) to store audit logs in a database.
+
+
+### ClickHouse Adapter
+
+The ClickHouse adapter uses [ClickHouse](https://clickhouse.com/) for high-performance analytical queries on massive amounts of log data. It communicates with ClickHouse via HTTP interface using Utopia Fetch.
+
+**Features:**
+- Optimized for analytical queries and aggregations
+- Handles billions of log entries efficiently
+- Column-oriented storage for fast queries
+- Automatic partitioning by month
+- Bloom filter indexes for fast lookups
+
+**Usage:**
+
+```php
+<?php
+
+use Utopia\Audit\Audit;
+use Utopia\Audit\Adapter\ClickHouse;
+
+// Create ClickHouse adapter
+$adapter = new ClickHouse(
+    host: 'localhost',
+    database: 'audit',
+    username: 'default',
+    password: '',
+    port: 8123,
+    table: 'audit_logs'
+);
+
+$audit = new Audit($adapter);
+$audit->setup(); // Creates database and table
+
+// Use as normal
+$document = $audit->log(
+    userId: 'user-123',
+    event: 'document.create',
+    resource: 'database/document/1',
+    userAgent: 'Mozilla/5.0...',
+    ip: '127.0.0.1',
+    location: 'US',
+    data: ['key' => 'value']
+);
+```
+
+**Performance Benefits:**
+- Ideal for high-volume logging (millions of events per day)
+- Fast aggregation queries (counts, analytics)
+- Efficient storage with compression
+- Automatic data partitioning and retention policies
+
+### Creating Custom Adapters
+
+To create a custom adapter, extend the `Utopia\Audit\Adapter` abstract class and implement all required methods:
+
+```php
+<?php
+
+namespace MyApp\Audit;
+
+use Utopia\Audit\Adapter;
+use Utopia\Audit\Log;
+
+class CustomAdapter extends Adapter
+{
+    public function getName(): string
+    {
+        return 'Custom';
+    }
+
+    public function setup(): void
+    {
+        // Initialize your storage backend (create tables, indexes, etc.)
+    }
+
+    public function create(array $log): Log
+    {
+        // Store a single log entry and return a Log object
+    }
+
+    public function createBatch(array $logs): array
+    {
+        // Store multiple log entries and return array of Log objects
+    }
+
+    public function getByUser(
+        string $userId,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
+    ): array {
+        // Retrieve logs by user ID with optional filtering
+    }
+
+    public function countByUser(
+        string $userId,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
+    ): int {
+        // Count logs by user ID with optional time filtering
+    }
+
+    public function getByResource(
+        string $resource,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
+    ): array {
+        // Retrieve logs by resource with optional filtering
+    }
+
+    public function countByResource(
+        string $resource,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
+    ): int {
+        // Count logs by resource with optional time filtering
+    }
+
+    public function getByUserAndEvents(
+        string $userId,
+        array $events,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
+    ): array {
+        // Retrieve logs by user ID and specific events with optional filtering
+    }
+
+    public function countByUserAndEvents(
+        string $userId,
+        array $events,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
+    ): int {
+        // Count logs by user ID and events with optional time filtering
+    }
+
+    public function getByResourceAndEvents(
+        string $resource,
+        array $events,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
+        int $limit = 25,
+        int $offset = 0,
+        bool $ascending = false,
+    ): array {
+        // Retrieve logs by resource and specific events with optional filtering
+    }
+
+    public function countByResourceAndEvents(
+        string $resource,
+        array $events,
+        ?\DateTime $after = null,
+        ?\DateTime $before = null,
+    ): int {
+        // Count logs by resource and events with optional time filtering
+    }
+
+    public function cleanup(\DateTime $datetime): bool
+    {
+        // Delete logs older than the specified datetime
+        // Return true on success, false otherwise
+    }
+}
+```
+
+Then use your custom adapter:
+
+```php
+$adapter = new CustomAdapter();
+$audit = new Audit($adapter);
 ```
 
 ## System Requirements
