@@ -152,7 +152,7 @@ class Database extends SQL
             $queries = [
                 Query::equal('userId', [$userId]),
                 ...$timeQueries,
-                $ascending ? Query::orderAsc('time') : Query::orderDesc('time'),
+                $ascending ? Query::orderAsc() : Query::orderDesc(),
                 Query::limit($limit),
                 Query::offset($offset),
             ];
@@ -208,7 +208,7 @@ class Database extends SQL
             $queries = [
                 Query::equal('resource', [$resource]),
                 ...$timeQueries,
-                $ascending ? Query::orderAsc('time') : Query::orderDesc('time'),
+                $ascending ? Query::orderAsc() : Query::orderDesc(),
                 Query::limit($limit),
                 Query::offset($offset),
             ];
@@ -269,7 +269,7 @@ class Database extends SQL
                 Query::equal('userId', [$userId]),
                 Query::equal('event', $events),
                 ...$timeQueries,
-                $ascending ? Query::orderAsc('time') : Query::orderDesc('time'),
+                $ascending ? Query::orderAsc() : Query::orderDesc(),
                 Query::limit($limit),
                 Query::offset($offset),
             ];
@@ -333,7 +333,7 @@ class Database extends SQL
                 Query::equal('resource', [$resource]),
                 Query::equal('event', $events),
                 ...$timeQueries,
-                $ascending ? Query::orderAsc('time') : Query::orderDesc('time'),
+                $ascending ? Query::orderAsc() : Query::orderDesc(),
                 Query::limit($limit),
                 Query::offset($offset),
             ];
