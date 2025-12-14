@@ -55,11 +55,11 @@ abstract class Adapter
      *     time: \DateTime|string|null,
      *     data?: array<string, mixed>
      * }> $logs
-     * @return array<Log>
+     * @return bool
      *
      * @throws \Exception
      */
-    abstract public function createBatch(array $logs): array;
+    abstract public function createBatch(array $logs): bool;
 
     /**
      * Get logs by user ID.

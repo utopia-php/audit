@@ -500,10 +500,10 @@ class ClickHouse extends SQL
      *
      * @throws Exception
      */
-    public function createBatch(array $logs): array
+    public function createBatch(array $logs): bool
     {
         if (empty($logs)) {
-            return [];
+            return true;
         }
 
         $tableName = $this->getTableName();
@@ -579,30 +579,7 @@ class ClickHouse extends SQL
             VALUES " . implode(', ', $valueClauses);
 
         $this->query($insertSql, $params);
-
-        // Return documents using the same IDs that were inserted
-        $documents = [];
-        foreach ($logs as $index => $log) {
-            $result = [
-                '$id' => $ids[$index],
-                'userId' => $log['userId'] ?? null,
-                'event' => $log['event'],
-                'resource' => $log['resource'],
-                'userAgent' => $log['userAgent'],
-                'ip' => $log['ip'],
-                'location' => $log['location'] ?? null,
-                'time' => $log['time'],
-                'data' => $log['data'] ?? [],
-            ];
-
-            if ($this->sharedTables) {
-                $result['tenant'] = $this->tenant;
-            }
-
-            $documents[] = new Log($result);
-        }
-
-        return $documents;
+        return true;
     }
 
     /**

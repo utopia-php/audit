@@ -85,23 +85,22 @@ class Database extends SQL
      * @return array<Log>
      * @throws AuthorizationException|\Exception
      */
-    public function createBatch(array $logs): array
+    public function createBatch(array $logs): bool
     {
-        $created = [];
-
-        Authorization::skip(function () use ($logs, &$created) {
-            foreach ($logs as $log) {
+        Authorization::skip(function () use ($logs) {
+            $documents = \array_map(function ($event) {
                 $time = $log['time'] ?? new \DateTime();
                 if (is_string($time)) {
                     $time = new \DateTime($time);
                 }
                 assert($time instanceof \DateTime);
                 $log['time'] = DateTime::format($time);
-                $created[] = $this->db->createDocument($this->getCollectionName(), new Document($log));
-            }
+                return new Document($log);
+            }, $logs);
+            $this->db->createDocuments($this->getCollectionName(), $documents);
         });
 
-        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $created);
+        return true;
     }
 
     /**
