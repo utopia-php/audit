@@ -88,7 +88,7 @@ class Database extends SQL
     public function createBatch(array $logs): bool
     {
         Authorization::skip(function () use ($logs) {
-            $documents = \array_map(function ($event) {
+            $documents = \array_map(function ($log) {
                 $time = $log['time'] ?? new \DateTime();
                 if (is_string($time)) {
                     $time = new \DateTime($time);
