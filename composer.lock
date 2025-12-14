@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7e7770e1778658a1376fdd3c1ffd73c3",
+    "content-hash": "56a7dbb2d6f7f217b842a1785df2f5d2",
     "packages": [
         {
             "name": "brick/math",
@@ -1383,16 +1383,16 @@
         },
         {
             "name": "symfony/http-client",
-            "version": "v7.4.0",
+            "version": "v7.4.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/http-client.git",
-                "reference": "ee5e0e0139ab506f6063a230e631bed677c650a4"
+                "reference": "26cc224ea7103dda90e9694d9e139a389092d007"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/http-client/zipball/ee5e0e0139ab506f6063a230e631bed677c650a4",
-                "reference": "ee5e0e0139ab506f6063a230e631bed677c650a4",
+                "url": "https://api.github.com/repos/symfony/http-client/zipball/26cc224ea7103dda90e9694d9e139a389092d007",
+                "reference": "26cc224ea7103dda90e9694d9e139a389092d007",
                 "shasum": ""
             },
             "require": {
@@ -1460,7 +1460,7 @@
                 "http"
             ],
             "support": {
-                "source": "https://github.com/symfony/http-client/tree/v7.4.0"
+                "source": "https://github.com/symfony/http-client/tree/v7.4.1"
             },
             "funding": [
                 {
@@ -1480,7 +1480,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-11-20T12:32:50+00:00"
+            "time": "2025-12-04T21:12:57+00:00"
         },
         {
             "name": "symfony/http-client-contracts",
@@ -2124,16 +2124,16 @@
         },
         {
             "name": "utopia-php/database",
-            "version": "4.3.0",
+            "version": "3.6.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/database.git",
-                "reference": "fe7a1326ad623609e65587fe8c01a630a7075fee"
+                "reference": "af15066255a5fd7bd2926de37bcbf3d8500fc155"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/database/zipball/fe7a1326ad623609e65587fe8c01a630a7075fee",
-                "reference": "fe7a1326ad623609e65587fe8c01a630a7075fee",
+                "url": "https://api.github.com/repos/utopia-php/database/zipball/af15066255a5fd7bd2926de37bcbf3d8500fc155",
+                "reference": "af15066255a5fd7bd2926de37bcbf3d8500fc155",
                 "shasum": ""
             },
             "require": {
@@ -2176,9 +2176,9 @@
             ],
             "support": {
                 "issues": "https://github.com/utopia-php/database/issues",
-                "source": "https://github.com/utopia-php/database/tree/4.3.0"
+                "source": "https://github.com/utopia-php/database/tree/3.6.0"
             },
-            "time": "2025-11-14T03:43:10+00:00"
+            "time": "2025-12-08T05:23:04+00:00"
         },
         {
             "name": "utopia-php/fetch",
@@ -2221,29 +2221,29 @@
         },
         {
             "name": "utopia-php/framework",
-            "version": "0.33.33",
+            "version": "0.33.35",
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/http.git",
-                "reference": "838e3a28276e73187bc34a314f014096dc92191b"
+                "reference": "82b139fb04f30045db51b0d322224f222da32313"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/http/zipball/838e3a28276e73187bc34a314f014096dc92191b",
-                "reference": "838e3a28276e73187bc34a314f014096dc92191b",
+                "url": "https://api.github.com/repos/utopia-php/http/zipball/82b139fb04f30045db51b0d322224f222da32313",
+                "reference": "82b139fb04f30045db51b0d322224f222da32313",
                 "shasum": ""
             },
             "require": {
-                "php": ">=8.1",
+                "php": ">=8.3",
                 "utopia-php/compression": "0.1.*",
                 "utopia-php/telemetry": "0.1.*",
                 "utopia-php/validators": "0.1.*"
             },
             "require-dev": {
-                "laravel/pint": "^1.2",
-                "phpbench/phpbench": "^1.2",
-                "phpstan/phpstan": "^1.10",
-                "phpunit/phpunit": "^9.5.25"
+                "laravel/pint": "1.*",
+                "phpbench/phpbench": "1.*",
+                "phpstan/phpstan": "1.*",
+                "phpunit/phpunit": "9.*"
             },
             "type": "library",
             "autoload": {
@@ -2263,9 +2263,9 @@
             ],
             "support": {
                 "issues": "https://github.com/utopia-php/http/issues",
-                "source": "https://github.com/utopia-php/http/tree/0.33.33"
+                "source": "https://github.com/utopia-php/http/tree/0.33.35"
             },
-            "time": "2025-11-25T10:21:13+00:00"
+            "time": "2025-12-12T08:33:52+00:00"
         },
         {
             "name": "utopia-php/mongo",
