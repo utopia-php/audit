@@ -215,8 +215,7 @@ trait AuditBase
 
         // Test batch insertion
         $result = $this->audit->logBatch($batchEvents);
-        $this->assertIsArray($result);
-        $this->assertEquals(4, count($result));
+        $this->assertTrue($result);
 
         // Verify the number of logs inserted
         $logs = $this->audit->getLogsByUser($userId);
@@ -296,7 +295,7 @@ trait AuditBase
 
         // Insert batch
         $result = $this->audit->logBatch($batchEvents);
-        $this->assertEquals(50, \count($result));
+        $this->assertTrue($result);
 
         // Verify all were inserted
         $count = $this->audit->countLogsByUser('largebatchuser');

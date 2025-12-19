@@ -75,11 +75,11 @@ class Audit
      * Add multiple event logs in batch.
      *
      * @param array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, time: string, data?: array<string, mixed>}> $events
-     * @return array<Log>
+     * @return bool
      *
      * @throws \Exception
      */
-    public function logBatch(array $events): array
+    public function logBatch(array $events): bool
     {
         return $this->adapter->createBatch($events);
     }

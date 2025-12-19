@@ -81,26 +81,25 @@ class Database extends SQL
      * Create multiple audit log entries in batch.
      *
      * @param array<int, array<string, mixed>> $logs
-     * @return array<Log>
+     * @return bool
      * @throws AuthorizationException|\Exception
      */
-    public function createBatch(array $logs): array
+    public function createBatch(array $logs): bool
     {
-        $created = [];
-
-        $this->db->getAuthorization()->skip(function () use ($logs, &$created) {
-            foreach ($logs as $log) {
+        $this->db->getAuthorization()->skip(function () use ($logs) {
+            $documents = \array_map(function ($log) {
                 $time = $log['time'] ?? new \DateTime();
                 if (is_string($time)) {
                     $time = new \DateTime($time);
                 }
                 assert($time instanceof \DateTime);
                 $log['time'] = DateTime::format($time);
-                $created[] = $this->db->createDocument($this->getCollectionName(), new Document($log));
-            }
+                return new Document($log);
+            }, $logs);
+            $this->db->createDocuments($this->getCollectionName(), $documents);
         });
 
-        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $created);
+        return true;
     }
 
     /**
@@ -152,7 +151,7 @@ class Database extends SQL
             $queries = [
                 Query::equal('userId', [$userId]),
                 ...$timeQueries,
-                $ascending ? Query::orderAsc('time') : Query::orderDesc('time'),
+                $ascending ? Query::orderAsc() : Query::orderDesc(),
                 Query::limit($limit),
                 Query::offset($offset),
             ];
@@ -208,7 +207,7 @@ class Database extends SQL
             $queries = [
                 Query::equal('resource', [$resource]),
                 ...$timeQueries,
-                $ascending ? Query::orderAsc('time') : Query::orderDesc('time'),
+                $ascending ? Query::orderAsc() : Query::orderDesc(),
                 Query::limit($limit),
                 Query::offset($offset),
             ];
@@ -269,7 +268,7 @@ class Database extends SQL
                 Query::equal('userId', [$userId]),
                 Query::equal('event', $events),
                 ...$timeQueries,
-                $ascending ? Query::orderAsc('time') : Query::orderDesc('time'),
+                $ascending ? Query::orderAsc() : Query::orderDesc(),
                 Query::limit($limit),
                 Query::offset($offset),
             ];
@@ -333,7 +332,7 @@ class Database extends SQL
                 Query::equal('resource', [$resource]),
                 Query::equal('event', $events),
                 ...$timeQueries,
-                $ascending ? Query::orderAsc('time') : Query::orderDesc('time'),
+                $ascending ? Query::orderAsc() : Query::orderDesc(),
                 Query::limit($limit),
                 Query::offset($offset),
             ];
