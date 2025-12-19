@@ -81,7 +81,7 @@ class Database extends SQL
      * Create multiple audit log entries in batch.
      *
      * @param array<int, array<string, mixed>> $logs
-     * @return array<Log>
+     * @return bool
      * @throws AuthorizationException|\Exception
      */
     public function createBatch(array $logs): bool

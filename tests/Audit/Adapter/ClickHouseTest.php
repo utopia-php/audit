@@ -310,7 +310,7 @@ class ClickHouseTest extends TestCase
         ];
 
         $result = $this->audit->logBatch($batchEvents);
-        $this->assertEquals(1, count($result));
+        $this->assertTrue($result);
 
         // Verify retrieval
         $logs = $this->audit->getLogsByUser('user`with`backticks');
