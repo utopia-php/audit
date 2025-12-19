@@ -28,7 +28,7 @@
     },
     "require": {
         "php": ">=8.0",
-        "utopia-php/database": "3.*",
+        "utopia-php/database": "4.*",
         "utopia-php/fetch": "^0.4.2",
         "utopia-php/validators": "^0.1.0"
     },

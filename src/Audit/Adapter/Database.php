@@ -71,7 +71,7 @@ class Database extends SQL
     public function create(array $log): Log
     {
         $log['time'] = $log['time'] ?? DateTime::now();
-        $document = Authorization::skip(function () use ($log) {
+        $document = $this->db->getAuthorization()->skip(function () use ($log) {
             return $this->db->createDocument($this->getCollectionName(), new Document($log));
         });
 
@@ -87,7 +87,7 @@ class Database extends SQL
      */
     public function createBatch(array $logs): bool
     {
-        Authorization::skip(function () use ($logs) {
+        $this->db->getAuthorization()->skip(function () use ($logs) {
             $documents = \array_map(function ($log) {
                 $time = $log['time'] ?? new \DateTime();
                 if (is_string($time)) {
@@ -148,7 +148,7 @@ class Database extends SQL
         bool $ascending = false,
     ): array {
         $timeQueries = $this->buildTimeQueries($after, $before);
-        $documents = Authorization::skip(function () use ($userId, $timeQueries, $limit, $offset, $ascending) {
+        $documents = $this->db->getAuthorization()->skip(function () use ($userId, $timeQueries, $limit, $offset, $ascending) {
             $queries = [
                 Query::equal('userId', [$userId]),
                 ...$timeQueries,
@@ -163,7 +163,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -177,7 +177,7 @@ class Database extends SQL
         ?\DateTime $before = null,
     ): int {
         $timeQueries = $this->buildTimeQueries($after, $before);
-        return Authorization::skip(function () use ($userId, $timeQueries) {
+        return $this->db->getAuthorization()->skip(function () use ($userId, $timeQueries) {
             return $this->db->count(
                 collection: $this->getCollectionName(),
                 queries: [
@@ -204,7 +204,7 @@ class Database extends SQL
         bool $ascending = false,
     ): array {
         $timeQueries = $this->buildTimeQueries($after, $before);
-        $documents = Authorization::skip(function () use ($resource, $timeQueries, $limit, $offset, $ascending) {
+        $documents = $this->db->getAuthorization()->skip(function () use ($resource, $timeQueries, $limit, $offset, $ascending) {
             $queries = [
                 Query::equal('resource', [$resource]),
                 ...$timeQueries,
@@ -219,7 +219,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -235,7 +235,7 @@ class Database extends SQL
         ?\DateTime $before = null,
     ): int {
         $timeQueries = $this->buildTimeQueries($after, $before);
-        return Authorization::skip(function () use ($resource, $timeQueries) {
+        return $this->db->getAuthorization()->skip(function () use ($resource, $timeQueries) {
             return $this->db->count(
                 collection: $this->getCollectionName(),
                 queries: [
@@ -264,7 +264,7 @@ class Database extends SQL
         bool $ascending = false,
     ): array {
         $timeQueries = $this->buildTimeQueries($after, $before);
-        $documents = Authorization::skip(function () use ($userId, $events, $timeQueries, $limit, $offset, $ascending) {
+        $documents = $this->db->getAuthorization()->skip(function () use ($userId, $events, $timeQueries, $limit, $offset, $ascending) {
             $queries = [
                 Query::equal('userId', [$userId]),
                 Query::equal('event', $events),
@@ -280,7 +280,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -298,7 +298,7 @@ class Database extends SQL
         ?\DateTime $before = null,
     ): int {
         $timeQueries = $this->buildTimeQueries($after, $before);
-        return Authorization::skip(function () use ($userId, $events, $timeQueries) {
+        return $this->db->getAuthorization()->skip(function () use ($userId, $events, $timeQueries) {
             return $this->db->count(
                 collection: $this->getCollectionName(),
                 queries: [
@@ -328,7 +328,7 @@ class Database extends SQL
         bool $ascending = false,
     ): array {
         $timeQueries = $this->buildTimeQueries($after, $before);
-        $documents = Authorization::skip(function () use ($resource, $events, $timeQueries, $limit, $offset, $ascending) {
+        $documents = $this->db->getAuthorization()->skip(function () use ($resource, $events, $timeQueries, $limit, $offset, $ascending) {
             $queries = [
                 Query::equal('resource', [$resource]),
                 Query::equal('event', $events),
@@ -344,7 +344,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -362,7 +362,7 @@ class Database extends SQL
         ?\DateTime $before = null,
     ): int {
         $timeQueries = $this->buildTimeQueries($after, $before);
-        return Authorization::skip(function () use ($resource, $events, $timeQueries) {
+        return $this->db->getAuthorization()->skip(function () use ($resource, $events, $timeQueries) {
             return $this->db->count(
                 collection: $this->getCollectionName(),
                 queries: [
@@ -384,7 +384,7 @@ class Database extends SQL
     public function cleanup(\DateTime $datetime): bool
     {
         $datetimeString = DateTime::format($datetime);
-        Authorization::skip(function () use ($datetimeString) {
+        $this->db->getAuthorization()->skip(function () use ($datetimeString) {
             do {
                 $removed = $this->db->deleteDocuments($this->getCollectionName(), [
                     Query::lessThan('time', $datetimeString),
