@@ -10,7 +10,6 @@ use Utopia\Database\Exception\Authorization as AuthorizationException;
 use Utopia\Database\Exception\Duplicate as DuplicateException;
 use Utopia\Database\Exception\Timeout;
 use Utopia\Database\Query;
-use Utopia\Database\Validator\Authorization;
 use Utopia\Exception;
 
 /**
@@ -163,7 +162,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -219,7 +218,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -280,7 +279,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -344,7 +343,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn($doc) => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
