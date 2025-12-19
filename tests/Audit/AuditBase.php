@@ -215,7 +215,6 @@ trait AuditBase
 
         // Test batch insertion
         $result = $this->audit->logBatch($batchEvents);
-        $this->assertIsArray($result);
         $this->assertTrue($result);
 
         // Verify the number of logs inserted
