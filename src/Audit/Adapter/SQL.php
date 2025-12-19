@@ -21,7 +21,7 @@ abstract class SQL extends Adapter
      *
      * @return string
      */
-    protected function getCollectionName(): string
+    public function getCollectionName(): string
     {
         return self::COLLECTION;
     }
@@ -40,7 +40,7 @@ abstract class SQL extends Adapter
      *
      * @return array<int, array<string, mixed>>
      */
-    protected function getAttributes(): array
+    public function getAttributes(): array
     {
         return [
             [
@@ -124,7 +124,7 @@ abstract class SQL extends Adapter
      *
      * @return array<Document>
      */
-    protected function getAttributeDocuments(): array
+    public function getAttributeDocuments(): array
     {
         return array_map(static fn (array $attribute) => new Document($attribute), $this->getAttributes());
     }
@@ -139,7 +139,7 @@ abstract class SQL extends Adapter
      *
      * @return array<int, array<string, mixed>>
      */
-    protected function getIndexes(): array
+    public function getIndexes(): array
     {
         return [
             [
@@ -170,7 +170,7 @@ abstract class SQL extends Adapter
      *
      * @return array<Document>
      */
-    protected function getIndexDocuments(): array
+    public function getIndexDocuments(): array
     {
         return array_map(static fn (array $index) => new Document($index), $this->getIndexes());
     }
