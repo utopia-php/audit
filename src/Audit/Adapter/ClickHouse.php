@@ -72,7 +72,7 @@ class ClickHouse extends SQL
         $this->client = new Client();
         $this->client->addHeader('X-ClickHouse-User', $this->username);
         $this->client->addHeader('X-ClickHouse-Key', $this->password);
-        $this->client->setTimeout(30 * 1000); // 30 seconds
+        $this->client->setTimeout(30);
     }
 
     /**

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "bfd267357545678327dd729167a5748a",
+    "content-hash": "7e7770e1778658a1376fdd3c1ffd73c3",
     "packages": [
         {
             "name": "brick/math",
@@ -2182,20 +2182,20 @@
         },
         {
             "name": "utopia-php/fetch",
-            "version": "0.5.1",
+            "version": "0.4.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/fetch.git",
-                "reference": "a96a010e1c273f3888765449687baf58cbc61fcd"
+                "reference": "83986d1be75a2fae4e684107fe70dd78a8e19b77"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/fetch/zipball/a96a010e1c273f3888765449687baf58cbc61fcd",
-                "reference": "a96a010e1c273f3888765449687baf58cbc61fcd",
+                "url": "https://api.github.com/repos/utopia-php/fetch/zipball/83986d1be75a2fae4e684107fe70dd78a8e19b77",
+                "reference": "83986d1be75a2fae4e684107fe70dd78a8e19b77",
                 "shasum": ""
             },
             "require": {
-                "php": ">=8.1"
+                "php": ">=8.0"
             },
             "require-dev": {
                 "laravel/pint": "^1.5.0",
@@ -2215,9 +2215,9 @@
             "description": "A simple library that provides an interface for making HTTP Requests.",
             "support": {
                 "issues": "https://github.com/utopia-php/fetch/issues",
-                "source": "https://github.com/utopia-php/fetch/tree/0.5.1"
+                "source": "https://github.com/utopia-php/fetch/tree/0.4.2"
             },
-            "time": "2025-12-18T16:25:10+00:00"
+            "time": "2025-04-25T13:48:02+00:00"
         },
         {
             "name": "utopia-php/framework",
