@@ -85,6 +85,19 @@ class Audit
     }
 
     /**
+     * Get a single log by its ID.
+     *
+     * @param string $id
+     * @return Log|null The log entry or null if not found
+     *
+     * @throws \Exception
+     */
+    public function getLogById(string $id): ?Log
+    {
+        return $this->adapter->getById($id);
+    }
+
+    /**
      * Get all logs by user ID.
      *
      * @param string $userId
