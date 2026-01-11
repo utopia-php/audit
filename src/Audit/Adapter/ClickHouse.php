@@ -4,6 +4,7 @@ namespace Utopia\Audit\Adapter;
 
 use Exception;
 use Utopia\Audit\Log;
+use Utopia\Database\Database;
 use Utopia\Fetch\Client;
 use Utopia\Validator\Hostname;
 
@@ -246,6 +247,211 @@ class ClickHouse extends SQL
     public function isSharedTables(): bool
     {
         return $this->sharedTables;
+    }
+
+    /**
+     * Override getAttributes to provide extended attributes for ClickHouse.
+     * Includes existing attributes from parent and adds new missing ones.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getAttributes(): array
+    {
+        $parentAttributes = parent::getAttributes();
+
+        return [
+            ...$parentAttributes,
+            [
+                '$id' => 'userType',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => true,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'userInternalId',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => false,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'resourceParent',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => false,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'resourceType',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => true,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'resourceId',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => true,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'resourceInternalId',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => false,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'country',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => false,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'projectId',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => true,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'projectInternalId',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => true,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'teamId',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => true,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'teamInternalId',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => true,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'hostname',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => true,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
+        ];
+    }
+
+    /**
+     * Override getIndexes to provide extended indexes for ClickHouse.
+     * Includes existing indexes from parent and adds new missing ones.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getIndexes(): array
+    {
+        $parentIndexes = parent::getIndexes();
+
+        // New indexes to add
+        return [
+            ...$parentIndexes,
+            [
+                '$id' => '_key_user_internal_and_event',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['userInternalId', 'event'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_project_internal_id',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['projectInternalId'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_team_internal_id',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['teamInternalId'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_user_internal_id',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['userInternalId'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_user_type',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['userType'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_country',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['country'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_hostname',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['hostname'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+        ];
     }
 
     /**
