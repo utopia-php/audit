@@ -329,7 +329,7 @@ class ClickHouseTest extends TestCase
         );
 
         $attributes = $adapter->getAttributes();
-        $attributeIds = array_map(fn($attr) => $attr['$id'], $attributes);
+        $attributeIds = array_map(fn ($attr) => $attr['$id'], $attributes);
 
         // Verify all expected attributes exist
         $expectedAttributes = [
@@ -371,7 +371,7 @@ class ClickHouseTest extends TestCase
         );
 
         $indexes = $adapter->getIndexes();
-        $indexIds = array_map(fn($idx) => $idx['$id'], $indexes);
+        $indexIds = array_map(fn ($idx) => $idx['$id'], $indexes);
 
         // Verify all ClickHouse-specific indexes exist
         $expectedClickHouseIndexes = [
