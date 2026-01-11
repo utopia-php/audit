@@ -4,6 +4,7 @@ namespace Utopia\Audit\Adapter;
 
 use Exception;
 use Utopia\Audit\Log;
+use Utopia\Audit\Query;
 use Utopia\Database\Database;
 use Utopia\Fetch\Client;
 use Utopia\Validator\Hostname;
@@ -726,6 +727,157 @@ class ClickHouse extends SQL
         $logs = $this->parseResults($result);
 
         return $logs[0] ?? null;
+    }
+
+    /**
+     * Find logs using Query objects.
+     *
+     * @param array<Query> $queries
+     * @return array<Log>
+     * @throws Exception
+     */
+    public function find(array $queries = []): array
+    {
+        $tableName = $this->getTableName();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+
+        // Parse queries
+        $parsed = $this->parseQueries($queries);
+
+        // Build SELECT clause
+        $selectColumns = $parsed['select'] ?? $this->getSelectColumns();
+
+        // Build WHERE clause
+        $whereClause = '';
+        $tenantFilter = $this->getTenantFilter();
+        if (!empty($parsed['filters']) || $tenantFilter) {
+            $conditions = $parsed['filters'] ?? [];
+            if ($tenantFilter) {
+                $conditions[] = ltrim($tenantFilter, ' AND');
+            }
+            $whereClause = ' WHERE ' . implode(' AND ', $conditions);
+        }
+
+        // Build ORDER BY clause
+        $orderClause = '';
+        if (!empty($parsed['orderBy'])) {
+            $orderClause = ' ORDER BY ' . implode(', ', $parsed['orderBy']);
+        }
+
+        // Build LIMIT and OFFSET
+        $limitClause = isset($parsed['limit']) ? ' LIMIT {limit:UInt64}' : '';
+        $offsetClause = isset($parsed['offset']) ? ' OFFSET {offset:UInt64}' : '';
+
+        $sql = "
+            SELECT {$selectColumns}
+            FROM {$escapedTable}{$whereClause}{$orderClause}{$limitClause}{$offsetClause}
+            FORMAT TabSeparated
+        ";
+
+        $result = $this->query($sql, $parsed['params']);
+        return $this->parseResults($result);
+    }
+
+    /**
+     * Parse Query objects into SQL components.
+     *
+     * @param array<Query> $queries
+     * @return array{filters: array<string>, params: array<string, mixed>, orderBy?: array<string>, limit?: int, offset?: int}
+     * @throws Exception
+     */
+    private function parseQueries(array $queries): array
+    {
+        $filters = [];
+        $params = [];
+        $orderBy = [];
+        $limit = null;
+        $offset = null;
+        $paramCounter = 0;
+
+        foreach ($queries as $query) {
+            if (!$query instanceof Query) {
+                continue;
+            }
+
+            $method = $query->getMethod();
+            $attribute = $query->getAttribute();
+            $values = $query->getValues();
+
+            switch ($method) {
+                case Query::TYPE_EQUAL:
+                    $paramName = 'param_' . $paramCounter++;
+                    $filters[] = "{$attribute} = {{$paramName}:String}";
+                    $params[$paramName] = $this->formatParamValue($values[0]);
+                    break;
+
+                case Query::TYPE_LESSER:
+                    $paramName = 'param_' . $paramCounter++;
+                    $filters[] = "{$attribute} < {{$paramName}:String}";
+                    $params[$paramName] = $this->formatParamValue($values[0]);
+                    break;
+
+                case Query::TYPE_GREATER:
+                    $paramName = 'param_' . $paramCounter++;
+                    $filters[] = "{$attribute} > {{$paramName}:String}";
+                    $params[$paramName] = $this->formatParamValue($values[0]);
+                    break;
+
+                case Query::TYPE_BETWEEN:
+                    $paramName1 = 'param_' . $paramCounter++;
+                    $paramName2 = 'param_' . $paramCounter++;
+                    $filters[] = "{$attribute} BETWEEN {{$paramName1}:String} AND {{$paramName2}:String}";
+                    $params[$paramName1] = $this->formatParamValue($values[0]);
+                    $params[$paramName2] = $this->formatParamValue($values[1]);
+                    break;
+
+                case Query::TYPE_IN:
+                    $inParams = [];
+                    foreach ($values as $value) {
+                        $paramName = 'param_' . $paramCounter++;
+                        $inParams[] = "{{$paramName}:String}";
+                        $params[$paramName] = $this->formatParamValue($value);
+                    }
+                    $filters[] = "{$attribute} IN (" . implode(', ', $inParams) . ")";
+                    break;
+
+                case Query::TYPE_ORDER_DESC:
+                    $orderBy[] = "{$attribute} DESC";
+                    break;
+
+                case Query::TYPE_ORDER_ASC:
+                    $orderBy[] = "{$attribute} ASC";
+                    break;
+
+                case Query::TYPE_LIMIT:
+                    $limit = (int) $values[0];
+                    $params['limit'] = $limit;
+                    break;
+
+                case Query::TYPE_OFFSET:
+                    $offset = (int) $values[0];
+                    $params['offset'] = $offset;
+                    break;
+            }
+        }
+
+        $result = [
+            'filters' => $filters,
+            'params' => $params,
+        ];
+
+        if (!empty($orderBy)) {
+            $result['orderBy'] = $orderBy;
+        }
+
+        if ($limit !== null) {
+            $result['limit'] = $limit;
+        }
+
+        if ($offset !== null) {
+            $result['offset'] = $offset;
+        }
+
+        return $result;
     }
 
     /**
