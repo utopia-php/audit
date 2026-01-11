@@ -329,7 +329,7 @@ class ClickHouseTest extends TestCase
         );
 
         $attributes = $adapter->getAttributes();
-        $attributeIds = array_map(fn ($attr) => $attr['$id'], $attributes);
+        $attributeIds = array_map(fn($attr) => $attr['$id'], $attributes);
 
         // Verify all expected attributes exist
         $expectedAttributes = [
@@ -371,14 +371,11 @@ class ClickHouseTest extends TestCase
         );
 
         $indexes = $adapter->getIndexes();
-        $indexIds = array_map(fn ($idx) => $idx['$id'], $indexes);
+        $indexIds = array_map(fn($idx) => $idx['$id'], $indexes);
 
-        // Verify all expected indexes exist
-        $expectedIndexes = [
-            '_key_event',
+        // Verify all ClickHouse-specific indexes exist
+        $expectedClickHouseIndexes = [
             '_key_user_internal_and_event',
-            '_key_resource_and_event',
-            '_key_time',
             '_key_project_internal_id',
             '_key_team_internal_id',
             '_key_user_internal_id',
@@ -387,8 +384,14 @@ class ClickHouseTest extends TestCase
             '_key_hostname'
         ];
 
-        foreach ($expectedIndexes as $expected) {
-            $this->assertContains($expected, $indexIds, "Index '{$expected}' not found in ClickHouse adapter");
+        foreach ($expectedClickHouseIndexes as $expected) {
+            $this->assertContains($expected, $indexIds, "ClickHouse index '{$expected}' not found in ClickHouse adapter");
+        }
+
+        // Verify parent indexes are also included (with parent naming convention)
+        $parentExpectedIndexes = ['idx_event', 'idx_userId_event', 'idx_resource_event', 'idx_time_desc'];
+        foreach ($parentExpectedIndexes as $expected) {
+            $this->assertContains($expected, $indexIds, "Parent index '{$expected}' not found in ClickHouse adapter");
         }
     }
 }
