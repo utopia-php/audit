@@ -6,6 +6,7 @@ use Exception;
 use PHPUnit\Framework\TestCase;
 use Utopia\Audit\Adapter\ClickHouse;
 use Utopia\Audit\Audit;
+use Utopia\Audit\Query;
 use Utopia\Tests\Audit\AuditBase;
 
 /**
@@ -314,6 +315,356 @@ class ClickHouseTest extends TestCase
 
         // Verify retrieval
         $logs = $this->audit->getLogsByUser('user`with`backticks');
+        $this->assertGreaterThan(0, count($logs));
+    }
+
+    /**
+     * Test that ClickHouse adapter has all required attributes
+     */
+    public function testClickHouseAdapterAttributes(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $attributes = $adapter->getAttributes();
+        $attributeIds = array_map(fn ($attr) => $attr['$id'], $attributes);
+
+        // Verify all expected attributes exist
+        $expectedAttributes = [
+            'userType',
+            'userId',
+            'userInternalId',
+            'resourceParent',
+            'resourceType',
+            'resourceId',
+            'resourceInternalId',
+            'event',
+            'resource',
+            'userAgent',
+            'ip',
+            'country',
+            'time',
+            'data',
+            'projectId',
+            'projectInternalId',
+            'teamId',
+            'teamInternalId',
+            'hostname'
+        ];
+
+        foreach ($expectedAttributes as $expected) {
+            $this->assertContains($expected, $attributeIds, "Attribute '{$expected}' not found in ClickHouse adapter");
+        }
+    }
+
+    /**
+     * Test that ClickHouse adapter has all required indexes
+     */
+    public function testClickHouseAdapterIndexes(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $indexes = $adapter->getIndexes();
+        $indexIds = array_map(fn ($idx) => $idx['$id'], $indexes);
+
+        // Verify all ClickHouse-specific indexes exist
+        $expectedClickHouseIndexes = [
+            '_key_user_internal_and_event',
+            '_key_project_internal_id',
+            '_key_team_internal_id',
+            '_key_user_internal_id',
+            '_key_user_type',
+            '_key_country',
+            '_key_hostname'
+        ];
+
+        foreach ($expectedClickHouseIndexes as $expected) {
+            $this->assertContains($expected, $indexIds, "ClickHouse index '{$expected}' not found in ClickHouse adapter");
+        }
+
+        // Verify parent indexes are also included (with parent naming convention)
+        $parentExpectedIndexes = ['idx_event', 'idx_userId_event', 'idx_resource_event', 'idx_time_desc'];
+        foreach ($parentExpectedIndexes as $expected) {
+            $this->assertContains($expected, $indexIds, "Parent index '{$expected}' not found in ClickHouse adapter");
+        }
+    }
+
+    /**
+     * Test find method with simple query
+     */
+    public function testFindWithSimpleQuery(): void
+    {
+        // Create test data
+        $this->audit->log(
+            userId: 'testuser1',
+            event: 'create',
+            resource: 'document/123',
+            userAgent: 'Test Agent',
+            ip: '192.168.1.1',
+            location: 'US',
+            data: ['action' => 'test']
+        );
+
+        $this->audit->log(
+            userId: 'testuser2',
+            event: 'update',
+            resource: 'document/456',
+            userAgent: 'Test Agent',
+            ip: '192.168.1.2',
+            location: 'UK',
+            data: ['action' => 'test']
+        );
+
+        /** @var ClickHouse $adapter */
+        $adapter = $this->audit->getAdapter();
+
+        // Test equal query
+        $logs = $adapter->find([
+            Query::equal('userId', 'testuser1')
+        ]);
+
+        $this->assertIsArray($logs);
+        $this->assertGreaterThan(0, count($logs));
+
+        foreach ($logs as $log) {
+            $this->assertEquals('testuser1', $log->getAttribute('userId'));
+        }
+    }
+
+    /**
+     * Test find method with multiple filters
+     */
+    public function testFindWithMultipleFilters(): void
+    {
+        // Create test data
+        $this->audit->log(
+            userId: 'user123',
+            event: 'create',
+            resource: 'collection/test',
+            userAgent: 'Test Agent',
+            ip: '10.0.0.1',
+            location: 'US',
+            data: []
+        );
+
+        $this->audit->log(
+            userId: 'user123',
+            event: 'delete',
+            resource: 'collection/test2',
+            userAgent: 'Test Agent',
+            ip: '10.0.0.1',
+            location: 'US',
+            data: []
+        );
+
+        /** @var ClickHouse $adapter */
+        $adapter = $this->audit->getAdapter();
+
+        // Test with multiple filters
+        $logs = $adapter->find([
+            Query::equal('userId', 'user123'),
+            Query::equal('event', 'create')
+        ]);
+
+        $this->assertIsArray($logs);
+        $this->assertGreaterThan(0, count($logs));
+
+        foreach ($logs as $log) {
+            $this->assertEquals('user123', $log->getAttribute('userId'));
+            $this->assertEquals('create', $log->getAttribute('event'));
+        }
+    }
+
+    /**
+     * Test find method with IN query
+     */
+    public function testFindWithInQuery(): void
+    {
+        // Create test data
+        $events = ['login', 'logout', 'create'];
+        foreach ($events as $event) {
+            $this->audit->log(
+                userId: 'userMulti',
+                event: $event,
+                resource: 'test',
+                userAgent: 'Test Agent',
+                ip: '127.0.0.1',
+                location: 'US',
+                data: []
+            );
+        }
+
+        /** @var ClickHouse $adapter */
+        $adapter = $this->audit->getAdapter();
+
+        // Test IN query
+        $logs = $adapter->find([
+            Query::equal('userId', 'userMulti'),
+            Query::in('event', ['login', 'logout'])
+        ]);
+
+        $this->assertIsArray($logs);
+        $this->assertCount(2, $logs);
+
+        foreach ($logs as $log) {
+            $this->assertContains($log->getAttribute('event'), ['login', 'logout']);
+        }
+    }
+
+    /**
+     * Test find method with ordering
+     */
+    public function testFindWithOrdering(): void
+    {
+        // Create test data with different events
+        $this->audit->log(
+            userId: 'orderUser',
+            event: 'zzz_event',
+            resource: 'test',
+            userAgent: 'Test Agent',
+            ip: '127.0.0.1',
+            location: 'US',
+            data: []
+        );
+
+        sleep(1); // Ensure different timestamps
+
+        $this->audit->log(
+            userId: 'orderUser',
+            event: 'aaa_event',
+            resource: 'test',
+            userAgent: 'Test Agent',
+            ip: '127.0.0.1',
+            location: 'US',
+            data: []
+        );
+
+        /** @var ClickHouse $adapter */
+        $adapter = $this->audit->getAdapter();
+
+        // Test ascending order
+        $logs = $adapter->find([
+            Query::equal('userId', 'orderUser'),
+            Query::orderAsc('event')
+        ]);
+
+        $this->assertIsArray($logs);
+        $this->assertGreaterThanOrEqual(2, count($logs));
+        $this->assertEquals('aaa_event', $logs[0]->getAttribute('event'));
+
+        // Test descending order
+        $logs = $adapter->find([
+            Query::equal('userId', 'orderUser'),
+            Query::orderDesc('event')
+        ]);
+
+        $this->assertIsArray($logs);
+        $this->assertGreaterThanOrEqual(2, count($logs));
+        $this->assertEquals('zzz_event', $logs[0]->getAttribute('event'));
+    }
+
+    /**
+     * Test find method with limit and offset
+     */
+    public function testFindWithLimitAndOffset(): void
+    {
+        // Create multiple test logs
+        for ($i = 1; $i <= 5; $i++) {
+            $this->audit->log(
+                userId: 'paginationUser',
+                event: "event_{$i}",
+                resource: "resource_{$i}",
+                userAgent: 'Test Agent',
+                ip: '127.0.0.1',
+                location: 'US',
+                data: ['index' => $i]
+            );
+        }
+
+        /** @var ClickHouse $adapter */
+        $adapter = $this->audit->getAdapter();
+
+        // Test limit
+        $logs = $adapter->find([
+            Query::equal('userId', 'paginationUser'),
+            Query::limit(2)
+        ]);
+
+        $this->assertIsArray($logs);
+        $this->assertCount(2, $logs);
+
+        // Test offset
+        $logs = $adapter->find([
+            Query::equal('userId', 'paginationUser'),
+            Query::orderAsc('event'),
+            Query::limit(2),
+            Query::offset(2)
+        ]);
+
+        $this->assertIsArray($logs);
+        $this->assertLessThanOrEqual(2, count($logs));
+    }
+
+    /**
+     * Test find method with between query
+     */
+    public function testFindWithBetweenQuery(): void
+    {
+        $time1 = '2023-01-01 00:00:00+00:00';
+        $time2 = '2023-06-01 00:00:00+00:00';
+        $time3 = '2023-12-31 23:59:59+00:00';
+
+        // Create test data with different times using logBatch
+        $this->audit->logBatch([
+            [
+                'userId' => 'betweenUser',
+                'event' => 'event1',
+                'resource' => 'test',
+                'userAgent' => 'Test Agent',
+                'ip' => '127.0.0.1',
+                'location' => 'US',
+                'data' => [],
+                'time' => $time1
+            ],
+            [
+                'userId' => 'betweenUser',
+                'event' => 'event2',
+                'resource' => 'test',
+                'userAgent' => 'Test Agent',
+                'ip' => '127.0.0.1',
+                'location' => 'US',
+                'data' => [],
+                'time' => $time2
+            ],
+            [
+                'userId' => 'betweenUser',
+                'event' => 'event3',
+                'resource' => 'test',
+                'userAgent' => 'Test Agent',
+                'ip' => '127.0.0.1',
+                'location' => 'US',
+                'data' => [],
+                'time' => $time3
+            ]
+        ]);
+
+        /** @var ClickHouse $adapter */
+        $adapter = $this->audit->getAdapter();
+
+        // Test between query
+        $logs = $adapter->find([
+            Query::equal('userId', 'betweenUser'),
+            Query::between('time', '2023-05-01 00:00:00+00:00', '2023-12-31 00:00:00+00:00')
+        ]);
+
+        $this->assertIsArray($logs);
         $this->assertGreaterThan(0, count($logs));
     }
 }
