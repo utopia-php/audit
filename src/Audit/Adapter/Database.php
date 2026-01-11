@@ -103,6 +103,30 @@ class Database extends SQL
     }
 
     /**
+     * Get a single log by its ID.
+     *
+     * @param string $id
+     * @return Log|null The log entry or null if not found
+     * @throws AuthorizationException|\Exception
+     */
+    public function getById(string $id): ?Log
+    {
+        try {
+            $document = $this->db->getAuthorization()->skip(function () use ($id) {
+                return $this->db->getDocument($this->getCollectionName(), $id);
+            });
+
+            if ($document->isEmpty()) {
+                return null;
+            }
+
+            return new Log($document->getArrayCopy());
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
      * Build time-related query conditions.
      *
      * @param \DateTime|null $after

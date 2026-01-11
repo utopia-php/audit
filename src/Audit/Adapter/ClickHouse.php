@@ -702,6 +702,33 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Get a single log by its ID.
+     *
+     * @param string $id
+     * @return Log|null The log entry or null if not found
+     * @throws Exception
+     */
+    public function getById(string $id): ?Log
+    {
+        $tableName = $this->getTableName();
+        $tenantFilter = $this->getTenantFilter();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+
+        $sql = "
+            SELECT " . $this->getSelectColumns() . "
+            FROM {$escapedTable}
+            WHERE id = {id:String}{$tenantFilter}
+            LIMIT 1
+            FORMAT TabSeparated
+        ";
+
+        $result = $this->query($sql, ['id' => $id]);
+        $logs = $this->parseResults($result);
+
+        return $logs[0] ?? null;
+    }
+
+    /**
      * Create multiple audit log entries in batch.
      *
      * @throws Exception

@@ -155,6 +155,36 @@ trait AuditBase
         $this->assertEquals('127.0.0.1', $logs5[0]['ip']);
     }
 
+    public function testGetLogById(): void
+    {
+        // Create a test log
+        $userId = 'testGetByIdUser';
+        $userAgent = 'Mozilla/5.0 Test';
+        $ip = '192.168.1.100';
+        $location = 'US';
+        $data = ['test' => 'getById'];
+
+        $log = $this->audit->log($userId, 'create', 'test/resource/123', $userAgent, $ip, $location, $data);
+        $logId = $log->getId();
+
+        // Retrieve the log by ID
+        $retrievedLog = $this->audit->getLogById($logId);
+
+        $this->assertNotNull($retrievedLog);
+        $this->assertEquals($logId, $retrievedLog->getId());
+        $this->assertEquals($userId, $retrievedLog->getAttribute('userId'));
+        $this->assertEquals('create', $retrievedLog->getAttribute('event'));
+        $this->assertEquals('test/resource/123', $retrievedLog->getAttribute('resource'));
+        $this->assertEquals($userAgent, $retrievedLog->getAttribute('userAgent'));
+        $this->assertEquals($ip, $retrievedLog->getAttribute('ip'));
+        $this->assertEquals($location, $retrievedLog->getAttribute('location'));
+        $this->assertEquals($data, $retrievedLog->getAttribute('data'));
+
+        // Test with non-existent ID
+        $nonExistentLog = $this->audit->getLogById('non-existent-id-12345');
+        $this->assertNull($nonExistentLog);
+    }
+
     public function testLogByBatch(): void
     {
         // First cleanup existing logs

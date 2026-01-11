@@ -25,6 +25,16 @@ abstract class Adapter
     abstract public function setup(): void;
 
     /**
+     * Get a single log by its ID.
+     *
+     * @param string $id
+     * @return Log|null The log entry or null if not found
+     *
+     * @throws \Exception
+     */
+    abstract public function getById(string $id): ?Log;
+
+    /**
      * Create an audit log entry.
      *
      * @param array{
