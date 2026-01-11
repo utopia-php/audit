@@ -316,4 +316,64 @@ class ClickHouseTest extends TestCase
         $logs = $this->audit->getLogsByUser('user`with`backticks');
         $this->assertGreaterThan(0, count($logs));
     }
+
+    /**
+     * Test that ClickHouse adapter has all required attributes
+     */
+    public function testClickHouseAdapterAttributes(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $attributes = $adapter->getAttributes();
+        $attributeIds = array_map(fn ($attr) => $attr['$id'], $attributes);
+
+        // Verify all expected attributes exist
+        $expectedAttributes = [
+            'userType', 'userId', 'userInternalId', 'resourceParent',
+            'resourceType', 'resourceId', 'resourceInternalId', 'event',
+            'resource', 'userAgent', 'ip', 'country', 'time', 'data',
+            'projectId', 'projectInternalId', 'teamId', 'teamInternalId', 'hostname'
+        ];
+
+        foreach ($expectedAttributes as $expected) {
+            $this->assertContains($expected, $attributeIds, "Attribute '{$expected}' not found in ClickHouse adapter");
+        }
+    }
+
+    /**
+     * Test that ClickHouse adapter has all required indexes
+     */
+    public function testClickHouseAdapterIndexes(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $indexes = $adapter->getIndexes();
+        $indexIds = array_map(fn ($idx) => $idx['$id'], $indexes);
+
+        // Verify all expected indexes exist
+        $expectedIndexes = [
+            '_key_event',
+            '_key_user_internal_and_event',
+            '_key_resource_and_event',
+            '_key_time',
+            '_key_project_internal_id',
+            '_key_team_internal_id',
+            '_key_user_internal_id',
+            '_key_user_type',
+            '_key_country',
+            '_key_hostname'
+        ];
+
+        foreach ($expectedIndexes as $expected) {
+            $this->assertContains($expected, $indexIds, "Index '{$expected}' not found in ClickHouse adapter");
+        }
+    }
 }
