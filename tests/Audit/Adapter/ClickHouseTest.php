@@ -333,10 +333,25 @@ class ClickHouseTest extends TestCase
 
         // Verify all expected attributes exist
         $expectedAttributes = [
-            'userType', 'userId', 'userInternalId', 'resourceParent',
-            'resourceType', 'resourceId', 'resourceInternalId', 'event',
-            'resource', 'userAgent', 'ip', 'country', 'time', 'data',
-            'projectId', 'projectInternalId', 'teamId', 'teamInternalId', 'hostname'
+            'userType',
+            'userId',
+            'userInternalId',
+            'resourceParent',
+            'resourceType',
+            'resourceId',
+            'resourceInternalId',
+            'event',
+            'resource',
+            'userAgent',
+            'ip',
+            'country',
+            'time',
+            'data',
+            'projectId',
+            'projectInternalId',
+            'teamId',
+            'teamInternalId',
+            'hostname'
         ];
 
         foreach ($expectedAttributes as $expected) {
