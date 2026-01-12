@@ -667,4 +667,268 @@ class ClickHouseTest extends TestCase
         $this->assertIsArray($logs);
         $this->assertGreaterThan(0, count($logs));
     }
+
+    /**
+     * Test count method with no filters
+     */
+    public function testCountWithNoFilters(): void
+    {
+        // Create test data
+        for ($i = 0; $i < 5; $i++) {
+            $this->audit->log(
+                userId: 'countUser',
+                event: "event{$i}",
+                resource: 'test/count',
+                userAgent: 'Test Agent',
+                ip: '127.0.0.1',
+                location: 'US',
+                data: []
+            );
+        }
+
+        /** @var ClickHouse $adapter */
+        $adapter = $this->audit->getAdapter();
+
+        // Count all logs for this user
+        $count = $adapter->count([
+            Query::equal('userId', 'countUser')
+        ]);
+
+        $this->assertIsInt($count);
+        $this->assertEquals(5, $count);
+    }
+
+    /**
+     * Test count method with simple query
+     */
+    public function testCountWithSimpleQuery(): void
+    {
+        // Create test data
+        $this->audit->log(
+            userId: 'countUser1',
+            event: 'create',
+            resource: 'document/123',
+            userAgent: 'Test Agent',
+            ip: '192.168.1.1',
+            location: 'US',
+            data: ['action' => 'test']
+        );
+
+        $this->audit->log(
+            userId: 'countUser1',
+            event: 'update',
+            resource: 'document/456',
+            userAgent: 'Test Agent',
+            ip: '192.168.1.2',
+            location: 'UK',
+            data: ['action' => 'test']
+        );
+
+        $this->audit->log(
+            userId: 'countUser2',
+            event: 'create',
+            resource: 'document/789',
+            userAgent: 'Test Agent',
+            ip: '192.168.1.3',
+            location: 'FR',
+            data: ['action' => 'test']
+        );
+
+        /** @var ClickHouse $adapter */
+        $adapter = $this->audit->getAdapter();
+
+        // Count logs for specific user
+        $count = $adapter->count([
+            Query::equal('userId', 'countUser1')
+        ]);
+
+        $this->assertIsInt($count);
+        $this->assertEquals(2, $count);
+    }
+
+    /**
+     * Test count method with multiple filters
+     */
+    public function testCountWithMultipleFilters(): void
+    {
+        // Create test data
+        $this->audit->log(
+            userId: 'multiFilterUser',
+            event: 'create',
+            resource: 'collection/test',
+            userAgent: 'Test Agent',
+            ip: '10.0.0.1',
+            location: 'US',
+            data: []
+        );
+
+        $this->audit->log(
+            userId: 'multiFilterUser',
+            event: 'create',
+            resource: 'collection/test2',
+            userAgent: 'Test Agent',
+            ip: '10.0.0.1',
+            location: 'US',
+            data: []
+        );
+
+        $this->audit->log(
+            userId: 'multiFilterUser',
+            event: 'delete',
+            resource: 'collection/test3',
+            userAgent: 'Test Agent',
+            ip: '10.0.0.1',
+            location: 'US',
+            data: []
+        );
+
+        /** @var ClickHouse $adapter */
+        $adapter = $this->audit->getAdapter();
+
+        // Count with multiple filters
+        $count = $adapter->count([
+            Query::equal('userId', 'multiFilterUser'),
+            Query::equal('event', 'create')
+        ]);
+
+        $this->assertIsInt($count);
+        $this->assertEquals(2, $count);
+    }
+
+    /**
+     * Test count method with IN query
+     */
+    public function testCountWithInQuery(): void
+    {
+        // Create test data
+        $events = ['login', 'logout', 'create', 'update', 'delete'];
+        foreach ($events as $event) {
+            $this->audit->log(
+                userId: 'inQueryCountUser',
+                event: $event,
+                resource: 'test',
+                userAgent: 'Test Agent',
+                ip: '127.0.0.1',
+                location: 'US',
+                data: []
+            );
+        }
+
+        /** @var ClickHouse $adapter */
+        $adapter = $this->audit->getAdapter();
+
+        // Count with IN query
+        $count = $adapter->count([
+            Query::equal('userId', 'inQueryCountUser'),
+            Query::in('event', ['login', 'logout', 'create'])
+        ]);
+
+        $this->assertIsInt($count);
+        $this->assertEquals(3, $count);
+    }
+
+    /**
+     * Test count method ignores limit and offset
+     */
+    public function testCountIgnoresLimitAndOffset(): void
+    {
+        // Create test data
+        for ($i = 0; $i < 10; $i++) {
+            $this->audit->log(
+                userId: 'limitOffsetCountUser',
+                event: "event{$i}",
+                resource: 'test',
+                userAgent: 'Test Agent',
+                ip: '127.0.0.1',
+                location: 'US',
+                data: []
+            );
+        }
+
+        /** @var ClickHouse $adapter */
+        $adapter = $this->audit->getAdapter();
+
+        // Count should ignore limit and offset and return total count
+        $count = $adapter->count([
+            Query::equal('userId', 'limitOffsetCountUser'),
+            Query::limit(3),
+            Query::offset(2)
+        ]);
+
+        $this->assertIsInt($count);
+        $this->assertEquals(10, $count); // Should count all 10, not affected by limit/offset
+    }
+
+    /**
+     * Test count method with between query
+     */
+    public function testCountWithBetweenQuery(): void
+    {
+        $time1 = '2023-01-01 00:00:00+00:00';
+        $time2 = '2023-06-01 00:00:00+00:00';
+        $time3 = '2023-12-31 23:59:59+00:00';
+
+        // Create test data with different times using logBatch
+        $this->audit->logBatch([
+            [
+                'userId' => 'betweenCountUser',
+                'event' => 'event1',
+                'resource' => 'test',
+                'userAgent' => 'Test Agent',
+                'ip' => '127.0.0.1',
+                'location' => 'US',
+                'data' => [],
+                'time' => $time1
+            ],
+            [
+                'userId' => 'betweenCountUser',
+                'event' => 'event2',
+                'resource' => 'test',
+                'userAgent' => 'Test Agent',
+                'ip' => '127.0.0.1',
+                'location' => 'US',
+                'data' => [],
+                'time' => $time2
+            ],
+            [
+                'userId' => 'betweenCountUser',
+                'event' => 'event3',
+                'resource' => 'test',
+                'userAgent' => 'Test Agent',
+                'ip' => '127.0.0.1',
+                'location' => 'US',
+                'data' => [],
+                'time' => $time3
+            ]
+        ]);
+
+        /** @var ClickHouse $adapter */
+        $adapter = $this->audit->getAdapter();
+
+        // Count with between query
+        $count = $adapter->count([
+            Query::equal('userId', 'betweenCountUser'),
+            Query::between('time', '2023-05-01 00:00:00+00:00', '2023-12-31 00:00:00+00:00')
+        ]);
+
+        $this->assertIsInt($count);
+        $this->assertGreaterThan(0, $count);
+    }
+
+    /**
+     * Test count method returns zero for no matches
+     */
+    public function testCountReturnsZeroForNoMatches(): void
+    {
+        /** @var ClickHouse $adapter */
+        $adapter = $this->audit->getAdapter();
+
+        // Count with filter that matches nothing
+        $count = $adapter->count([
+            Query::equal('userId', 'nonExistentUserForCountTest12345')
+        ]);
+
+        $this->assertIsInt($count);
+        $this->assertEquals(0, $count);
+    }
 }
