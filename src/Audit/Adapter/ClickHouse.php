@@ -779,6 +779,48 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Count logs using Query objects.
+     *
+     * @param array<Query> $queries
+     * @return int
+     * @throws Exception
+     */
+    public function count(array $queries = []): int
+    {
+        $tableName = $this->getTableName();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+
+        // Parse queries - we only need filters and params, not ordering/limit/offset
+        $parsed = $this->parseQueries($queries);
+
+        // Build WHERE clause
+        $whereClause = '';
+        $tenantFilter = $this->getTenantFilter();
+        if (!empty($parsed['filters']) || $tenantFilter) {
+            $conditions = $parsed['filters'] ?? [];
+            if ($tenantFilter) {
+                $conditions[] = ltrim($tenantFilter, ' AND');
+            }
+            $whereClause = ' WHERE ' . implode(' AND ', $conditions);
+        }
+
+        // Remove limit and offset from params as they don't apply to count
+        $params = $parsed['params'];
+        unset($params['limit'], $params['offset']);
+
+        $sql = "
+            SELECT COUNT(*) as count
+            FROM {$escapedTable}{$whereClause}
+            FORMAT TabSeparated
+        ";
+
+        $result = $this->query($sql, $params);
+        $trimmed = trim($result);
+
+        return $trimmed !== '' ? (int) $trimmed : 0;
+    }
+
+    /**
      * Parse Query objects into SQL components.
      *
      * @param array<Query> $queries
