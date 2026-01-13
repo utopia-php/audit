@@ -384,10 +384,15 @@ class Database extends SQL
     {
         $datetimeString = DateTime::format($datetime);
         $this->db->getAuthorization()->skip(function () use ($datetimeString) {
+            $queries = [
+                Query::select(['$sequence', '$id', '$collection', '$permissions', '$updatedAt', 'time']),
+                Query::lessThan('time', $datetimeString),
+                Query::orderDesc('time'),
+                Query::orderAsc(),
+            ];
+
             do {
-                $removed = $this->db->deleteDocuments($this->getCollectionName(), [
-                    Query::lessThan('time', $datetimeString),
-                ]);
+                $removed = $this->db->deleteDocuments($this->getCollectionName(), $queries);
             } while ($removed > 0);
         });
 
