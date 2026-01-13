@@ -451,4 +451,75 @@ class Database extends SQL
 
         return "{$id}: {$type}";
     }
+
+    /**
+     * Find logs using custom queries.
+     *
+     * Translates Audit Query objects to Database Query objects.
+     *
+     * @param array<\Utopia\Audit\Query> $queries
+     * @return array<\Utopia\Audit\Log>
+     * @throws AuthorizationException|\Exception
+     */
+    public function find(array $queries = []): array
+    {
+        $dbQueries = [];
+
+        foreach ($queries as $query) {
+            if (!($query instanceof \Utopia\Audit\Query)) {
+                throw new \Exception('Invalid query type. Expected Utopia\\Audit\\Query');
+            }
+
+            // Convert Audit Query to array and parse as Database Query
+            // Both use the same structure: method, attribute, values
+            $dbQueries[] = Query::parseQuery($query->toArray());
+        }
+
+        $documents = $this->db->getAuthorization()->skip(function () use ($dbQueries) {
+            return $this->db->find(
+                collection: $this->getCollectionName(),
+                queries: $dbQueries,
+            );
+        });
+
+        return array_map(fn ($doc) => new Log($doc->getArrayCopy()), $documents);
+    }
+
+    /**
+     * Count logs using custom queries.
+     *
+     * Translates Audit Query objects to Database Query objects.
+     * Ignores limit and offset queries as they don't apply to count.
+     *
+     * @param array<\Utopia\Audit\Query> $queries
+     * @return int
+     * @throws AuthorizationException|\Exception
+     */
+    public function count(array $queries = []): int
+    {
+        $dbQueries = [];
+
+        foreach ($queries as $query) {
+            if (!($query instanceof \Utopia\Audit\Query)) {
+                throw new \Exception('Invalid query type. Expected Utopia\\Audit\\Query');
+            }
+
+            // Skip limit and offset for count queries
+            $method = $query->getMethod();
+            if ($method === \Utopia\Audit\Query::TYPE_LIMIT || $method === \Utopia\Audit\Query::TYPE_OFFSET) {
+                continue;
+            }
+
+            // Convert Audit Query to array and parse as Database Query
+            // Both use the same structure: method, attribute, values
+            $dbQueries[] = Query::parseQuery($query->toArray());
+        }
+
+        return $this->db->getAuthorization()->skip(function () use ($dbQueries) {
+            return $this->db->count(
+                collection: $this->getCollectionName(),
+                queries: $dbQueries,
+            );
+        });
+    }
 }

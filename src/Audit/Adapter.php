@@ -212,4 +212,24 @@ abstract class Adapter
      * @throws \Exception
      */
     abstract public function cleanup(\DateTime $datetime): bool;
+
+    /**
+     * Find logs using custom queries.
+     *
+     * @param array<\Utopia\Audit\Query> $queries
+     * @return array<Log>
+     *
+     * @throws \Exception
+     */
+    abstract public function find(array $queries = []): array;
+
+    /**
+     * Count logs using custom queries.
+     *
+     * @param array<\Utopia\Audit\Query> $queries
+     * @return int
+     *
+     * @throws \Exception
+     */
+    abstract public function count(array $queries = []): int;
 }

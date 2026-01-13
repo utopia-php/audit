@@ -256,4 +256,30 @@ class Audit
     {
         return $this->adapter->cleanup($datetime);
     }
+
+    /**
+     * Find logs using custom queries.
+     *
+     * @param array<Query> $queries Array of Audit Query objects
+     * @return array<Log>
+     *
+     * @throws \Exception
+     */
+    public function find(array $queries = []): array
+    {
+        return $this->adapter->find($queries);
+    }
+
+    /**
+     * Count logs using custom queries.
+     *
+     * @param array<Query> $queries Array of Audit Query objects
+     * @return int
+     *
+     * @throws \Exception
+     */
+    public function count(array $queries = []): int
+    {
+        return $this->adapter->count($queries);
+    }
 }

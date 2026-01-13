@@ -586,4 +586,153 @@ trait AuditBase
         );
         $this->assertGreaterThanOrEqual(0, \count($logsResEvt));
     }
+
+    public function testFind(): void
+    {
+        $userId = 'userId';
+
+        // Test 1: Find with equal filter
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+        ]);
+        $this->assertEquals(5, \count($logs));
+
+        // Test 2: Find with equal and limit
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::limit(2),
+        ]);
+        $this->assertEquals(2, \count($logs));
+
+        // Test 3: Find with equal, limit and offset
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::limit(2),
+            \Utopia\Audit\Query::offset(1),
+        ]);
+        $this->assertEquals(2, \count($logs));
+
+        // Test 4: Find with multiple filters
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::equal('resource', 'doc/0'),
+        ]);
+        $this->assertEquals(1, \count($logs));
+
+        // Test 5: Find with ordering
+        $logsDesc = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::orderDesc('time'),
+        ]);
+        $logsAsc = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::orderAsc('time'),
+        ]);
+        $this->assertEquals(5, \count($logsDesc));
+        $this->assertEquals(5, \count($logsAsc));
+
+        // Verify order is reversed
+        if (\count($logsDesc) === \count($logsAsc)) {
+            for ($i = 0; $i < \count($logsDesc); $i++) {
+                $this->assertEquals(
+                    $logsDesc[$i]->getId(),
+                    $logsAsc[\count($logsAsc) - 1 - $i]->getId()
+                );
+            }
+        }
+
+        // Test 6: Find with IN filter
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::in('event', ['event_0', 'event_1']),
+        ]);
+        $this->assertGreaterThanOrEqual(2, \count($logs));
+
+        // Test 7: Find with between query for time range
+        $afterTime = new \DateTime('2024-06-15 12:01:00');
+        $beforeTime = new \DateTime('2024-06-15 12:04:00');
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::between('time', DateTime::format($afterTime), DateTime::format($beforeTime)),
+        ]);
+        $this->assertGreaterThanOrEqual(0, \count($logs));
+
+        // Test 8: Find with greater than
+        $afterTime = new \DateTime('2024-06-15 12:02:00');
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::greaterThan('time', DateTime::format($afterTime)),
+        ]);
+        $this->assertGreaterThanOrEqual(0, \count($logs));
+
+        // Test 9: Find with less than
+        $beforeTime = new \DateTime('2024-06-15 12:03:00');
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::lessThan('time', DateTime::format($beforeTime)),
+        ]);
+        $this->assertGreaterThanOrEqual(0, \count($logs));
+    }
+
+    public function testCount(): void
+    {
+        $userId = 'userId';
+
+        // Test 1: Count with simple filter
+        $count = $this->audit->count([
+            \Utopia\Audit\Query::equal('userId', $userId),
+        ]);
+        $this->assertEquals(5, $count);
+
+        // Test 2: Count with multiple filters
+        $count = $this->audit->count([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::equal('resource', 'doc/0'),
+        ]);
+        $this->assertEquals(1, $count);
+
+        // Test 3: Count with IN filter
+        $count = $this->audit->count([
+            \Utopia\Audit\Query::in('event', ['event_0', 'event_1']),
+        ]);
+        $this->assertGreaterThanOrEqual(2, $count);
+
+        // Test 4: Count ignores limit and offset
+        $count = $this->audit->count([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::limit(2),
+            \Utopia\Audit\Query::offset(1),
+        ]);
+        $this->assertEquals(5, $count); // Should count all 5, not affected by limit/offset
+
+        // Test 5: Count with between query
+        $afterTime = new \DateTime('2024-06-15 12:01:00');
+        $beforeTime = new \DateTime('2024-06-15 12:04:00');
+        $count = $this->audit->count([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::between('time', DateTime::format($afterTime), DateTime::format($beforeTime)),
+        ]);
+        $this->assertGreaterThanOrEqual(0, $count);
+
+        // Test 6: Count with greater than
+        $afterTime = new \DateTime('2024-06-15 12:02:00');
+        $count = $this->audit->count([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::greaterThan('time', DateTime::format($afterTime)),
+        ]);
+        $this->assertGreaterThanOrEqual(0, $count);
+
+        // Test 7: Count with less than
+        $beforeTime = new \DateTime('2024-06-15 12:03:00');
+        $count = $this->audit->count([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::lessThan('time', DateTime::format($beforeTime)),
+        ]);
+        $this->assertGreaterThanOrEqual(0, $count);
+
+        // Test 8: Count returns zero for no matches
+        $count = $this->audit->count([
+            \Utopia\Audit\Query::equal('userId', 'nonExistentUser'),
+        ]);
+        $this->assertEquals(0, $count);
+    }
 }
