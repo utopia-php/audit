@@ -386,7 +386,7 @@ class Database extends SQL
         $this->db->getAuthorization()->skip(function () use ($datetimeString) {
             /**
              * $selects = ['$sequence', '$id', '$collection', '$permissions', '$updatedAt', 'time'];
-             * todo: use this select queries when using new version
+             * todo: Use select queries when using new version
              */
             $queries = [
                 Query::lessThan('time', $datetimeString),
