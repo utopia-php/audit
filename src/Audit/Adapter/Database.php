@@ -385,7 +385,7 @@ class Database extends SQL
         $datetimeString = DateTime::format($datetime);
         $this->db->getAuthorization()->skip(function () use ($datetimeString) {
             $queries = [
-                Query::select(['$sequence', '$id', '$collection', '$permissions', '$updatedAt', 'time']),
+                //Query::select(['$sequence', '$id', '$collection', '$permissions', '$updatedAt', 'time']), // Uncomment when using new select queries
                 Query::lessThan('time', $datetimeString),
                 Query::orderDesc('time'),
                 Query::orderAsc(),
