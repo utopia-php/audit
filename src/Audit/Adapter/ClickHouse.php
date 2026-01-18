@@ -745,13 +745,13 @@ class ClickHouse extends SQL
         $parsed = $this->parseQueries($queries);
 
         // Build SELECT clause
-        $selectColumns = $parsed['select'] ?? $this->getSelectColumns();
+        $selectColumns = $this->getSelectColumns();
 
         // Build WHERE clause
         $whereClause = '';
         $tenantFilter = $this->getTenantFilter();
         if (!empty($parsed['filters']) || $tenantFilter) {
-            $conditions = $parsed['filters'] ?? [];
+            $conditions = $parsed['filters'];
             if ($tenantFilter) {
                 $conditions[] = ltrim($tenantFilter, ' AND');
             }
@@ -797,7 +797,7 @@ class ClickHouse extends SQL
         $whereClause = '';
         $tenantFilter = $this->getTenantFilter();
         if (!empty($parsed['filters']) || $tenantFilter) {
-            $conditions = $parsed['filters'] ?? [];
+            $conditions = $parsed['filters'];
             if ($tenantFilter) {
                 $conditions[] = ltrim($tenantFilter, ' AND');
             }
@@ -891,12 +891,18 @@ class ClickHouse extends SQL
                     break;
 
                 case Query::TYPE_LIMIT:
-                    $limit = (int) $values[0];
+                    if (!\is_int($values[0])) {
+                        throw new \Exception('Invalid limit value. Expected int');
+                    }
+                    $limit = $values[0];
                     $params['limit'] = $limit;
                     break;
 
                 case Query::TYPE_OFFSET:
-                    $offset = (int) $values[0];
+                    if (!\is_int($values[0])) {
+                        throw new \Exception('Invalid offset value. Expected int');
+                    }
+                    $offset = $values[0];
                     $params['offset'] = $offset;
                     break;
             }
