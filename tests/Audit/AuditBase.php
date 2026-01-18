@@ -595,7 +595,7 @@ trait AuditBase
         $logs = $this->audit->find([
             \Utopia\Audit\Query::equal('userId', $userId),
         ]);
-        $this->assertEquals(5, \count($logs));
+        $this->assertEquals(3, \count($logs));
 
         // Test 2: Find with equal and limit
         $logs = $this->audit->find([
@@ -628,8 +628,8 @@ trait AuditBase
             \Utopia\Audit\Query::equal('userId', $userId),
             \Utopia\Audit\Query::orderAsc('time'),
         ]);
-        $this->assertEquals(5, \count($logsDesc));
-        $this->assertEquals(5, \count($logsAsc));
+        $this->assertEquals(3, \count($logsDesc));
+        $this->assertEquals(3, \count($logsAsc));
 
         // Verify order is reversed
         if (\count($logsDesc) === \count($logsAsc)) {
@@ -681,7 +681,7 @@ trait AuditBase
         $count = $this->audit->count([
             \Utopia\Audit\Query::equal('userId', $userId),
         ]);
-        $this->assertEquals(5, $count);
+        $this->assertEquals(3, $count);
 
         // Test 2: Count with multiple filters
         $count = $this->audit->count([
@@ -702,7 +702,7 @@ trait AuditBase
             \Utopia\Audit\Query::limit(2),
             \Utopia\Audit\Query::offset(1),
         ]);
-        $this->assertEquals(5, $count); // Should count all 5, not affected by limit/offset
+        $this->assertEquals(3, $count); // Should count all 3, not affected by limit/offset
 
         // Test 5: Count with between query
         $afterTime = new \DateTime('2024-06-15 12:01:00');

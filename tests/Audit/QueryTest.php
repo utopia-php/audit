@@ -106,7 +106,7 @@ class QueryTest extends TestCase
     {
         $queries = [
             '{"method":"equal","attribute":"userId","values":["123"]}',
-            '{"method":"greaterThan","attribute":"time","values":["2023-01-01"]}',
+            '{"method":"greater","attribute":"time","values":["2023-01-01"]}',
             '{"method":"limit","values":[10]}'
         ];
 
