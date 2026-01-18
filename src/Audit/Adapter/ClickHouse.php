@@ -789,6 +789,15 @@ class ClickHouse extends SQL
                 continue;
             }
 
+            // Get attribute metadata to check if required
+            $attributeMeta = $this->getAttributeMetadata($column);
+            $isRequired = $attributeMeta !== null && isset($attributeMeta['required']) && $attributeMeta['required'];
+
+            // Check if value is missing for required attributes
+            if ($isRequired && (!isset($log[$column]) || $log[$column] === '')) {
+                throw new \InvalidArgumentException("Required attribute '{$column}' is missing or empty in log entry");
+            }
+
             if (isset($log[$column])) {
                 $columns[] = $column;
 
