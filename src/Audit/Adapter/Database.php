@@ -478,8 +478,8 @@ class Database extends SQL
                 throw new \Exception('Invalid query type. Expected Utopia\\Audit\\Query');
             }
 
-            // Convert Audit Query to array and parse as Database Query
-            // Both use the same structure: method, attribute, values
+            // Convert Audit Query to Database Query
+            // Both use the same structure and method names
             $dbQueries[] = Query::parseQuery($query->toArray());
         }
 
@@ -518,9 +518,10 @@ class Database extends SQL
                 continue;
             }
 
-            // Convert Audit Query to array and parse as Database Query
-            // Both use the same structure: method, attribute, values
-            $dbQueries[] = Query::parseQuery($query->toArray());
+            // Convert Audit Query to Database Query
+            // Both use the same structure and method names
+            $queryArray = $query->toArray();
+            $dbQueries[] = Query::parseQuery($queryArray);
         }
 
         return $this->db->getAuthorization()->skip(function () use ($dbQueries) {

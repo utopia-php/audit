@@ -589,7 +589,34 @@ trait AuditBase
 
     public function testFind(): void
     {
+        // Setup: Create specific test data for find queries
+        $this->audit->cleanup(new \DateTime());
+
         $userId = 'userId';
+        $userAgent = 'Mozilla/5.0';
+        $ip = '192.168.1.1';
+        $location = 'US';
+
+        // Create test logs with specific attributes
+        $baseTime = new \DateTime('2024-06-15 12:00:00');
+        $batchEvents = [];
+        for ($i = 0; $i < 3; $i++) {
+            $offset = $i * 60;
+            $logTime = new \DateTime('2024-06-15 12:00:00');
+            $logTime->modify("+{$offset} seconds");
+            $timestamp = DateTime::format($logTime);
+            $batchEvents[] = [
+                'userId' => $userId,
+                'event' => 'event_' . $i,
+                'resource' => 'doc/' . $i,
+                'userAgent' => $userAgent,
+                'ip' => $ip,
+                'location' => $location,
+                'data' => ['sequence' => $i],
+                'time' => $timestamp
+            ];
+        }
+        $this->audit->logBatch($batchEvents);
 
         // Test 1: Find with equal filter
         $logs = $this->audit->find([
@@ -675,7 +702,34 @@ trait AuditBase
 
     public function testCount(): void
     {
+        // Setup: Create specific test data for count queries
+        $this->audit->cleanup(new \DateTime());
+
         $userId = 'userId';
+        $userAgent = 'Mozilla/5.0';
+        $ip = '192.168.1.1';
+        $location = 'US';
+
+        // Create test logs with specific attributes
+        $baseTime = new \DateTime('2024-06-15 12:00:00');
+        $batchEvents = [];
+        for ($i = 0; $i < 3; $i++) {
+            $offset = $i * 60;
+            $logTime = new \DateTime('2024-06-15 12:00:00');
+            $logTime->modify("+{$offset} seconds");
+            $timestamp = DateTime::format($logTime);
+            $batchEvents[] = [
+                'userId' => $userId,
+                'event' => 'event_' . $i,
+                'resource' => 'doc/' . $i,
+                'userAgent' => $userAgent,
+                'ip' => $ip,
+                'location' => $location,
+                'data' => ['sequence' => $i],
+                'time' => $timestamp
+            ];
+        }
+        $this->audit->logBatch($batchEvents);
 
         // Test 1: Count with simple filter
         $count = $this->audit->count([

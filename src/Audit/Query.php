@@ -12,10 +12,10 @@ class Query
 {
     // Filter methods
     public const TYPE_EQUAL = 'equal';
-    public const TYPE_GREATER = 'greater';
-    public const TYPE_LESSER = 'lesser';
+    public const TYPE_GREATER = 'greaterThan';
+    public const TYPE_LESSER = 'lessThan';
     public const TYPE_BETWEEN = 'between';
-    public const TYPE_IN = 'in';
+    public const TYPE_IN = 'contains';
 
     // Order methods
     public const TYPE_ORDER_DESC = 'orderDesc';
