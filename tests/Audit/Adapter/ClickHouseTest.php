@@ -34,6 +34,25 @@ class ClickHouseTest extends TestCase
     }
 
     /**
+     * Provide required attributes for ClickHouse adapter tests.
+     *
+     * @return array<string, mixed>
+     */
+    protected function getRequiredAttributes(): array
+    {
+        return [
+            'userType' => 'member',
+            'resourceType' => 'document',
+            'resourceId' => 'res-1',
+            'projectId' => 'proj-1',
+            'projectInternalId' => 'proj-int-1',
+            'teamId' => 'team-1',
+            'teamInternalId' => 'team-int-1',
+            'hostname' => 'example.org',
+        ];
+    }
+
+    /**
      * Test constructor validates host
      */
     public function testConstructorValidatesHost(): void

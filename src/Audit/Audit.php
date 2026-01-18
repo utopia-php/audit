@@ -54,13 +54,14 @@ class Audit
      * @param string $ip
      * @param string $location
      * @param array<string, mixed> $data
+     * @param array<string, mixed> $attributes
      * @return Log
      *
      * @throws \Exception
      */
-    public function log(?string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): Log
+    public function log(?string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = [], array $attributes = []): Log
     {
-        return $this->adapter->create([
+        $baseLog = [
             'userId' => $userId,
             'event' => $event,
             'resource' => $resource,
@@ -68,20 +69,25 @@ class Audit
             'ip' => $ip,
             'location' => $location,
             'data' => $data,
-        ]);
+        ];
+
+        return $this->adapter->create(array_merge($baseLog, $attributes));
     }
 
     /**
      * Add multiple event logs in batch.
      *
      * @param array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, time: string, data?: array<string, mixed>}> $events
+     * @param array<string, mixed> $defaultAttributes
      * @return bool
      *
      * @throws \Exception
      */
-    public function logBatch(array $events): bool
+    public function logBatch(array $events, array $defaultAttributes = []): bool
     {
-        return $this->adapter->createBatch($events);
+        $eventsWithDefaults = array_map(static fn (array $event) => array_merge($defaultAttributes, $event), $events);
+
+        return $this->adapter->createBatch($eventsWithDefaults);
     }
 
     /**

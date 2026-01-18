@@ -54,10 +54,12 @@ trait AuditBase
         $location = 'US';
         $data = ['key1' => 'value1', 'key2' => 'value2'];
 
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log(null, 'insert', 'user/null', $userAgent, $ip, $location, $data));
+        $requiredAttributes = $this->getRequiredAttributes();
+
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data, $requiredAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data, $requiredAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data, $requiredAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log(null, 'insert', 'user/null', $userAgent, $ip, $location, $data, $requiredAttributes));
     }
 
     public function testGetLogsByUser(): void
@@ -164,7 +166,8 @@ trait AuditBase
         $location = 'US';
         $data = ['test' => 'getById'];
 
-        $log = $this->audit->log($userId, 'create', 'test/resource/123', $userAgent, $ip, $location, $data);
+        $requiredAttributes = $this->getRequiredAttributes();
+        $log = $this->audit->log($userId, 'create', 'test/resource/123', $userAgent, $ip, $location, $data, $requiredAttributes);
         $logId = $log->getId();
 
         // Retrieve the log by ID
@@ -243,7 +246,11 @@ trait AuditBase
             ]
         ];
 
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
+
         // Test batch insertion
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
+
         $result = $this->audit->logBatch($batchEvents);
         $this->assertTrue($result);
 
@@ -324,6 +331,7 @@ trait AuditBase
         }
 
         // Insert batch
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
         $result = $this->audit->logBatch($batchEvents);
         $this->assertTrue($result);
 
@@ -368,6 +376,7 @@ trait AuditBase
             ]
         ];
 
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
         $this->audit->logBatch($batchEvents);
 
         // Test getting all logs
@@ -396,11 +405,13 @@ trait AuditBase
         $location = 'US';
         $data = ['key1' => 'value1', 'key2' => 'value2'];
 
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
+        $requiredAttributes = $this->getRequiredAttributes();
+
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data, $requiredAttributes));
         sleep(5);
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data, $requiredAttributes));
         sleep(5);
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data, $requiredAttributes));
         sleep(5);
 
         // DELETE logs older than 11 seconds and check that status is true
@@ -446,6 +457,8 @@ trait AuditBase
                 'time' => $timestamp
             ];
         }
+
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
 
         $this->audit->logBatch($batchEvents);
 
@@ -616,6 +629,8 @@ trait AuditBase
                 'time' => $timestamp
             ];
         }
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
+
         $this->audit->logBatch($batchEvents);
 
         // Test 1: Find with equal filter
@@ -788,5 +803,31 @@ trait AuditBase
             \Utopia\Audit\Query::equal('userId', 'nonExistentUser'),
         ]);
         $this->assertEquals(0, $count);
+    }
+
+    /**
+     * Apply adapter-specific required attributes to batch events.
+     *
+     * @param array<int, array<string, mixed>> $batchEvents
+     * @return array<int, array<string, mixed>>
+     */
+    protected function applyRequiredAttributesToBatch(array $batchEvents): array
+    {
+        $requiredAttributes = $this->getRequiredAttributes();
+        if ($requiredAttributes === []) {
+            return $batchEvents;
+        }
+
+        return array_map(static fn (array $event) => array_merge($event, $requiredAttributes), $batchEvents);
+    }
+
+    /**
+     * Override in adapter-specific tests to provide required attribute defaults.
+     *
+     * @return array<string, mixed>
+     */
+    protected function getRequiredAttributes(): array
+    {
+        return [];
     }
 }
