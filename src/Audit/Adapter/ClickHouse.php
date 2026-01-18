@@ -990,7 +990,9 @@ class ClickHouse extends SQL
 
         foreach ($queries as $query) {
             if (!$query instanceof Query) {
-                continue;
+                /** @phpstan-ignore-next-line ternary.alwaysTrue - runtime validation despite type hint */
+                $type = is_object($query) ? get_class($query) : gettype($query);
+                throw new \InvalidArgumentException("Invalid query item: expected instance of Query, got {$type}");
             }
 
             $method = $query->getMethod();
