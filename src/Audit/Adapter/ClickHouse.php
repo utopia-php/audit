@@ -639,6 +639,57 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Get column names from attributes.
+     * Returns an array of column names excluding 'id' and 'tenant' which are handled separately.
+     *
+     * @return array<string> Column names
+     */
+    private function getColumnNames(): array
+    {
+        $columns = [];
+        foreach ($this->getAttributes() as $attribute) {
+            $columnName = $attribute['$id'];
+            // Exclude id and tenant as they're handled separately
+            if ($columnName !== 'id' && $columnName !== 'tenant') {
+                $columns[] = $columnName;
+            }
+        }
+        return $columns;
+    }
+
+    /**
+     * Format datetime for ClickHouse compatibility.
+     * Converts datetime to 'YYYY-MM-DD HH:MM:SS.mmm' format without timezone suffix.
+     * ClickHouse DateTime64(3) type expects this format as timezone is handled by column metadata.
+     *
+     * @param \DateTime|string|null $dateTime The datetime value to format
+     * @return string The formatted datetime string in ClickHouse compatible format
+     * @throws Exception If the datetime string cannot be parsed
+     */
+    private function formatDateTimeForClickHouse($dateTime): string
+    {
+        if ($dateTime === null) {
+            return (new \DateTime())->format('Y-m-d H:i:s.v');
+        }
+
+        if ($dateTime instanceof \DateTime) {
+            return $dateTime->format('Y-m-d H:i:s.v');
+        }
+
+        if (is_string($dateTime)) {
+            try {
+                // Parse the datetime string, handling ISO 8601 format with timezone
+                $dt = new \DateTime($dateTime);
+                return $dt->format('Y-m-d H:i:s.v');
+            } catch (\Exception $e) {
+                throw new Exception("Invalid datetime string: {$dateTime}");
+            }
+        }
+
+        throw new Exception('DateTime must be a DateTime object or string');
+    }
+
+    /**
      * Create an audit log entry.
      *
      * @throws Exception
@@ -646,25 +697,48 @@ class ClickHouse extends SQL
     public function create(array $log): Log
     {
         $id = uniqid('', true);
-        $time = (new \DateTime())->format('Y-m-d H:i:s.v');
+        $time = $this->formatDateTimeForClickHouse($log['time'] ?? null);
 
         $tableName = $this->getTableName();
 
-        // Build column list and values based on sharedTables setting
-        $columns = ['id', 'userId', 'event', 'resource', 'userAgent', 'ip', 'location', 'time', 'data'];
-        $placeholders = ['{id:String}', '{userId:Nullable(String)}', '{event:String}', '{resource:String}', '{userAgent:String}', '{ip:String}', '{location:Nullable(String)}', '{time:String}', '{data:String}'];
+        // Build column list and placeholders dynamically from attributes
+        $columns = ['id'];
+        $placeholders = ['{id:String}'];
+        $params = ['id' => $id];
 
-        $params = [
-            'id' => $id,
-            'userId' => $log['userId'] ?? null,
-            'event' => $log['event'],
-            'resource' => $log['resource'],
-            'userAgent' => $log['userAgent'],
-            'ip' => $log['ip'],
-            'location' => $log['location'] ?? null,
-            'time' => $time,
-            'data' => json_encode($log['data'] ?? []),
-        ];
+        // Get all column names from attributes
+        $attributeColumns = $this->getColumnNames();
+
+        foreach ($attributeColumns as $column) {
+            if (isset($log[$column])) {
+                $columns[] = $column;
+
+                // Special handling for time column
+                if ($column === 'time') {
+                    $params[$column] = $this->formatDateTimeForClickHouse($log[$column]);
+                    $placeholders[] = '{' . $column . ':String}';
+                } elseif ($column === 'data') {
+                    $params[$column] = json_encode($log[$column] ?? []);
+                    // data is nullable based on attributes
+                    $placeholders[] = '{' . $column . ':Nullable(String)}';
+                } elseif (in_array($column, ['userId', 'location', 'userInternalId', 'resourceParent', 'resourceInternalId', 'country'])) {
+                    // Nullable string fields
+                    $params[$column] = $log[$column];
+                    $placeholders[] = '{' . $column . ':Nullable(String)}';
+                } else {
+                    // Required string fields
+                    $params[$column] = $log[$column];
+                    $placeholders[] = '{' . $column . ':String}';
+                }
+            }
+        }
+
+        // Add special handling for time if not provided
+        if (!isset($log['time'])) {
+            $columns[] = 'time';
+            $params['time'] = $time;
+            $placeholders[] = '{time:String}';
+        }
 
         if ($this->sharedTables) {
             $columns[] = 'tenant';
@@ -683,17 +757,18 @@ class ClickHouse extends SQL
 
         $this->query($insertSql, $params);
 
-        $result = [
-            '$id' => $id,
-            'userId' => $log['userId'] ?? null,
-            'event' => $log['event'],
-            'resource' => $log['resource'],
-            'userAgent' => $log['userAgent'],
-            'ip' => $log['ip'],
-            'location' => $log['location'] ?? null,
-            'time' => $time,
-            'data' => $log['data'] ?? [],
-        ];
+        $result = ['$id' => $id];
+
+        // Add all columns from log to result
+        foreach ($attributeColumns as $column) {
+            if ($column === 'time') {
+                $result[$column] = $time;
+            } elseif ($column === 'data') {
+                $result[$column] = $log[$column] ?? [];
+            } elseif (isset($log[$column])) {
+                $result[$column] = $log[$column];
+            }
+        }
 
         if ($this->sharedTables) {
             $result['tenant'] = $this->tenant;
@@ -942,8 +1017,34 @@ class ClickHouse extends SQL
         $tableName = $this->getTableName();
         $escapedDatabaseAndTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
-        // Build column list based on sharedTables setting
-        $columns = ['id', 'userId', 'event', 'resource', 'userAgent', 'ip', 'location', 'time', 'data'];
+        // Get all attribute column names
+        $attributeColumns = $this->getColumnNames();
+
+        // Build column list starting with id
+        $columns = ['id'];
+
+        // Determine which attribute columns are present in any log
+        $presentColumns = [];
+        foreach ($logs as $log) {
+            foreach ($attributeColumns as $column) {
+                if (isset($log[$column]) && !in_array($column, $presentColumns, true)) {
+                    $presentColumns[] = $column;
+                }
+            }
+        }
+
+        // Add present columns in the order they're defined in attributes
+        foreach ($attributeColumns as $column) {
+            if (in_array($column, $presentColumns, true)) {
+                $columns[] = $column;
+            }
+        }
+
+        // Always include time column
+        if (!in_array('time', $columns, true)) {
+            $columns[] = 'time';
+        }
+
         if ($this->sharedTables) {
             $columns[] = 'tenant';
         }
@@ -959,47 +1060,55 @@ class ClickHouse extends SQL
 
             // Create parameter placeholders for this row
             $paramKeys = [];
-            $paramKeys[] = 'id_' . $paramCounter;
-            $paramKeys[] = 'userId_' . $paramCounter;
-            $paramKeys[] = 'event_' . $paramCounter;
-            $paramKeys[] = 'resource_' . $paramCounter;
-            $paramKeys[] = 'userAgent_' . $paramCounter;
-            $paramKeys[] = 'ip_' . $paramCounter;
-            $paramKeys[] = 'location_' . $paramCounter;
-            $paramKeys[] = 'time_' . $paramCounter;
-            $paramKeys[] = 'data_' . $paramCounter;
+            $paramValues = [];
+            $placeholders = [];
 
-            // Set parameter values
-            $params[$paramKeys[0]] = $id;
-            $params[$paramKeys[1]] = $log['userId'] ?? null;
-            $params[$paramKeys[2]] = $log['event'];
-            $params[$paramKeys[3]] = $log['resource'];
-            $params[$paramKeys[4]] = $log['userAgent'];
-            $params[$paramKeys[5]] = $log['ip'];
-            $params[$paramKeys[6]] = $log['location'] ?? null;
+            // Add id first
+            $paramKey = 'id_' . $paramCounter;
+            $paramKeys[] = $paramKey;
+            $paramValues[] = $id;
+            $params[$paramKey] = $id;
+            $placeholders[] = '{' . $paramKey . ':String}';
 
-            $time = $log['time'] ?? new \DateTime();
-            if (is_string($time)) {
-                $time = new \DateTime($time);
+            // Add all present columns in order
+            foreach ($columns as $column) {
+                if ($column === 'id') {
+                    continue; // Already added
+                }
+
+                if ($column === 'tenant') {
+                    continue; // Handle separately below
+                }
+
+                $paramKey = $column . '_' . $paramCounter;
+                $paramKeys[] = $paramKey;
+
+                // Determine value based on column type
+                if ($column === 'time') {
+                    $value = $this->formatDateTimeForClickHouse($log['time'] ?? null);
+                    $params[$paramKey] = $value;
+                    $placeholders[] = '{' . $paramKey . ':String}';
+                } elseif ($column === 'data') {
+                    $value = json_encode($log['data'] ?? []);
+                    $params[$paramKey] = $value;
+                    $placeholders[] = '{' . $paramKey . ':Nullable(String)}';
+                } elseif (in_array($column, ['userId', 'location', 'userInternalId', 'resourceParent', 'resourceInternalId', 'country'])) {
+                    $value = $log[$column] ?? null;
+                    $params[$paramKey] = $value;
+                    $placeholders[] = '{' . $paramKey . ':Nullable(String)}';
+                } else {
+                    $value = $log[$column] ?? null;
+                    $params[$paramKey] = $value;
+                    $placeholders[] = '{' . $paramKey . ':Nullable(String)}';
+                }
+
+                $paramValues[] = $value;
             }
-            $params[$paramKeys[7]] = $time->format('Y-m-d H:i:s.v');
-            $params[$paramKeys[8]] = json_encode($log['data'] ?? []);
 
             if ($this->sharedTables) {
-                $paramKeys[] = 'tenant_' . $paramCounter;
-                $params[$paramKeys[9]] = $this->tenant;
-            }
-
-            // Build placeholder string for this row
-            $placeholders = [];
-            for ($i = 0; $i < count($paramKeys); $i++) {
-                if ($i === 1 || $i === 6) { // userId and location are nullable
-                    $placeholders[] = '{' . $paramKeys[$i] . ':Nullable(String)}';
-                } elseif ($this->sharedTables && $i === 9) { // tenant is nullable UInt64
-                    $placeholders[] = '{' . $paramKeys[$i] . ':Nullable(UInt64)}';
-                } else {
-                    $placeholders[] = '{' . $paramKeys[$i] . ':String}';
-                }
+                $paramKey = 'tenant_' . $paramCounter;
+                $params[$paramKey] = $this->tenant;
+                $placeholders[] = '{' . $paramKey . ':Nullable(UInt64)}';
             }
 
             $valueClauses[] = '(' . implode(', ', $placeholders) . ')';
