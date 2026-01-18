@@ -616,7 +616,9 @@ class ClickHouse extends SQL
             $indexName = $index['$id'];
             /** @var array<string> $attributes */
             $attributes = $index['attributes'];
-            $attributeList = implode(', ', $attributes);
+            // Escape each attribute name to prevent SQL injection
+            $escapedAttributes = array_map(fn ($attr) => $this->escapeIdentifier($attr), $attributes);
+            $attributeList = implode(', ', $escapedAttributes);
             $indexes[] = "INDEX {$indexName} ({$attributeList}) TYPE bloom_filter GRANULARITY 1";
         }
 
@@ -656,6 +658,51 @@ class ClickHouse extends SQL
         }
         return $columns;
     }
+
+    /**
+     * Validate that an attribute name exists in the schema.
+     * Prevents SQL injection by ensuring only valid column names are used.
+     *
+     * @param string $attributeName The attribute name to validate
+     * @return bool True if valid
+     * @throws Exception If attribute name is invalid
+     */
+    private function validateAttributeName(string $attributeName): bool
+    {
+        // Special case: 'id' is always valid
+        if ($attributeName === 'id') {
+            return true;
+        }
+
+        // Check if tenant is valid (only when sharedTables is enabled)
+        if ($attributeName === 'tenant' && $this->sharedTables) {
+            return true;
+        }
+
+        // Check against defined attributes
+        foreach ($this->getAttributes() as $attribute) {
+            if ($attribute['$id'] === $attributeName) {
+                return true;
+            }
+        }
+
+        throw new Exception("Invalid attribute name: {$attributeName}");
+    }
+
+    /**
+     * Format datetime values for ClickHouse parameter binding.
+     * Removes timezone suffixes which are incompatible with DateTime64 type comparisons.
+     *
+     * @param mixed $value The value to format
+     * @return string Formatted string without timezone suffix
+     */
+    private function formatDateTimeParam(mixed $value): string
+    {
+        $strValue = $this->formatParamValue($value);
+        // Remove timezone suffix if present (e.g., +00:00, -05:00)
+        return preg_replace('/[+\\-]\\d{2}:\\d{2}$/', '', $strValue) ?? $strValue;
+    }
+
 
     /**
      * Format datetime for ClickHouse compatibility.
@@ -789,11 +836,12 @@ class ClickHouse extends SQL
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $escapedId = $this->escapeIdentifier('id');
 
         $sql = "
             SELECT " . $this->getSelectColumns() . "
             FROM {$escapedTable}
-            WHERE id = {id:String}{$tenantFilter}
+            WHERE {$escapedId} = {id:String}{$tenantFilter}
             LIMIT 1
             FORMAT TabSeparated
         ";
@@ -922,47 +970,70 @@ class ClickHouse extends SQL
 
             switch ($method) {
                 case Query::TYPE_EQUAL:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
                     $paramName = 'param_' . $paramCounter++;
-                    $filters[] = "{$attribute} = {{$paramName}:String}";
+                    $filters[] = "{$escapedAttr} = {{$paramName}:String}";
                     $params[$paramName] = $this->formatParamValue($values[0]);
                     break;
 
                 case Query::TYPE_LESSER:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
                     $paramName = 'param_' . $paramCounter++;
-                    $filters[] = "{$attribute} < {{$paramName}:String}";
+                    $filters[] = "{$escapedAttr} < {{$paramName}:String}";
                     $params[$paramName] = $this->formatParamValue($values[0]);
                     break;
 
                 case Query::TYPE_GREATER:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
                     $paramName = 'param_' . $paramCounter++;
-                    $filters[] = "{$attribute} > {{$paramName}:String}";
+                    $filters[] = "{$escapedAttr} > {{$paramName}:String}";
                     $params[$paramName] = $this->formatParamValue($values[0]);
                     break;
 
                 case Query::TYPE_BETWEEN:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
                     $paramName1 = 'param_' . $paramCounter++;
                     $paramName2 = 'param_' . $paramCounter++;
-                    $filters[] = "{$attribute} BETWEEN {{$paramName1}:String} AND {{$paramName2}:String}";
-                    $params[$paramName1] = $this->formatParamValue($values[0]);
-                    $params[$paramName2] = $this->formatParamValue($values[1]);
+                    // Use DateTime64 type for time column, String for others
+                    // This prevents type mismatch when comparing DateTime64 with timezone-suffixed strings
+                    if ($attribute === 'time') {
+                        $paramType = 'DateTime64(3)';
+                        $filters[] = "{$escapedAttr} BETWEEN {{$paramName1}:{$paramType}} AND {{$paramName2}:{$paramType}}";
+                        $params[$paramName1] = $this->formatDateTimeParam($values[0]);
+                        $params[$paramName2] = $this->formatDateTimeParam($values[1]);
+                    } else {
+                        $filters[] = "{$escapedAttr} BETWEEN {{$paramName1}:String} AND {{$paramName2}:String}";
+                        $params[$paramName1] = $this->formatParamValue($values[0]);
+                        $params[$paramName2] = $this->formatParamValue($values[1]);
+                    }
                     break;
 
                 case Query::TYPE_IN:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
                     $inParams = [];
                     foreach ($values as $value) {
                         $paramName = 'param_' . $paramCounter++;
                         $inParams[] = "{{$paramName}:String}";
                         $params[$paramName] = $this->formatParamValue($value);
                     }
-                    $filters[] = "{$attribute} IN (" . implode(', ', $inParams) . ")";
+                    $filters[] = "{$escapedAttr} IN (" . implode(', ', $inParams) . ")";
                     break;
 
                 case Query::TYPE_ORDER_DESC:
-                    $orderBy[] = "{$attribute} DESC";
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $orderBy[] = "{$escapedAttr} DESC";
                     break;
 
                 case Query::TYPE_ORDER_ASC:
-                    $orderBy[] = "{$attribute} ASC";
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $orderBy[] = "{$escapedAttr} ASC";
                     break;
 
                 case Query::TYPE_LIMIT:
@@ -1194,20 +1265,34 @@ class ClickHouse extends SQL
 
     /**
      * Get the SELECT column list for queries.
-     * Returns 9 columns if not using shared tables, 10 if using shared tables.
+     * Escapes all column names to prevent SQL injection.
      *
      * @return string
      */
     private function getSelectColumns(): string
     {
+        $columns = [
+            $this->escapeIdentifier('id'),
+            $this->escapeIdentifier('userId'),
+            $this->escapeIdentifier('event'),
+            $this->escapeIdentifier('resource'),
+            $this->escapeIdentifier('userAgent'),
+            $this->escapeIdentifier('ip'),
+            $this->escapeIdentifier('location'),
+            $this->escapeIdentifier('time'),
+            $this->escapeIdentifier('data'),
+        ];
+
         if ($this->sharedTables) {
-            return 'id, userId, event, resource, userAgent, ip, location, time, data, tenant';
+            $columns[] = $this->escapeIdentifier('tenant');
         }
-        return 'id, userId, event, resource, userAgent, ip, location, time, data';
+
+        return implode(', ', $columns);
     }
 
     /**
      * Build tenant filter clause based on current tenant context.
+     * Escapes column name to prevent SQL injection.
      *
      * @return string
      */
@@ -1217,11 +1302,13 @@ class ClickHouse extends SQL
             return '';
         }
 
-        return " AND tenant = {$this->tenant}";
+        $escapedTenant = $this->escapeIdentifier('tenant');
+        return " AND {$escapedTenant} = {$this->tenant}";
     }
 
     /**
      * Build time WHERE clause and parameters with safe parameter placeholders.
+     * Escapes column name to prevent SQL injection.
      *
      * @param \DateTime|null $after
      * @param \DateTime|null $before
@@ -1245,8 +1332,10 @@ class ClickHouse extends SQL
             $beforeStr = \Utopia\Database\DateTime::format($before);
         }
 
+        $escapedTime = $this->escapeIdentifier('time');
+
         if ($afterStr !== null && $beforeStr !== null) {
-            $conditions[] = 'time BETWEEN {after:String} AND {before:String}';
+            $conditions[] = "{$escapedTime} BETWEEN {after:String} AND {before:String}";
             $params['after'] = $afterStr;
             $params['before'] = $beforeStr;
 
@@ -1254,12 +1343,12 @@ class ClickHouse extends SQL
         }
 
         if ($afterStr !== null) {
-            $conditions[] = 'time > {after:String}';
+            $conditions[] = "{$escapedTime} > {after:String}";
             $params['after'] = $afterStr;
         }
 
         if ($beforeStr !== null) {
-            $conditions[] = 'time < {before:String}';
+            $conditions[] = "{$escapedTime} < {before:String}";
             $params['before'] = $beforeStr;
         }
 
@@ -1344,12 +1433,14 @@ class ClickHouse extends SQL
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $escapedUserId = $this->escapeIdentifier('userId');
+        $escapedTime = $this->escapeIdentifier('time');
 
         $sql = "
             SELECT " . $this->getSelectColumns() . "
             FROM {$escapedTable}
-            WHERE userId = {userId:String}{$tenantFilter}{$time['clause']}
-            ORDER BY time {$order}
+            WHERE {$escapedUserId} = {userId:String}{$tenantFilter}{$time['clause']}
+            ORDER BY {$escapedTime} {$order}
             LIMIT {limit:UInt64} OFFSET {offset:UInt64}
             FORMAT TabSeparated
         ";
@@ -1378,11 +1469,12 @@ class ClickHouse extends SQL
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $escapedUserId = $this->escapeIdentifier('userId');
 
         $sql = "
             SELECT count()
             FROM {$escapedTable}
-            WHERE userId = {userId:String}{$tenantFilter}{$time['clause']}
+            WHERE {$escapedUserId} = {userId:String}{$tenantFilter}{$time['clause']}
             FORMAT TabSeparated
         ";
 
@@ -1412,12 +1504,14 @@ class ClickHouse extends SQL
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $escapedResource = $this->escapeIdentifier('resource');
+        $escapedTime = $this->escapeIdentifier('time');
 
         $sql = "
             SELECT " . $this->getSelectColumns() . "
             FROM {$escapedTable}
-            WHERE resource = {resource:String}{$tenantFilter}{$time['clause']}
-            ORDER BY time {$order}
+            WHERE {$escapedResource} = {resource:String}{$tenantFilter}{$time['clause']}
+            ORDER BY {$escapedTime} {$order}
             LIMIT {limit:UInt64} OFFSET {offset:UInt64}
             FORMAT TabSeparated
         ";
@@ -1446,11 +1540,12 @@ class ClickHouse extends SQL
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $escapedResource = $this->escapeIdentifier('resource');
 
         $sql = "
             SELECT count()
             FROM {$escapedTable}
-            WHERE resource = {resource:String}{$tenantFilter}{$time['clause']}
+            WHERE {$escapedResource} = {resource:String}{$tenantFilter}{$time['clause']}
             FORMAT TabSeparated
         ";
 
@@ -1516,11 +1611,13 @@ class ClickHouse extends SQL
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $escapedUserId = $this->escapeIdentifier('userId');
+        $escapedEvent = $this->escapeIdentifier('event');
 
         $sql = "
             SELECT count()
             FROM {$escapedTable}
-            WHERE userId = {userId:String} AND event IN ({$eventList['clause']}){$tenantFilter}{$time['clause']}
+            WHERE {$escapedUserId} = {userId:String} AND {$escapedEvent} IN ({$eventList['clause']}){$tenantFilter}{$time['clause']}
             FORMAT TabSeparated
         ";
 
@@ -1586,11 +1683,13 @@ class ClickHouse extends SQL
         $tableName = $this->getTableName();
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $escapedResource = $this->escapeIdentifier('resource');
+        $escapedEvent = $this->escapeIdentifier('event');
 
         $sql = "
             SELECT count()
             FROM {$escapedTable}
-            WHERE resource = {resource:String} AND event IN ({$eventList['clause']}){$tenantFilter}{$time['clause']}
+            WHERE {$escapedResource} = {resource:String} AND {$escapedEvent} IN ({$eventList['clause']}){$tenantFilter}{$time['clause']}
             FORMAT TabSeparated
         ";
 

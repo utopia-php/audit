@@ -111,19 +111,15 @@ class Database extends SQL
      */
     public function getById(string $id): ?Log
     {
-        try {
-            $document = $this->db->getAuthorization()->skip(function () use ($id) {
-                return $this->db->getDocument($this->getCollectionName(), $id);
-            });
+        $document = $this->db->getAuthorization()->skip(function () use ($id) {
+            return $this->db->getDocument($this->getCollectionName(), $id);
+        });
 
-            if ($document->isEmpty()) {
-                return null;
-            }
-
-            return new Log($document->getArrayCopy());
-        } catch (\Exception $e) {
+        if ($document->isEmpty()) {
             return null;
         }
+
+        return new Log($document->getArrayCopy());
     }
 
     /**
