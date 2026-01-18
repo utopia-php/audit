@@ -691,6 +691,23 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Get attribute metadata by column name.
+     * Searches through all attributes to find metadata for a specific column.
+     *
+     * @param string $columnName The column name to look up
+     * @return array<string, mixed>|null The attribute metadata or null if not found
+     */
+    private function getAttributeMetadata(string $columnName): ?array
+    {
+        foreach ($this->getAttributes() as $attribute) {
+            if ($attribute['$id'] === $columnName) {
+                return $attribute;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Format datetime values for ClickHouse parameter binding.
      * Removes timezone suffixes which are incompatible with DateTime64 type comparisons.
      *
@@ -1168,28 +1185,52 @@ class ClickHouse extends SQL
                 $paramKey = $column . '_' . $paramCounter;
                 $paramKeys[] = $paramKey;
 
+                // Get attribute metadata to determine nullability and requirements
+                $attributeMeta = $this->getAttributeMetadata($column);
+                $isRequired = $attributeMeta !== null && isset($attributeMeta['required']) && $attributeMeta['required'];
+                $value = null;
+                $placeholder = '';
+
                 // Determine value based on column type
                 if ($column === 'time') {
                     /** @var string|\DateTime|null $timeVal */
                     $timeVal = $log['time'] ?? null;
+
+                    if ($timeVal === null && $isRequired) {
+                        throw new Exception("Required attribute 'time' is missing in batch log entry");
+                    }
+
                     $value = $this->formatDateTimeForClickHouse($timeVal);
                     $params[$paramKey] = $value;
-                    $placeholders[] = '{' . $paramKey . ':String}';
+                    // time is always non-nullable in ClickHouse
+                    $placeholder = '{' . $paramKey . ':String}';
                 } elseif ($column === 'data') {
-                    $value = json_encode($log['data'] ?? []);
+                    /** @var array<string, mixed>|null $dataVal */
+                    $dataVal = $log['data'] ?? null;
+
+                    if ($dataVal === null && $isRequired) {
+                        throw new Exception("Required attribute 'data' is missing in batch log entry");
+                    }
+
+                    $value = json_encode($dataVal ?? []);
                     $params[$paramKey] = $value;
-                    $placeholders[] = '{' . $paramKey . ':Nullable(String)}';
-                } elseif (in_array($column, ['userId', 'location', 'userInternalId', 'resourceParent', 'resourceInternalId', 'country'])) {
-                    $value = $log[$column] ?? null;
-                    $params[$paramKey] = $value;
-                    $placeholders[] = '{' . $paramKey . ':Nullable(String)}';
+                    // data is nullable in schema
+                    $placeholder = $isRequired ? '{' . $paramKey . ':String}' : '{' . $paramKey . ':Nullable(String)}';
                 } else {
+                    // Regular attributes
                     $value = $log[$column] ?? null;
+
+                    if ($value === null && $isRequired) {
+                        throw new Exception("Required attribute '{$column}' is missing in batch log entry");
+                    }
+
                     $params[$paramKey] = $value;
-                    $placeholders[] = '{' . $paramKey . ':Nullable(String)}';
+                    // Use metadata to determine if nullable
+                    $placeholder = $isRequired ? '{' . $paramKey . ':String}' : '{' . $paramKey . ':Nullable(String)}';
                 }
 
                 $paramValues[] = $value;
+                $placeholders[] = $placeholder;
             }
 
             if ($this->sharedTables) {
