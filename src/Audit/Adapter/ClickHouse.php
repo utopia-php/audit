@@ -4,6 +4,8 @@ namespace Utopia\Audit\Adapter;
 
 use Exception;
 use Utopia\Audit\Log;
+use Utopia\Audit\Query;
+use Utopia\Database\Database;
 use Utopia\Fetch\Client;
 use Utopia\Validator\Hostname;
 
@@ -246,6 +248,211 @@ class ClickHouse extends SQL
     public function isSharedTables(): bool
     {
         return $this->sharedTables;
+    }
+
+    /**
+     * Override getAttributes to provide extended attributes for ClickHouse.
+     * Includes existing attributes from parent and adds new missing ones.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getAttributes(): array
+    {
+        $parentAttributes = parent::getAttributes();
+
+        return [
+            ...$parentAttributes,
+            [
+                '$id' => 'userType',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => true,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'userInternalId',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => false,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'resourceParent',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => false,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'resourceType',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => true,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'resourceId',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => true,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'resourceInternalId',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => false,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'country',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => false,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'projectId',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => true,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'projectInternalId',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => true,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'teamId',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => true,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'teamInternalId',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => true,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'hostname',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => true,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
+        ];
+    }
+
+    /**
+     * Override getIndexes to provide extended indexes for ClickHouse.
+     * Includes existing indexes from parent and adds new missing ones.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getIndexes(): array
+    {
+        $parentIndexes = parent::getIndexes();
+
+        // New indexes to add
+        return [
+            ...$parentIndexes,
+            [
+                '$id' => '_key_user_internal_and_event',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['userInternalId', 'event'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_project_internal_id',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['projectInternalId'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_team_internal_id',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['teamInternalId'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_user_internal_id',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['userInternalId'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_user_type',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['userType'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_country',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['country'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_hostname',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['hostname'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+        ];
     }
 
     /**
@@ -493,6 +700,232 @@ class ClickHouse extends SQL
         }
 
         return new Log($result);
+    }
+
+    /**
+     * Get a single log by its ID.
+     *
+     * @param string $id
+     * @return Log|null The log entry or null if not found
+     * @throws Exception
+     */
+    public function getById(string $id): ?Log
+    {
+        $tableName = $this->getTableName();
+        $tenantFilter = $this->getTenantFilter();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+
+        $sql = "
+            SELECT " . $this->getSelectColumns() . "
+            FROM {$escapedTable}
+            WHERE id = {id:String}{$tenantFilter}
+            LIMIT 1
+            FORMAT TabSeparated
+        ";
+
+        $result = $this->query($sql, ['id' => $id]);
+        $logs = $this->parseResults($result);
+
+        return $logs[0] ?? null;
+    }
+
+    /**
+     * Find logs using Query objects.
+     *
+     * @param array<Query> $queries
+     * @return array<Log>
+     * @throws Exception
+     */
+    public function find(array $queries = []): array
+    {
+        $tableName = $this->getTableName();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+
+        // Parse queries
+        $parsed = $this->parseQueries($queries);
+
+        // Build SELECT clause
+        $selectColumns = $this->getSelectColumns();
+
+        // Build WHERE clause
+        $whereClause = '';
+        $tenantFilter = $this->getTenantFilter();
+        if (!empty($parsed['filters']) || $tenantFilter) {
+            $conditions = $parsed['filters'];
+            if ($tenantFilter) {
+                $conditions[] = ltrim($tenantFilter, ' AND');
+            }
+            $whereClause = ' WHERE ' . implode(' AND ', $conditions);
+        }
+
+        // Build ORDER BY clause
+        $orderClause = '';
+        if (!empty($parsed['orderBy'])) {
+            $orderClause = ' ORDER BY ' . implode(', ', $parsed['orderBy']);
+        }
+
+        // Build LIMIT and OFFSET
+        $limitClause = isset($parsed['limit']) ? ' LIMIT {limit:UInt64}' : '';
+        $offsetClause = isset($parsed['offset']) ? ' OFFSET {offset:UInt64}' : '';
+
+        $sql = "
+            SELECT {$selectColumns}
+            FROM {$escapedTable}{$whereClause}{$orderClause}{$limitClause}{$offsetClause}
+            FORMAT TabSeparated
+        ";
+
+        $result = $this->query($sql, $parsed['params']);
+        return $this->parseResults($result);
+    }
+
+    /**
+     * Count logs using Query objects.
+     *
+     * @param array<Query> $queries
+     * @return int
+     * @throws Exception
+     */
+    public function count(array $queries = []): int
+    {
+        $tableName = $this->getTableName();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+
+        // Parse queries - we only need filters and params, not ordering/limit/offset
+        $parsed = $this->parseQueries($queries);
+
+        // Build WHERE clause
+        $whereClause = '';
+        $tenantFilter = $this->getTenantFilter();
+        if (!empty($parsed['filters']) || $tenantFilter) {
+            $conditions = $parsed['filters'];
+            if ($tenantFilter) {
+                $conditions[] = ltrim($tenantFilter, ' AND');
+            }
+            $whereClause = ' WHERE ' . implode(' AND ', $conditions);
+        }
+
+        // Remove limit and offset from params as they don't apply to count
+        $params = $parsed['params'];
+        unset($params['limit'], $params['offset']);
+
+        $sql = "
+            SELECT COUNT(*) as count
+            FROM {$escapedTable}{$whereClause}
+            FORMAT TabSeparated
+        ";
+
+        $result = $this->query($sql, $params);
+        $trimmed = trim($result);
+
+        return $trimmed !== '' ? (int) $trimmed : 0;
+    }
+
+    /**
+     * Parse Query objects into SQL components.
+     *
+     * @param array<Query> $queries
+     * @return array{filters: array<string>, params: array<string, mixed>, orderBy?: array<string>, limit?: int, offset?: int}
+     * @throws Exception
+     */
+    private function parseQueries(array $queries): array
+    {
+        $filters = [];
+        $params = [];
+        $orderBy = [];
+        $limit = null;
+        $offset = null;
+        $paramCounter = 0;
+
+        foreach ($queries as $query) {
+            if (!$query instanceof Query) {
+                continue;
+            }
+
+            $method = $query->getMethod();
+            $attribute = $query->getAttribute();
+            $values = $query->getValues();
+
+            switch ($method) {
+                case Query::TYPE_EQUAL:
+                    $paramName = 'param_' . $paramCounter++;
+                    $filters[] = "{$attribute} = {{$paramName}:String}";
+                    $params[$paramName] = $this->formatParamValue($values[0]);
+                    break;
+
+                case Query::TYPE_LESSER:
+                    $paramName = 'param_' . $paramCounter++;
+                    $filters[] = "{$attribute} < {{$paramName}:String}";
+                    $params[$paramName] = $this->formatParamValue($values[0]);
+                    break;
+
+                case Query::TYPE_GREATER:
+                    $paramName = 'param_' . $paramCounter++;
+                    $filters[] = "{$attribute} > {{$paramName}:String}";
+                    $params[$paramName] = $this->formatParamValue($values[0]);
+                    break;
+
+                case Query::TYPE_BETWEEN:
+                    $paramName1 = 'param_' . $paramCounter++;
+                    $paramName2 = 'param_' . $paramCounter++;
+                    $filters[] = "{$attribute} BETWEEN {{$paramName1}:String} AND {{$paramName2}:String}";
+                    $params[$paramName1] = $this->formatParamValue($values[0]);
+                    $params[$paramName2] = $this->formatParamValue($values[1]);
+                    break;
+
+                case Query::TYPE_IN:
+                    $inParams = [];
+                    foreach ($values as $value) {
+                        $paramName = 'param_' . $paramCounter++;
+                        $inParams[] = "{{$paramName}:String}";
+                        $params[$paramName] = $this->formatParamValue($value);
+                    }
+                    $filters[] = "{$attribute} IN (" . implode(', ', $inParams) . ")";
+                    break;
+
+                case Query::TYPE_ORDER_DESC:
+                    $orderBy[] = "{$attribute} DESC";
+                    break;
+
+                case Query::TYPE_ORDER_ASC:
+                    $orderBy[] = "{$attribute} ASC";
+                    break;
+
+                case Query::TYPE_LIMIT:
+                    if (!\is_int($values[0])) {
+                        throw new \Exception('Invalid limit value. Expected int');
+                    }
+                    $limit = $values[0];
+                    $params['limit'] = $limit;
+                    break;
+
+                case Query::TYPE_OFFSET:
+                    if (!\is_int($values[0])) {
+                        throw new \Exception('Invalid offset value. Expected int');
+                    }
+                    $offset = $values[0];
+                    $params['offset'] = $offset;
+                    break;
+            }
+        }
+
+        $result = [
+            'filters' => $filters,
+            'params' => $params,
+        ];
+
+        if (!empty($orderBy)) {
+            $result['orderBy'] = $orderBy;
+        }
+
+        if ($limit !== null) {
+            $result['limit'] = $limit;
+        }
+
+        if ($offset !== null) {
+            $result['offset'] = $offset;
+        }
+
+        return $result;
     }
 
     /**

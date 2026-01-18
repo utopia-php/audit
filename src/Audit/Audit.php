@@ -85,6 +85,19 @@ class Audit
     }
 
     /**
+     * Get a single log by its ID.
+     *
+     * @param string $id
+     * @return Log|null The log entry or null if not found
+     *
+     * @throws \Exception
+     */
+    public function getLogById(string $id): ?Log
+    {
+        return $this->adapter->getById($id);
+    }
+
+    /**
      * Get all logs by user ID.
      *
      * @param string $userId
@@ -242,5 +255,31 @@ class Audit
     public function cleanup(\DateTime $datetime): bool
     {
         return $this->adapter->cleanup($datetime);
+    }
+
+    /**
+     * Find logs using custom queries.
+     *
+     * @param array<Query> $queries Array of Audit Query objects
+     * @return array<Log>
+     *
+     * @throws \Exception
+     */
+    public function find(array $queries = []): array
+    {
+        return $this->adapter->find($queries);
+    }
+
+    /**
+     * Count logs using custom queries.
+     *
+     * @param array<Query> $queries Array of Audit Query objects
+     * @return int
+     *
+     * @throws \Exception
+     */
+    public function count(array $queries = []): int
+    {
+        return $this->adapter->count($queries);
     }
 }
