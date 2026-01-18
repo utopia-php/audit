@@ -54,14 +54,14 @@ class Audit
      * @param string $ip
      * @param string $location
      * @param array<string, mixed> $data
-     * @param array<string, mixed> $attributes
      * @return Log
      *
      * @throws \Exception
      */
-    public function log(?string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = [], array $attributes = []): Log
+    public function log(?string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): Log
     {
-        $baseLog = [
+        /** @var array{userId?: string|null, event: string, resource: string, userAgent: string, ip: string, location?: string, data?: array<string, mixed>} $log */
+        $log = [
             'userId' => $userId,
             'event' => $event,
             'resource' => $resource,
@@ -71,8 +71,6 @@ class Audit
             'data' => $data,
         ];
 
-        /** @var array{userId?: string|null, event: string, resource: string, userAgent: string, ip: string, location?: string, data?: array<string, mixed>} $log */
-        $log = array_merge($baseLog, $attributes);
         return $this->adapter->create($log);
     }
 

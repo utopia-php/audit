@@ -764,102 +764,112 @@ class ClickHouse extends SQL
      */
     public function create(array $log): Log
     {
-        $id = uniqid('', true);
+        $logId = uniqid('', true);
+
         // Format time - use provided time or current time
-        /** @var string|\DateTime|null $logTime */
-        $logTime = $log['time'] ?? null;
-        $timeValue = $this->formatDateTimeForClickHouse($logTime);
+        /** @var string|\DateTime|null $providedTime */
+        $providedTime = $log['time'] ?? null;
+        $formattedTime = $this->formatDateTimeForClickHouse($providedTime);
 
         $tableName = $this->getTableName();
 
+        // Extract additional attributes from the data array
+        /** @var array<string, mixed> $logData */
+        $logData = $log['data'] ?? [];
+
         // Build column list and placeholders dynamically from attributes
-        $columns = ['id', 'time'];
-        $placeholders = ['{id:String}', '{time:String}'];
-        $params = [
-            'id' => $id,
-            'time' => $timeValue,
+        $insertColumns = ['id', 'time'];
+        $valuePlaceholders = ['{id:String}', '{time:String}'];
+        $queryParams = [
+            'id' => $logId,
+            'time' => $formattedTime,
         ];
 
         // Get all column names from attributes
-        $attributeColumns = $this->getColumnNames();
+        $schemaColumns = $this->getColumnNames();
 
-        foreach ($attributeColumns as $column) {
-            if ($column === 'time') {
+        // Separate data for the data column (non-schema attributes)
+        $nonSchemaData = $logData;
+
+        foreach ($schemaColumns as $columnName) {
+            if ($columnName === 'time') {
                 // Skip time - already handled above
                 continue;
             }
 
-            // Get attribute metadata to check if required
-            $attributeMeta = $this->getAttributeMetadata($column);
-            $isRequired = $attributeMeta !== null && isset($attributeMeta['required']) && $attributeMeta['required'];
+            // Get attribute metadata to determine if required and nullable
+            $attributeMetadata = $this->getAttributeMetadata($columnName);
+            $isRequiredAttribute = $attributeMetadata !== null && isset($attributeMetadata['required']) && $attributeMetadata['required'];
+            $isNullableAttribute = $attributeMetadata !== null && (!isset($attributeMetadata['required']) || !$attributeMetadata['required']);
 
-            // Check if value is missing for required attributes
-            if ($isRequired && (!isset($log[$column]) || $log[$column] === '')) {
-                throw new \InvalidArgumentException("Required attribute '{$column}' is missing or empty in log entry");
+            // For 'data' column, we'll handle it separately at the end
+            if ($columnName === 'data') {
+                continue;
             }
 
-            if (isset($log[$column])) {
-                $columns[] = $column;
+            // Check if value exists in main log or in data array
+            $attributeValue = null;
+            $hasAttributeValue = false;
 
-                // Special handling for data column
-                if ($column === 'data') {
-                    /** @var array<string, mixed> $dataValue */
-                    $dataValue = $log['data'] ?? [];
-                    $params[$column] = json_encode($dataValue);
-                    // data is nullable based on attributes
-                    $placeholders[] = '{' . $column . ':Nullable(String)}';
-                } elseif (in_array($column, ['userId', 'location', 'userInternalId', 'resourceParent', 'resourceInternalId', 'country'])) {
-                    // Nullable string fields
-                    $params[$column] = $log[$column];
-                    $placeholders[] = '{' . $column . ':Nullable(String)}';
+            if (isset($log[$columnName]) && $log[$columnName] !== '') {
+                // Value is in main log (e.g., userId, event, resource, etc.)
+                $attributeValue = $log[$columnName];
+                $hasAttributeValue = true;
+            } elseif (isset($logData[$columnName]) && $logData[$columnName] !== '') {
+                // Value is in data array (additional attributes)
+                $attributeValue = $logData[$columnName];
+                $hasAttributeValue = true;
+                // Remove from non-schema data as it's now a dedicated column
+                unset($nonSchemaData[$columnName]);
+            }
+
+            // Check if value is missing for required attributes
+            if ($isRequiredAttribute && !$hasAttributeValue) {
+                throw new \InvalidArgumentException("Required attribute '{$columnName}' is missing or empty in log entry");
+            }
+
+            if ($hasAttributeValue) {
+                $insertColumns[] = $columnName;
+                $queryParams[$columnName] = $attributeValue;
+
+                // Determine placeholder type based on attribute metadata
+                if ($isNullableAttribute) {
+                    $valuePlaceholders[] = '{' . $columnName . ':Nullable(String)}';
                 } else {
-                    // Required string fields
-                    $params[$column] = $log[$column];
-                    $placeholders[] = '{' . $column . ':String}';
+                    $valuePlaceholders[] = '{' . $columnName . ':String}';
                 }
             }
         }
 
+        // Add the data column with remaining non-schema attributes
+        $insertColumns[] = 'data';
+        $queryParams['data'] = json_encode($nonSchemaData);
+        $valuePlaceholders[] = '{data:Nullable(String)}';
+
         if ($this->sharedTables) {
-            $columns[] = 'tenant';
-            $placeholders[] = '{tenant:Nullable(UInt64)}';
-            $params['tenant'] = $this->tenant;
+            $insertColumns[] = 'tenant';
+            $valuePlaceholders[] = '{tenant:Nullable(UInt64)}';
+            $queryParams['tenant'] = $this->tenant;
         }
 
         $escapedDatabaseAndTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
         $insertSql = "
             INSERT INTO {$escapedDatabaseAndTable}
-            (" . implode(', ', $columns) . ")
+            (" . implode(', ', $insertColumns) . ")
             VALUES (
-                " . implode(", ", $placeholders) . "
+                " . implode(", ", $valuePlaceholders) . "
             )
         ";
 
-        $this->query($insertSql, $params);
+        $this->query($insertSql, $queryParams);
 
-        $result = ['$id' => $id];
-
-        // Add time
-        $result['time'] = $timeValue;
-
-        // Add all columns from log to result
-        foreach ($attributeColumns as $column) {
-            if ($column === 'time') {
-                continue; // Already added
-            }
-
-            if ($column === 'data') {
-                $result[$column] = $log['data'] ?? [];
-            } elseif (isset($log[$column])) {
-                $result[$column] = $log[$column];
-            }
+        // Retrieve the created log using getById to ensure consistency
+        $createdLog = $this->getById($logId);
+        if ($createdLog === null) {
+            throw new Exception("Failed to retrieve created log with ID: {$logId}");
         }
 
-        if ($this->sharedTables) {
-            $result['tenant'] = $this->tenant;
-        }
-
-        return new Log($result);
+        return $createdLog;
     }
 
     /**
@@ -1130,136 +1140,144 @@ class ClickHouse extends SQL
         $escapedDatabaseAndTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
         // Get all attribute column names
-        $attributeColumns = $this->getColumnNames();
+        $schemaColumns = $this->getColumnNames();
 
-        // Build column list starting with id
-        $columns = ['id'];
+        // Process each log to extract additional attributes from data
+        $processedLogs = [];
+        foreach ($logs as $log) {
+            /** @var array<string, mixed> $logData */
+            $logData = $log['data'] ?? [];
+
+            // Separate data for non-schema attributes
+            $nonSchemaData = $logData;
+            $processedLog = $log;
+
+            // Extract schema attributes from data array
+            foreach ($schemaColumns as $columnName) {
+                if ($columnName === 'data' || $columnName === 'time') {
+                    continue;
+                }
+
+                // If attribute exists in data array and not in main log, move it
+                if (!isset($processedLog[$columnName]) && isset($logData[$columnName])) {
+                    $processedLog[$columnName] = $logData[$columnName];
+                    unset($nonSchemaData[$columnName]);
+                }
+            }
+
+            // Update data with remaining non-schema attributes
+            $processedLog['data'] = $nonSchemaData;
+            $processedLogs[] = $processedLog;
+        }
+
+        // Build column list starting with id and time
+        $insertColumns = ['id', 'time'];
 
         // Determine which attribute columns are present in any log
         $presentColumns = [];
-        foreach ($logs as $log) {
-            foreach ($attributeColumns as $column) {
-                if (isset($log[$column]) && !in_array($column, $presentColumns, true)) {
-                    $presentColumns[] = $column;
+        foreach ($processedLogs as $processedLog) {
+            foreach ($schemaColumns as $columnName) {
+                if ($columnName === 'time') {
+                    continue; // Already in insertColumns
+                }
+                if (isset($processedLog[$columnName]) && !in_array($columnName, $presentColumns, true)) {
+                    $presentColumns[] = $columnName;
                 }
             }
         }
 
         // Add present columns in the order they're defined in attributes
-        foreach ($attributeColumns as $column) {
-            if (in_array($column, $presentColumns, true)) {
-                $columns[] = $column;
+        foreach ($schemaColumns as $columnName) {
+            if ($columnName === 'time') {
+                continue; // Already added
+            }
+            if (in_array($columnName, $presentColumns, true)) {
+                $insertColumns[] = $columnName;
             }
         }
 
-        // Always include time column
-        if (!in_array('time', $columns, true)) {
-            $columns[] = 'time';
-        }
-
         if ($this->sharedTables) {
-            $columns[] = 'tenant';
+            $insertColumns[] = 'tenant';
         }
 
-        $ids = [];
         $paramCounter = 0;
-        $params = [];
+        $queryParams = [];
         $valueClauses = [];
 
-        foreach ($logs as $log) {
-            /** @var array<string, mixed> $log */
-            $id = uniqid('', true);
-            $ids[] = $id;
+        foreach ($processedLogs as $processedLog) {
+            $logId = uniqid('', true);
+            $valuePlaceholders = [];
 
-            // Create parameter placeholders for this row
-            $paramKeys = [];
-            $paramValues = [];
-            $placeholders = [];
-
-            // Add id first
+            // Add id
             $paramKey = 'id_' . $paramCounter;
-            $paramKeys[] = $paramKey;
-            $paramValues[] = $id;
-            $params[$paramKey] = $id;
-            $placeholders[] = '{' . $paramKey . ':String}';
+            $queryParams[$paramKey] = $logId;
+            $valuePlaceholders[] = '{' . $paramKey . ':String}';
 
-            // Add all present columns in order
-            foreach ($columns as $column) {
-                if ($column === 'id') {
-                    continue; // Already added
+            // Add time
+            /** @var string|\DateTime|null $providedTime */
+            $providedTime = $processedLog['time'] ?? null;
+            $formattedTime = $this->formatDateTimeForClickHouse($providedTime);
+            $paramKey = 'time_' . $paramCounter;
+            $queryParams[$paramKey] = $formattedTime;
+            $valuePlaceholders[] = '{' . $paramKey . ':String}';
+
+            // Add all other present columns
+            foreach ($insertColumns as $columnName) {
+                if ($columnName === 'id' || $columnName === 'time' || $columnName === 'tenant') {
+                    continue; // Already handled
                 }
 
-                if ($column === 'tenant') {
-                    continue; // Handle separately below
+                $paramKey = $columnName . '_' . $paramCounter;
+
+                // Get attribute metadata to determine if required and nullable
+                $attributeMetadata = $this->getAttributeMetadata($columnName);
+                $isRequiredAttribute = $attributeMetadata !== null && isset($attributeMetadata['required']) && $attributeMetadata['required'];
+                $isNullableAttribute = $attributeMetadata !== null && (!isset($attributeMetadata['required']) || !$attributeMetadata['required']);
+
+                $attributeValue = null;
+                $hasAttributeValue = false;
+
+                if ($columnName === 'data') {
+                    // Data column - encode as JSON\n                    /** @var array<string, mixed> $dataValue */
+                    $dataValue = $processedLog['data'];
+                    $attributeValue = json_encode($dataValue);
+                    $hasAttributeValue = true;
+                } elseif (isset($processedLog[$columnName]) && $processedLog[$columnName] !== '') {
+                    $attributeValue = $processedLog[$columnName];
+                    $hasAttributeValue = true;
                 }
 
-                $paramKey = $column . '_' . $paramCounter;
-                $paramKeys[] = $paramKey;
+                // Check if value is missing for required attributes
+                if ($isRequiredAttribute && !$hasAttributeValue) {
+                    throw new \InvalidArgumentException("Required attribute '{$columnName}' is missing or empty in batch log entry");
+                }
 
-                // Get attribute metadata to determine nullability and requirements
-                $attributeMeta = $this->getAttributeMetadata($column);
-                $isRequired = $attributeMeta !== null && isset($attributeMeta['required']) && $attributeMeta['required'];
-                $value = null;
-                $placeholder = '';
+                $queryParams[$paramKey] = $attributeValue;
 
-                // Determine value based on column type
-                if ($column === 'time') {
-                    /** @var string|\DateTime|null $timeVal */
-                    $timeVal = $log['time'] ?? null;
-
-                    if ($timeVal === null && $isRequired) {
-                        throw new Exception("Required attribute 'time' is missing in batch log entry");
-                    }
-
-                    $value = $this->formatDateTimeForClickHouse($timeVal);
-                    $params[$paramKey] = $value;
-                    // time is always non-nullable in ClickHouse
-                    $placeholder = '{' . $paramKey . ':String}';
-                } elseif ($column === 'data') {
-                    /** @var array<string, mixed>|null $dataVal */
-                    $dataVal = $log['data'] ?? null;
-
-                    if ($dataVal === null && $isRequired) {
-                        throw new Exception("Required attribute 'data' is missing in batch log entry");
-                    }
-
-                    $value = json_encode($dataVal ?? []);
-                    $params[$paramKey] = $value;
-                    // data is nullable in schema
-                    $placeholder = $isRequired ? '{' . $paramKey . ':String}' : '{' . $paramKey . ':Nullable(String)}';
+                // Determine placeholder type based on attribute metadata
+                if ($isNullableAttribute) {
+                    $valuePlaceholders[] = '{' . $paramKey . ':Nullable(String)}';
                 } else {
-                    // Regular attributes
-                    $value = $log[$column] ?? null;
-
-                    if ($value === null && $isRequired) {
-                        throw new Exception("Required attribute '{$column}' is missing in batch log entry");
-                    }
-
-                    $params[$paramKey] = $value;
-                    // Use metadata to determine if nullable
-                    $placeholder = $isRequired ? '{' . $paramKey . ':String}' : '{' . $paramKey . ':Nullable(String)}';
+                    $valuePlaceholders[] = '{' . $paramKey . ':String}';
                 }
-
-                $paramValues[] = $value;
-                $placeholders[] = $placeholder;
             }
 
             if ($this->sharedTables) {
                 $paramKey = 'tenant_' . $paramCounter;
-                $params[$paramKey] = $this->tenant;
-                $placeholders[] = '{' . $paramKey . ':Nullable(UInt64)}';
+                $queryParams[$paramKey] = $this->tenant;
+                $valuePlaceholders[] = '{' . $paramKey . ':Nullable(UInt64)}';
             }
 
-            $valueClauses[] = '(' . implode(', ', $placeholders) . ')';
+            $valueClauses[] = '(' . implode(', ', $valuePlaceholders) . ')';
             $paramCounter++;
         }
 
         $insertSql = "
             INSERT INTO {$escapedDatabaseAndTable}
-            (" . implode(', ', $columns) . ")
+            (" . implode(', ', $insertColumns) . ")
             VALUES " . implode(', ', $valueClauses);
 
-        $this->query($insertSql, $params);
+        $this->query($insertSql, $queryParams);
         return true;
     }
 

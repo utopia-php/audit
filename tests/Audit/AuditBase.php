@@ -55,11 +55,12 @@ trait AuditBase
         $data = ['key1' => 'value1', 'key2' => 'value2'];
 
         $requiredAttributes = $this->getRequiredAttributes();
+        $dataWithAttributes = array_merge($data, $requiredAttributes);
 
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data, $requiredAttributes));
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data, $requiredAttributes));
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data, $requiredAttributes));
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log(null, 'insert', 'user/null', $userAgent, $ip, $location, $data, $requiredAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $dataWithAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $dataWithAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $dataWithAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log(null, 'insert', 'user/null', $userAgent, $ip, $location, $dataWithAttributes));
     }
 
     public function testGetLogsByUser(): void
@@ -167,7 +168,8 @@ trait AuditBase
         $data = ['test' => 'getById'];
 
         $requiredAttributes = $this->getRequiredAttributes();
-        $log = $this->audit->log($userId, 'create', 'test/resource/123', $userAgent, $ip, $location, $data, $requiredAttributes);
+        $dataWithAttributes = array_merge($data, $requiredAttributes);
+        $log = $this->audit->log($userId, 'create', 'test/resource/123', $userAgent, $ip, $location, $dataWithAttributes);
         $logId = $log->getId();
 
         // Retrieve the log by ID
@@ -406,12 +408,13 @@ trait AuditBase
         $data = ['key1' => 'value1', 'key2' => 'value2'];
 
         $requiredAttributes = $this->getRequiredAttributes();
+        $dataWithAttributes = array_merge($data, $requiredAttributes);
 
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data, $requiredAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $dataWithAttributes));
         sleep(5);
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data, $requiredAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $dataWithAttributes));
         sleep(5);
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data, $requiredAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $dataWithAttributes));
         sleep(5);
 
         // DELETE logs older than 11 seconds and check that status is true
