@@ -71,7 +71,9 @@ class Audit
             'data' => $data,
         ];
 
-        return $this->adapter->create(array_merge($baseLog, $attributes));
+        /** @var array{userId?: string|null, event: string, resource: string, userAgent: string, ip: string, location?: string, data?: array<string, mixed>} $log */
+        $log = array_merge($baseLog, $attributes);
+        return $this->adapter->create($log);
     }
 
     /**
@@ -85,6 +87,7 @@ class Audit
      */
     public function logBatch(array $events, array $defaultAttributes = []): bool
     {
+        /** @var array<array{userId?: string|null, event: string, resource: string, userAgent: string, ip: string, location?: string, time: \DateTime|string|null, data?: array<string, mixed>}> $eventsWithDefaults */
         $eventsWithDefaults = array_map(static fn (array $event) => array_merge($defaultAttributes, $event), $events);
 
         return $this->adapter->createBatch($eventsWithDefaults);

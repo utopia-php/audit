@@ -809,15 +809,17 @@ trait AuditBase
      * Apply adapter-specific required attributes to batch events.
      *
      * @param array<int, array<string, mixed>> $batchEvents
-     * @return array<int, array<string, mixed>>
+     * @return array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, time: string, data?: array<string, mixed>}>
      */
     protected function applyRequiredAttributesToBatch(array $batchEvents): array
     {
         $requiredAttributes = $this->getRequiredAttributes();
         if ($requiredAttributes === []) {
+            /** @var array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, time: string, data?: array<string, mixed>}> */
             return $batchEvents;
         }
 
+        /** @var array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, time: string, data?: array<string, mixed>}> */
         return array_map(static fn (array $event) => array_merge($event, $requiredAttributes), $batchEvents);
     }
 
