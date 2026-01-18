@@ -650,6 +650,7 @@ class ClickHouse extends SQL
     {
         $columns = [];
         foreach ($this->getAttributes() as $attribute) {
+            /** @var string $columnName */
             $columnName = $attribute['$id'];
             // Exclude id and tenant as they're handled separately
             if ($columnName !== 'id' && $columnName !== 'tenant') {
@@ -733,39 +734,52 @@ class ClickHouse extends SQL
             }
         }
 
+        // This is unreachable code but kept for completeness - all valid types are handled above
+        // @phpstan-ignore-next-line
         throw new Exception('DateTime must be a DateTime object or string');
     }
 
     /**
      * Create an audit log entry.
      *
+     * @param array<string, mixed> $log The log data
      * @throws Exception
      */
     public function create(array $log): Log
     {
         $id = uniqid('', true);
-        $time = $this->formatDateTimeForClickHouse($log['time'] ?? null);
+        // Format time - use provided time or current time
+        /** @var string|\DateTime|null $logTime */
+        $logTime = $log['time'] ?? null;
+        $timeValue = $this->formatDateTimeForClickHouse($logTime);
 
         $tableName = $this->getTableName();
 
         // Build column list and placeholders dynamically from attributes
-        $columns = ['id'];
-        $placeholders = ['{id:String}'];
-        $params = ['id' => $id];
+        $columns = ['id', 'time'];
+        $placeholders = ['{id:String}', '{time:String}'];
+        $params = [
+            'id' => $id,
+            'time' => $timeValue,
+        ];
 
         // Get all column names from attributes
         $attributeColumns = $this->getColumnNames();
 
         foreach ($attributeColumns as $column) {
+            if ($column === 'time') {
+                // Skip time - already handled above
+                continue;
+            }
+
             if (isset($log[$column])) {
                 $columns[] = $column;
 
-                // Special handling for time column
-                if ($column === 'time') {
-                    $params[$column] = $this->formatDateTimeForClickHouse($log[$column]);
-                    $placeholders[] = '{' . $column . ':String}';
-                } elseif ($column === 'data') {
-                    $params[$column] = json_encode($log[$column] ?? []);
+                // Special handling for data column
+                if ($column === 'data') {
+                    /** @var array<string, mixed> $dataValue */
+                    $dataValue = $log['data'] ?? [];
+                    $params[$column] = json_encode($dataValue);
                     // data is nullable based on attributes
                     $placeholders[] = '{' . $column . ':Nullable(String)}';
                 } elseif (in_array($column, ['userId', 'location', 'userInternalId', 'resourceParent', 'resourceInternalId', 'country'])) {
@@ -778,13 +792,6 @@ class ClickHouse extends SQL
                     $placeholders[] = '{' . $column . ':String}';
                 }
             }
-        }
-
-        // Add special handling for time if not provided
-        if (!isset($log['time'])) {
-            $columns[] = 'time';
-            $params['time'] = $time;
-            $placeholders[] = '{time:String}';
         }
 
         if ($this->sharedTables) {
@@ -806,12 +813,17 @@ class ClickHouse extends SQL
 
         $result = ['$id' => $id];
 
+        // Add time
+        $result['time'] = $timeValue;
+
         // Add all columns from log to result
         foreach ($attributeColumns as $column) {
             if ($column === 'time') {
-                $result[$column] = $time;
-            } elseif ($column === 'data') {
-                $result[$column] = $log[$column] ?? [];
+                continue; // Already added
+            }
+
+            if ($column === 'data') {
+                $result[$column] = $log['data'] ?? [];
             } elseif (isset($log[$column])) {
                 $result[$column] = $log[$column];
             }
@@ -1077,6 +1089,7 @@ class ClickHouse extends SQL
     /**
      * Create multiple audit log entries in batch.
      *
+     * @param array<array<string, mixed>> $logs The logs to insert
      * @throws Exception
      */
     public function createBatch(array $logs): bool
@@ -1126,6 +1139,7 @@ class ClickHouse extends SQL
         $valueClauses = [];
 
         foreach ($logs as $log) {
+            /** @var array<string, mixed> $log */
             $id = uniqid('', true);
             $ids[] = $id;
 
@@ -1156,7 +1170,9 @@ class ClickHouse extends SQL
 
                 // Determine value based on column type
                 if ($column === 'time') {
-                    $value = $this->formatDateTimeForClickHouse($log['time'] ?? null);
+                    /** @var string|\DateTime|null $timeVal */
+                    $timeVal = $log['time'] ?? null;
+                    $value = $this->formatDateTimeForClickHouse($timeVal);
                     $params[$paramKey] = $value;
                     $placeholders[] = '{' . $paramKey . ':String}';
                 } elseif ($column === 'data') {
