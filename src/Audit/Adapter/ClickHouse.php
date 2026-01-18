@@ -807,15 +807,15 @@ class ClickHouse extends SQL
                 continue;
             }
 
-            // Check if value exists in main log or in data array
+            // Check if value exists in main log first, then in data array
             $attributeValue = null;
             $hasAttributeValue = false;
 
-            if (isset($log[$columnName]) && $log[$columnName] !== '') {
+            if (isset($log[$columnName])) {
                 // Value is in main log (e.g., userId, event, resource, etc.)
                 $attributeValue = $log[$columnName];
                 $hasAttributeValue = true;
-            } elseif (isset($logData[$columnName]) && $logData[$columnName] !== '') {
+            } elseif (isset($logData[$columnName])) {
                 // Value is in data array (additional attributes)
                 $attributeValue = $logData[$columnName];
                 $hasAttributeValue = true;
@@ -823,9 +823,9 @@ class ClickHouse extends SQL
                 unset($nonSchemaData[$columnName]);
             }
 
-            // Check if value is missing for required attributes
+            // Validate required attributes
             if ($isRequiredAttribute && !$hasAttributeValue) {
-                throw new \InvalidArgumentException("Required attribute '{$columnName}' is missing or empty in log entry");
+                throw new \InvalidArgumentException("Required attribute '{$columnName}' is missing in log entry");
             }
 
             if ($hasAttributeValue) {
@@ -1152,15 +1152,18 @@ class ClickHouse extends SQL
             $nonSchemaData = $logData;
             $processedLog = $log;
 
-            // Extract schema attributes from data array
+            // Extract schema attributes: check main log first, then data array
             foreach ($schemaColumns as $columnName) {
                 if ($columnName === 'data' || $columnName === 'time') {
                     continue;
                 }
 
-                // If attribute exists in data array and not in main log, move it
+                // If attribute not in main log, check data array
                 if (!isset($processedLog[$columnName]) && isset($logData[$columnName])) {
                     $processedLog[$columnName] = $logData[$columnName];
+                    unset($nonSchemaData[$columnName]);
+                } elseif (isset($processedLog[$columnName]) && isset($logData[$columnName])) {
+                    // If in both, main log takes precedence, remove from data
                     unset($nonSchemaData[$columnName]);
                 }
             }
@@ -1238,18 +1241,19 @@ class ClickHouse extends SQL
                 $hasAttributeValue = false;
 
                 if ($columnName === 'data') {
-                    // Data column - encode as JSON\n                    /** @var array<string, mixed> $dataValue */
+                    // Data column - encode as JSON
+                    /** @var array<string, mixed> $dataValue */
                     $dataValue = $processedLog['data'];
                     $attributeValue = json_encode($dataValue);
                     $hasAttributeValue = true;
-                } elseif (isset($processedLog[$columnName]) && $processedLog[$columnName] !== '') {
+                } elseif (isset($processedLog[$columnName])) {
                     $attributeValue = $processedLog[$columnName];
                     $hasAttributeValue = true;
                 }
 
-                // Check if value is missing for required attributes
+                // Validate required attributes
                 if ($isRequiredAttribute && !$hasAttributeValue) {
-                    throw new \InvalidArgumentException("Required attribute '{$columnName}' is missing or empty in batch log entry");
+                    throw new \InvalidArgumentException("Required attribute '{$columnName}' is missing in batch log entry");
                 }
 
                 $queryParams[$paramKey] = $attributeValue;
