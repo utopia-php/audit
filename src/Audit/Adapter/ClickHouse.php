@@ -1287,6 +1287,7 @@ class ClickHouse extends SQL
 
     /**
      * Parse ClickHouse query result into Log objects.
+     * Dynamically maps columns based on current attribute definitions.
      *
      * @return array<int, Log>
      */
@@ -1299,26 +1300,30 @@ class ClickHouse extends SQL
         $lines = explode("\n", trim($result));
         $documents = [];
 
+        // Build the expected column order dynamically
+        $selectColumns = [];
+        foreach ($this->getAttributes() as $attribute) {
+            $id = $attribute['$id'];
+            if ($id !== 'data') {
+                $selectColumns[] = $id;
+            }
+        }
+        $selectColumns[] = 'data';
+
+        if ($this->sharedTables) {
+            $selectColumns[] = 'tenant';
+        }
+
+        $expectedColumns = count($selectColumns);
+
         foreach ($lines as $line) {
             if (empty(trim($line))) {
                 continue;
             }
 
             $columns = explode("\t", $line);
-            // Expect 9 columns without sharedTables, 10 with sharedTables
-            $expectedColumns = $this->sharedTables ? 10 : 9;
             if (count($columns) < $expectedColumns) {
                 continue;
-            }
-
-            $data = json_decode($columns[8], true) ?? [];
-
-            // Convert ClickHouse timestamp format back to ISO 8601
-            // ClickHouse: 2025-12-07 23:33:54.493
-            // ISO 8601:   2025-12-07T23:33:54.493+00:00
-            $time = $columns[7];
-            if (strpos($time, 'T') === false) {
-                $time = str_replace(' ', 'T', $time) . '+00:00';
             }
 
             // Helper function to parse nullable string fields
@@ -1330,21 +1335,47 @@ class ClickHouse extends SQL
                 return $value;
             };
 
-            $document = [
-                '$id' => $columns[0],
-                'userId' => $parseNullableString($columns[1]),
-                'event' => $columns[2],
-                'resource' => $columns[3],
-                'userAgent' => $columns[4],
-                'ip' => $columns[5],
-                'location' => $parseNullableString($columns[6]),
-                'time' => $time,
-                'data' => $data,
-            ];
+            // Build document dynamically by mapping columns to values
+            $document = [];
+            foreach ($selectColumns as $index => $columnName) {
+                if (!isset($columns[$index])) {
+                    continue;
+                }
 
-            // Add tenant only if sharedTables is enabled
-            if ($this->sharedTables && isset($columns[9])) {
-                $document['tenant'] = $columns[9] === '\\N' || $columns[9] === '' ? null : (int) $columns[9];
+                $value = $columns[$index];
+
+                if ($columnName === 'data') {
+                    // Decode JSON data column
+                    $document[$columnName] = json_decode($value, true) ?? [];
+                } elseif ($columnName === 'tenant') {
+                    // Parse tenant as integer or null
+                    $document[$columnName] = ($value === '\\N' || $value === '') ? null : (int) $value;
+                } elseif ($columnName === 'time') {
+                    // Convert ClickHouse timestamp format back to ISO 8601
+                    // ClickHouse: 2025-12-07 23:33:54.493
+                    // ISO 8601:   2025-12-07T23:33:54.493+00:00
+                    $parsedTime = $value;
+                    if (strpos($parsedTime, 'T') === false) {
+                        $parsedTime = str_replace(' ', 'T', $parsedTime) . '+00:00';
+                    }
+                    $document[$columnName] = $parsedTime;
+                } else {
+                    // Get attribute metadata to check if nullable
+                    $attribute = $this->getAttribute($columnName);
+                    if ($attribute && !$attribute['required']) {
+                        // Nullable field - parse null values
+                        $document[$columnName] = $parseNullableString($value);
+                    } else {
+                        // Required field - use value as-is
+                        $document[$columnName] = $value;
+                    }
+                }
+            }
+
+            // Add special $id field if present
+            if (isset($document['id'])) {
+                $document['$id'] = $document['id'];
+                unset($document['id']);
             }
 
             $documents[] = new Log($document);
@@ -1355,24 +1386,27 @@ class ClickHouse extends SQL
 
     /**
      * Get the SELECT column list for queries.
+     * Dynamically builds the column list from attributes, excluding 'data' column.
      * Escapes all column names to prevent SQL injection.
      *
      * @return string
      */
     private function getSelectColumns(): string
     {
-        $columns = [
-            $this->escapeIdentifier('id'),
-            $this->escapeIdentifier('userId'),
-            $this->escapeIdentifier('event'),
-            $this->escapeIdentifier('resource'),
-            $this->escapeIdentifier('userAgent'),
-            $this->escapeIdentifier('ip'),
-            $this->escapeIdentifier('location'),
-            $this->escapeIdentifier('time'),
-            $this->escapeIdentifier('data'),
-        ];
+        $columns = [];
 
+        // Dynamically add all attribute columns except 'data'
+        foreach ($this->getAttributes() as $attribute) {
+            $id = $attribute['$id'];
+            if ($id !== 'data') {
+                $columns[] = $this->escapeIdentifier($id);
+            }
+        }
+
+        // Add data column at the end
+        $columns[] = $this->escapeIdentifier('data');
+
+        // Add tenant column if shared tables are enabled
         if ($this->sharedTables) {
             $columns[] = $this->escapeIdentifier('tenant');
         }
@@ -1480,6 +1514,9 @@ class ClickHouse extends SQL
     /**
      * Get ClickHouse-specific SQL column definition for a given attribute ID.
      *
+     * Dynamically determines the ClickHouse type based on attribute metadata.
+     * DateTime attributes use DateTime64(3), all others use String.
+     *
      * @param string $id Attribute identifier
      * @return string ClickHouse column definition with appropriate types and nullability
      * @throws Exception
@@ -1492,12 +1529,11 @@ class ClickHouse extends SQL
             throw new Exception("Attribute {$id} not found");
         }
 
-        // ClickHouse-specific type mapping
-        $type = match ($id) {
-            'userId', 'event', 'resource', 'userAgent', 'ip', 'location', 'data' => 'String',
-            'time' => 'DateTime64(3)',
-            default => 'String',
-        };
+        // Dynamically determine type based on attribute metadata
+        // DateTime attributes use DateTime64(3), all others use String
+        $type = (isset($attribute['type']) && $attribute['type'] === Database::VAR_DATETIME)
+            ? 'DateTime64(3)'
+            : 'String';
 
         $nullable = !$attribute['required'] ? 'Nullable(' . $type . ')' : $type;
 
