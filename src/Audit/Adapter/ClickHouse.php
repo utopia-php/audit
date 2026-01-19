@@ -691,23 +691,6 @@ class ClickHouse extends SQL
     }
 
     /**
-     * Get attribute metadata by column name.
-     * Searches through all attributes to find metadata for a specific column.
-     *
-     * @param string $columnName The column name to look up
-     * @return array<string, mixed>|null The attribute metadata or null if not found
-     */
-    private function getAttributeMetadata(string $columnName): ?array
-    {
-        foreach ($this->getAttributes() as $attribute) {
-            if ($attribute['$id'] === $columnName) {
-                return $attribute;
-            }
-        }
-        return null;
-    }
-
-    /**
      * Format datetime for ClickHouse compatibility.
      * Converts datetime to 'YYYY-MM-DD HH:MM:SS.mmm' format without timezone suffix.
      * ClickHouse DateTime64(3) type expects this format as timezone is handled by column metadata.
@@ -784,7 +767,7 @@ class ClickHouse extends SQL
             }
 
             // Get attribute metadata to determine if required and nullable
-            $attributeMetadata = $this->getAttributeMetadata($columnName);
+            $attributeMetadata = $this->getAttribute($columnName);
             $isRequiredAttribute = $attributeMetadata !== null && isset($attributeMetadata['required']) && $attributeMetadata['required'];
             $isNullableAttribute = $attributeMetadata !== null && (!isset($attributeMetadata['required']) || !$attributeMetadata['required']);
 
@@ -1219,7 +1202,7 @@ class ClickHouse extends SQL
                 $paramKey = $columnName . '_' . $paramCounter;
 
                 // Get attribute metadata to determine if required and nullable
-                $attributeMetadata = $this->getAttributeMetadata($columnName);
+                $attributeMetadata = $this->getAttribute($columnName);
                 $isRequiredAttribute = $attributeMetadata !== null && isset($attributeMetadata['required']) && $attributeMetadata['required'];
                 $isNullableAttribute = $attributeMetadata !== null && (!isset($attributeMetadata['required']) || !$attributeMetadata['required']);
 
