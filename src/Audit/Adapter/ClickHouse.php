@@ -708,24 +708,10 @@ class ClickHouse extends SQL
     }
 
     /**
-     * Format datetime values for ClickHouse parameter binding.
-     * Removes timezone suffixes which are incompatible with DateTime64 type comparisons.
-     *
-     * @param mixed $value The value to format
-     * @return string Formatted string without timezone suffix
-     */
-    private function formatDateTimeParam(mixed $value): string
-    {
-        $strValue = $this->formatParamValue($value);
-        // Remove timezone suffix if present (e.g., +00:00, -05:00)
-        return preg_replace('/[+\\-]\\d{2}:\\d{2}$/', '', $strValue) ?? $strValue;
-    }
-
-
-    /**
      * Format datetime for ClickHouse compatibility.
      * Converts datetime to 'YYYY-MM-DD HH:MM:SS.mmm' format without timezone suffix.
      * ClickHouse DateTime64(3) type expects this format as timezone is handled by column metadata.
+     * Works with DateTime objects, strings, and other datetime representations.
      *
      * @param \DateTime|string|null $dateTime The datetime value to format
      * @return string The formatted datetime string in ClickHouse compatible format
@@ -1053,8 +1039,8 @@ class ClickHouse extends SQL
                     if ($attribute === 'time') {
                         $paramType = 'DateTime64(3)';
                         $filters[] = "{$escapedAttr} BETWEEN {{$paramName1}:{$paramType}} AND {{$paramName2}:{$paramType}}";
-                        $params[$paramName1] = $this->formatDateTimeParam($values[0]);
-                        $params[$paramName2] = $this->formatDateTimeParam($values[1]);
+                        $params[$paramName1] = $this->formatDateTimeForClickHouse($values[0]);
+                        $params[$paramName2] = $this->formatDateTimeForClickHouse($values[1]);
                     } else {
                         $filters[] = "{$escapedAttr} BETWEEN {{$paramName1}:String} AND {{$paramName2}:String}";
                         $params[$paramName1] = $this->formatParamValue($values[0]);
@@ -1300,8 +1286,8 @@ class ClickHouse extends SQL
         $lines = explode("\n", trim($result));
         $documents = [];
 
-        // Build the expected column order dynamically
-        $selectColumns = [];
+        // Build the expected column order dynamically (matching getSelectColumns order)
+        $selectColumns = ['id'];
         foreach ($this->getAttributes() as $attribute) {
             $id = $attribute['$id'];
             if ($id !== 'data') {
@@ -1394,6 +1380,9 @@ class ClickHouse extends SQL
     private function getSelectColumns(): string
     {
         $columns = [];
+
+        // Add id column first (not part of attributes)
+        $columns[] = $this->escapeIdentifier('id');
 
         // Dynamically add all attribute columns except 'data'
         foreach ($this->getAttributes() as $attribute) {
