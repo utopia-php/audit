@@ -1000,16 +1000,26 @@ class ClickHouse extends SQL
                     $this->validateAttributeName($attribute);
                     $escapedAttr = $this->escapeIdentifier($attribute);
                     $paramName = 'param_' . $paramCounter++;
-                    $filters[] = "{$escapedAttr} < {{$paramName}:String}";
-                    $params[$paramName] = $this->formatParamValue($values[0]);
+                    if ($attribute === 'time') {
+                        $filters[] = "{$escapedAttr} < {{$paramName}:DateTime64(3)}";
+                        $params[$paramName] = $this->formatDateTime($values[0]);
+                    } else {
+                        $filters[] = "{$escapedAttr} < {{$paramName}:String}";
+                        $params[$paramName] = $this->formatParamValue($values[0]);
+                    }
                     break;
 
                 case Query::TYPE_GREATER:
                     $this->validateAttributeName($attribute);
                     $escapedAttr = $this->escapeIdentifier($attribute);
                     $paramName = 'param_' . $paramCounter++;
-                    $filters[] = "{$escapedAttr} > {{$paramName}:String}";
-                    $params[$paramName] = $this->formatParamValue($values[0]);
+                    if ($attribute === 'time') {
+                        $filters[] = "{$escapedAttr} > {{$paramName}:DateTime64(3)}";
+                        $params[$paramName] = $this->formatDateTime($values[0]);
+                    } else {
+                        $filters[] = "{$escapedAttr} > {{$paramName}:String}";
+                        $params[$paramName] = $this->formatParamValue($values[0]);
+                    }
                     break;
 
                 case Query::TYPE_BETWEEN:
@@ -1525,31 +1535,23 @@ class ClickHouse extends SQL
         int $offset = 0,
         bool $ascending = false,
     ): array {
-        $time = $this->buildTimeClause($after, $before);
-        $order = $ascending ? 'ASC' : 'DESC';
+        $queries = [
+            Query::equal('userId', $userId),
+        ];
 
-        $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
-        $escapedUserId = $this->escapeIdentifier('userId');
-        $escapedTime = $this->escapeIdentifier('time');
+        if ($after !== null && $before !== null) {
+            $queries[] = Query::between('time', $after, $before);
+        } elseif ($after !== null) {
+            $queries[] = Query::greaterThan('time', $after);
+        } elseif ($before !== null) {
+            $queries[] = Query::lessThan('time', $before);
+        }
 
-        $sql = "
-            SELECT " . $this->getSelectColumns() . "
-            FROM {$escapedTable}
-            WHERE {$escapedUserId} = {userId:String}{$tenantFilter}{$time['clause']}
-            ORDER BY {$escapedTime} {$order}
-            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
-            FORMAT TabSeparated
-        ";
+        $queries[] = $ascending ? Query::orderAsc('time') : Query::orderDesc('time');
+        $queries[] = Query::limit($limit);
+        $queries[] = Query::offset($offset);
 
-        $result = $this->query($sql, array_merge([
-            'userId' => $userId,
-            'limit' => $limit,
-            'offset' => $offset,
-        ], $time['params']));
-
-        return $this->parseResults($result);
+        return $this->find($queries);
     }
 
     /**
@@ -1562,25 +1564,19 @@ class ClickHouse extends SQL
         ?\DateTime $after = null,
         ?\DateTime $before = null,
     ): int {
-        $time = $this->buildTimeClause($after, $before);
+        $queries = [
+            Query::equal('userId', $userId),
+        ];
 
-        $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
-        $escapedUserId = $this->escapeIdentifier('userId');
+        if ($after !== null && $before !== null) {
+            $queries[] = Query::between('time', $after, $before);
+        } elseif ($after !== null) {
+            $queries[] = Query::greaterThan('time', $after);
+        } elseif ($before !== null) {
+            $queries[] = Query::lessThan('time', $before);
+        }
 
-        $sql = "
-            SELECT count()
-            FROM {$escapedTable}
-            WHERE {$escapedUserId} = {userId:String}{$tenantFilter}{$time['clause']}
-            FORMAT TabSeparated
-        ";
-
-        $result = $this->query($sql, array_merge([
-            'userId' => $userId,
-        ], $time['params']));
-
-        return (int) trim($result);
+        return count($this->find($queries));
     }
 
     /**
@@ -1596,31 +1592,23 @@ class ClickHouse extends SQL
         int $offset = 0,
         bool $ascending = false,
     ): array {
-        $time = $this->buildTimeClause($after, $before);
-        $order = $ascending ? 'ASC' : 'DESC';
+        $queries = [
+            Query::equal('resource', $resource),
+        ];
 
-        $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
-        $escapedResource = $this->escapeIdentifier('resource');
-        $escapedTime = $this->escapeIdentifier('time');
+        if ($after !== null && $before !== null) {
+            $queries[] = Query::between('time', $after, $before);
+        } elseif ($after !== null) {
+            $queries[] = Query::greaterThan('time', $after);
+        } elseif ($before !== null) {
+            $queries[] = Query::lessThan('time', $before);
+        }
 
-        $sql = "
-            SELECT " . $this->getSelectColumns() . "
-            FROM {$escapedTable}
-            WHERE {$escapedResource} = {resource:String}{$tenantFilter}{$time['clause']}
-            ORDER BY {$escapedTime} {$order}
-            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
-            FORMAT TabSeparated
-        ";
+        $queries[] = $ascending ? Query::orderAsc('time') : Query::orderDesc('time');
+        $queries[] = Query::limit($limit);
+        $queries[] = Query::offset($offset);
 
-        $result = $this->query($sql, array_merge([
-            'resource' => $resource,
-            'limit' => $limit,
-            'offset' => $offset,
-        ], $time['params']));
-
-        return $this->parseResults($result);
+        return $this->find($queries);
     }
 
     /**
@@ -1633,25 +1621,19 @@ class ClickHouse extends SQL
         ?\DateTime $after = null,
         ?\DateTime $before = null,
     ): int {
-        $time = $this->buildTimeClause($after, $before);
+        $queries = [
+            Query::equal('resource', $resource),
+        ];
 
-        $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
-        $escapedResource = $this->escapeIdentifier('resource');
+        if ($after !== null && $before !== null) {
+            $queries[] = Query::between('time', $after, $before);
+        } elseif ($after !== null) {
+            $queries[] = Query::greaterThan('time', $after);
+        } elseif ($before !== null) {
+            $queries[] = Query::lessThan('time', $before);
+        }
 
-        $sql = "
-            SELECT count()
-            FROM {$escapedTable}
-            WHERE {$escapedResource} = {resource:String}{$tenantFilter}{$time['clause']}
-            FORMAT TabSeparated
-        ";
-
-        $result = $this->query($sql, array_merge([
-            'resource' => $resource,
-        ], $time['params']));
-
-        return (int) trim($result);
+        return count($this->find($queries));
     }
 
     /**
@@ -1668,29 +1650,24 @@ class ClickHouse extends SQL
         int $offset = 0,
         bool $ascending = false,
     ): array {
-        $time = $this->buildTimeClause($after, $before);
-        $order = $ascending ? 'ASC' : 'DESC';
-        $eventList = $this->buildEventsList($events, 0);
-        $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $queries = [
+            Query::equal('userId', $userId),
+            Query::in('event', $events),
+        ];
 
-        $sql = "
-            SELECT " . $this->getSelectColumns() . "
-            FROM {$escapedTable}
-            WHERE userId = {userId:String} AND event IN ({$eventList['clause']}){$tenantFilter}{$time['clause']}
-            ORDER BY time {$order}
-            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
-            FORMAT TabSeparated
-        ";
+        if ($after !== null && $before !== null) {
+            $queries[] = Query::between('time', $after, $before);
+        } elseif ($after !== null) {
+            $queries[] = Query::greaterThan('time', $after);
+        } elseif ($before !== null) {
+            $queries[] = Query::lessThan('time', $before);
+        }
 
-        $result = $this->query($sql, array_merge([
-            'userId' => $userId,
-            'limit' => $limit,
-            'offset' => $offset,
-        ], $eventList['params'], $time['params']));
+        $queries[] = $ascending ? Query::orderAsc('time') : Query::orderDesc('time');
+        $queries[] = Query::limit($limit);
+        $queries[] = Query::offset($offset);
 
-        return $this->parseResults($result);
+        return $this->find($queries);
     }
 
     /**
@@ -1704,26 +1681,20 @@ class ClickHouse extends SQL
         ?\DateTime $after = null,
         ?\DateTime $before = null,
     ): int {
-        $time = $this->buildTimeClause($after, $before);
-        $eventList = $this->buildEventsList($events, 0);
-        $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
-        $escapedUserId = $this->escapeIdentifier('userId');
-        $escapedEvent = $this->escapeIdentifier('event');
+        $queries = [
+            Query::equal('userId', $userId),
+            Query::in('event', $events),
+        ];
 
-        $sql = "
-            SELECT count()
-            FROM {$escapedTable}
-            WHERE {$escapedUserId} = {userId:String} AND {$escapedEvent} IN ({$eventList['clause']}){$tenantFilter}{$time['clause']}
-            FORMAT TabSeparated
-        ";
+        if ($after !== null && $before !== null) {
+            $queries[] = Query::between('time', $after, $before);
+        } elseif ($after !== null) {
+            $queries[] = Query::greaterThan('time', $after);
+        } elseif ($before !== null) {
+            $queries[] = Query::lessThan('time', $before);
+        }
 
-        $result = $this->query($sql, array_merge([
-            'userId' => $userId,
-        ], $eventList['params'], $time['params']));
-
-        return (int) trim($result);
+        return count($this->find($queries));
     }
 
     /**
@@ -1740,29 +1711,24 @@ class ClickHouse extends SQL
         int $offset = 0,
         bool $ascending = false,
     ): array {
-        $time = $this->buildTimeClause($after, $before);
-        $order = $ascending ? 'ASC' : 'DESC';
-        $eventList = $this->buildEventsList($events, 0);
-        $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $queries = [
+            Query::equal('resource', $resource),
+            Query::in('event', $events),
+        ];
 
-        $sql = "
-            SELECT " . $this->getSelectColumns() . "
-            FROM {$escapedTable}
-            WHERE resource = {resource:String} AND event IN ({$eventList['clause']}){$tenantFilter}{$time['clause']}
-            ORDER BY time {$order}
-            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
-            FORMAT TabSeparated
-        ";
+        if ($after !== null && $before !== null) {
+            $queries[] = Query::between('time', $after, $before);
+        } elseif ($after !== null) {
+            $queries[] = Query::greaterThan('time', $after);
+        } elseif ($before !== null) {
+            $queries[] = Query::lessThan('time', $before);
+        }
 
-        $result = $this->query($sql, array_merge([
-            'resource' => $resource,
-            'limit' => $limit,
-            'offset' => $offset,
-        ], $eventList['params'], $time['params']));
+        $queries[] = $ascending ? Query::orderAsc('time') : Query::orderDesc('time');
+        $queries[] = Query::limit($limit);
+        $queries[] = Query::offset($offset);
 
-        return $this->parseResults($result);
+        return $this->find($queries);
     }
 
     /**
@@ -1776,26 +1742,20 @@ class ClickHouse extends SQL
         ?\DateTime $after = null,
         ?\DateTime $before = null,
     ): int {
-        $time = $this->buildTimeClause($after, $before);
-        $eventList = $this->buildEventsList($events, 0);
-        $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
-        $escapedResource = $this->escapeIdentifier('resource');
-        $escapedEvent = $this->escapeIdentifier('event');
+        $queries = [
+            Query::equal('resource', $resource),
+            Query::in('event', $events),
+        ];
 
-        $sql = "
-            SELECT count()
-            FROM {$escapedTable}
-            WHERE {$escapedResource} = {resource:String} AND {$escapedEvent} IN ({$eventList['clause']}){$tenantFilter}{$time['clause']}
-            FORMAT TabSeparated
-        ";
+        if ($after !== null && $before !== null) {
+            $queries[] = Query::between('time', $after, $before);
+        } elseif ($after !== null) {
+            $queries[] = Query::greaterThan('time', $after);
+        } elseif ($before !== null) {
+            $queries[] = Query::lessThan('time', $before);
+        }
 
-        $result = $this->query($sql, array_merge([
-            'resource' => $resource,
-        ], $eventList['params'], $time['params']));
-
-        return (int) trim($result);
+        return count($this->find($queries));
     }
 
     /**
