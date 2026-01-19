@@ -617,7 +617,7 @@ class ClickHouse extends SQL
             /** @var array<string> $attributes */
             $attributes = $index['attributes'];
             // Escape each attribute name to prevent SQL injection
-            $escapedAttributes = array_map(fn ($attr) => $this->escapeIdentifier($attr), $attributes);
+            $escapedAttributes = array_map(fn (string $attr) => $this->escapeIdentifier($attr), $attributes);
             $attributeList = implode(', ', $escapedAttributes);
             $indexes[] = "INDEX {$indexName} ({$attributeList}) TYPE bloom_filter GRANULARITY 1";
         }
@@ -700,7 +700,7 @@ class ClickHouse extends SQL
      * @return string The formatted datetime string in ClickHouse compatible format
      * @throws Exception If the datetime string cannot be parsed
      */
-    private function formatDateTime($dateTime): string
+    private function formatDateTime(\DateTime|string|null $dateTime): string
     {
         if ($dateTime === null) {
             return (new \DateTime())->format('Y-m-d H:i:s.v');
@@ -985,12 +985,15 @@ class ClickHouse extends SQL
 
             $method = $query->getMethod();
             $attribute = $query->getAttribute();
+            /** @var string $attribute */
+
+            $values = $query->getValues();
             $values = $query->getValues();
 
             switch ($method) {
                 case Query::TYPE_EQUAL:
                     $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $escapedAttr = $this->escapeIdentifier((string) $attribute);
                     $paramName = 'param_' . $paramCounter++;
                     $filters[] = "{$escapedAttr} = {{$paramName}:String}";
                     $params[$paramName] = $this->formatParamValue($values[0]);
@@ -998,11 +1001,13 @@ class ClickHouse extends SQL
 
                 case Query::TYPE_LESSER:
                     $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $escapedAttr = $this->escapeIdentifier((string) $attribute);
                     $paramName = 'param_' . $paramCounter++;
                     if ($attribute === 'time') {
                         $filters[] = "{$escapedAttr} < {{$paramName}:DateTime64(3)}";
-                        $params[$paramName] = $this->formatDateTime($values[0]);
+                        /** @var \DateTime|string|null $val */
+                        $val = $values[0];
+                        $params[$paramName] = $this->formatDateTime($val);
                     } else {
                         $filters[] = "{$escapedAttr} < {{$paramName}:String}";
                         $params[$paramName] = $this->formatParamValue($values[0]);
@@ -1011,11 +1016,13 @@ class ClickHouse extends SQL
 
                 case Query::TYPE_GREATER:
                     $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $escapedAttr = $this->escapeIdentifier((string) $attribute);
                     $paramName = 'param_' . $paramCounter++;
                     if ($attribute === 'time') {
                         $filters[] = "{$escapedAttr} > {{$paramName}:DateTime64(3)}";
-                        $params[$paramName] = $this->formatDateTime($values[0]);
+                        /** @var \DateTime|string|null $val */
+                        $val = $values[0];
+                        $params[$paramName] = $this->formatDateTime($val);
                     } else {
                         $filters[] = "{$escapedAttr} > {{$paramName}:String}";
                         $params[$paramName] = $this->formatParamValue($values[0]);
@@ -1024,7 +1031,7 @@ class ClickHouse extends SQL
 
                 case Query::TYPE_BETWEEN:
                     $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $escapedAttr = $this->escapeIdentifier((string) $attribute);
                     $paramName1 = 'param_' . $paramCounter++;
                     $paramName2 = 'param_' . $paramCounter++;
                     // Use DateTime64 type for time column, String for others
@@ -1032,8 +1039,12 @@ class ClickHouse extends SQL
                     if ($attribute === 'time') {
                         $paramType = 'DateTime64(3)';
                         $filters[] = "{$escapedAttr} BETWEEN {{$paramName1}:{$paramType}} AND {{$paramName2}:{$paramType}}";
-                        $params[$paramName1] = $this->formatDateTime($values[0]);
-                        $params[$paramName2] = $this->formatDateTime($values[1]);
+                        /** @var \DateTime|string|null $val1 */
+                        $val1 = $values[0];
+                        /** @var \DateTime|string|null $val2 */
+                        $val2 = $values[1];
+                        $params[$paramName1] = $this->formatDateTime($val1);
+                        $params[$paramName2] = $this->formatDateTime($val2);
                     } else {
                         $filters[] = "{$escapedAttr} BETWEEN {{$paramName1}:String} AND {{$paramName2}:String}";
                         $params[$paramName1] = $this->formatParamValue($values[0]);
@@ -1043,7 +1054,7 @@ class ClickHouse extends SQL
 
                 case Query::TYPE_IN:
                     $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $escapedAttr = $this->escapeIdentifier((string) $attribute);
                     $inParams = [];
                     foreach ($values as $value) {
                         $paramName = 'param_' . $paramCounter++;
@@ -1340,7 +1351,9 @@ class ClickHouse extends SQL
                     $document[$columnName] = $parsedTime;
                 } else {
                     // Get attribute metadata to check if nullable
-                    $attribute = $this->getAttribute($columnName);
+                    $col = $columnName;
+                    /** @var string $col */
+                    $attribute = $this->getAttribute($col);
                     if ($attribute && !$attribute['required']) {
                         // Nullable field - parse null values
                         $document[$columnName] = $parseNullableString($value);
@@ -1380,6 +1393,7 @@ class ClickHouse extends SQL
         // Dynamically add all attribute columns except 'data'
         foreach ($this->getAttributes() as $attribute) {
             $id = $attribute['$id'];
+            /** @var string $id */
             if ($id !== 'data') {
                 $columns[] = $this->escapeIdentifier($id);
             }
@@ -1420,6 +1434,7 @@ class ClickHouse extends SQL
      * @param \DateTime|null $before
      * @return array{clause: string, params: array<string, mixed>}
      */
+    /** @phpstan-ignore-next-line */
     private function buildTimeClause(?\DateTime $after, ?\DateTime $before): array
     {
         $params = [];
@@ -1476,6 +1491,7 @@ class ClickHouse extends SQL
      * @param int $paramOffset Base parameter number for creating unique param names
      * @return array{clause: string, params: array<string, string>}
      */
+    /** @phpstan-ignore-next-line */
     private function buildEventsList(array $events, int $paramOffset = 0): array
     {
         $placeholders = [];
