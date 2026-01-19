@@ -717,7 +717,7 @@ class ClickHouse extends SQL
      * @return string The formatted datetime string in ClickHouse compatible format
      * @throws Exception If the datetime string cannot be parsed
      */
-    private function formatDateTimeForClickHouse($dateTime): string
+    private function formatDateTime($dateTime): string
     {
         if ($dateTime === null) {
             return (new \DateTime())->format('Y-m-d H:i:s.v');
@@ -755,7 +755,7 @@ class ClickHouse extends SQL
         // Format time - use provided time or current time
         /** @var string|\DateTime|null $providedTime */
         $providedTime = $log['time'] ?? null;
-        $formattedTime = $this->formatDateTimeForClickHouse($providedTime);
+        $formattedTime = $this->formatDateTime($providedTime);
 
         $tableName = $this->getTableName();
 
@@ -1039,8 +1039,8 @@ class ClickHouse extends SQL
                     if ($attribute === 'time') {
                         $paramType = 'DateTime64(3)';
                         $filters[] = "{$escapedAttr} BETWEEN {{$paramName1}:{$paramType}} AND {{$paramName2}:{$paramType}}";
-                        $params[$paramName1] = $this->formatDateTimeForClickHouse($values[0]);
-                        $params[$paramName2] = $this->formatDateTimeForClickHouse($values[1]);
+                        $params[$paramName1] = $this->formatDateTime($values[0]);
+                        $params[$paramName2] = $this->formatDateTime($values[1]);
                     } else {
                         $filters[] = "{$escapedAttr} BETWEEN {{$paramName1}:String} AND {{$paramName2}:String}";
                         $params[$paramName1] = $this->formatParamValue($values[0]);
@@ -1205,7 +1205,7 @@ class ClickHouse extends SQL
             // Add time
             /** @var string|\DateTime|null $providedTime */
             $providedTime = $processedLog['time'] ?? null;
-            $formattedTime = $this->formatDateTimeForClickHouse($providedTime);
+            $formattedTime = $this->formatDateTime($providedTime);
             $paramKey = 'time_' . $paramCounter;
             $queryParams[$paramKey] = $formattedTime;
             $valuePlaceholders[] = '{' . $paramKey . ':String}';
