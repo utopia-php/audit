@@ -25,6 +25,16 @@ abstract class Adapter
     abstract public function setup(): void;
 
     /**
+     * Get a single log by its ID.
+     *
+     * @param string $id
+     * @return Log|null The log entry or null if not found
+     *
+     * @throws \Exception
+     */
+    abstract public function getById(string $id): ?Log;
+
+    /**
      * Create an audit log entry.
      *
      * @param array{
@@ -202,4 +212,24 @@ abstract class Adapter
      * @throws \Exception
      */
     abstract public function cleanup(\DateTime $datetime): bool;
+
+    /**
+     * Find logs using custom queries.
+     *
+     * @param array<\Utopia\Audit\Query> $queries
+     * @return array<Log>
+     *
+     * @throws \Exception
+     */
+    abstract public function find(array $queries = []): array;
+
+    /**
+     * Count logs using custom queries.
+     *
+     * @param array<\Utopia\Audit\Query> $queries
+     * @return int
+     *
+     * @throws \Exception
+     */
+    abstract public function count(array $queries = []): int;
 }

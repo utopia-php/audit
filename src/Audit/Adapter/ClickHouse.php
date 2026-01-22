@@ -4,6 +4,8 @@ namespace Utopia\Audit\Adapter;
 
 use Exception;
 use Utopia\Audit\Log;
+use Utopia\Audit\Query;
+use Utopia\Database\Database;
 use Utopia\Fetch\Client;
 use Utopia\Validator\Hostname;
 
@@ -249,6 +251,211 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Override getAttributes to provide extended attributes for ClickHouse.
+     * Includes existing attributes from parent and adds new missing ones.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getAttributes(): array
+    {
+        $parentAttributes = parent::getAttributes();
+
+        return [
+            ...$parentAttributes,
+            [
+                '$id' => 'userType',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => true,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'userInternalId',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => false,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'resourceParent',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => false,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'resourceType',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => true,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'resourceId',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => true,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'resourceInternalId',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => false,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'country',
+                'type' => Database::VAR_STRING,
+                'size' => Database::LENGTH_KEY,
+                'required' => false,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'projectId',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => true,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'projectInternalId',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => true,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'teamId',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => true,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'teamInternalId',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => true,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'hostname',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => true,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
+        ];
+    }
+
+    /**
+     * Override getIndexes to provide extended indexes for ClickHouse.
+     * Includes existing indexes from parent and adds new missing ones.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getIndexes(): array
+    {
+        $parentIndexes = parent::getIndexes();
+
+        // New indexes to add
+        return [
+            ...$parentIndexes,
+            [
+                '$id' => '_key_user_internal_and_event',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['userInternalId', 'event'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_project_internal_id',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['projectInternalId'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_team_internal_id',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['teamInternalId'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_user_internal_id',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['userInternalId'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_user_type',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['userType'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_country',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['country'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_hostname',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['hostname'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+        ];
+    }
+
+    /**
      * Get the table name with namespace prefix.
      * Namespace is used to isolate tables for different projects/applications.
      *
@@ -409,7 +616,9 @@ class ClickHouse extends SQL
             $indexName = $index['$id'];
             /** @var array<string> $attributes */
             $attributes = $index['attributes'];
-            $attributeList = implode(', ', $attributes);
+            // Escape each attribute name to prevent SQL injection
+            $escapedAttributes = array_map(fn (string $attr) => $this->escapeIdentifier($attr), $attributes);
+            $attributeList = implode(', ', $escapedAttributes);
             $indexes[] = "INDEX {$indexName} ({$attributeList}) TYPE bloom_filter GRANULARITY 1";
         }
 
@@ -432,72 +641,483 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Get column names from attributes.
+     * Returns an array of column names excluding 'id' and 'tenant' which are handled separately.
+     *
+     * @return array<string> Column names
+     */
+    private function getColumnNames(): array
+    {
+        $columns = [];
+        foreach ($this->getAttributes() as $attribute) {
+            /** @var string $columnName */
+            $columnName = $attribute['$id'];
+            // Exclude id and tenant as they're handled separately
+            if ($columnName !== 'id' && $columnName !== 'tenant') {
+                $columns[] = $columnName;
+            }
+        }
+        return $columns;
+    }
+
+    /**
+     * Validate that an attribute name exists in the schema.
+     * Prevents SQL injection by ensuring only valid column names are used.
+     *
+     * @param string $attributeName The attribute name to validate
+     * @return bool True if valid
+     * @throws Exception If attribute name is invalid
+     */
+    private function validateAttributeName(string $attributeName): bool
+    {
+        // Special case: 'id' is always valid
+        if ($attributeName === 'id') {
+            return true;
+        }
+
+        // Check if tenant is valid (only when sharedTables is enabled)
+        if ($attributeName === 'tenant' && $this->sharedTables) {
+            return true;
+        }
+
+        // Check against defined attributes
+        foreach ($this->getAttributes() as $attribute) {
+            if ($attribute['$id'] === $attributeName) {
+                return true;
+            }
+        }
+
+        throw new Exception("Invalid attribute name: {$attributeName}");
+    }
+
+    /**
+     * Format datetime for ClickHouse compatibility.
+     * Converts datetime to 'YYYY-MM-DD HH:MM:SS.mmm' format without timezone suffix.
+     * ClickHouse DateTime64(3) type expects this format as timezone is handled by column metadata.
+     * Works with DateTime objects, strings, and other datetime representations.
+     *
+     * @param \DateTime|string|null $dateTime The datetime value to format
+     * @return string The formatted datetime string in ClickHouse compatible format
+     * @throws Exception If the datetime string cannot be parsed
+     */
+    private function formatDateTime(\DateTime|string|null $dateTime): string
+    {
+        if ($dateTime === null) {
+            return (new \DateTime())->format('Y-m-d H:i:s.v');
+        }
+
+        if ($dateTime instanceof \DateTime) {
+            return $dateTime->format('Y-m-d H:i:s.v');
+        }
+
+        if (is_string($dateTime)) {
+            try {
+                // Parse the datetime string, handling ISO 8601 format with timezone
+                $dt = new \DateTime($dateTime);
+                return $dt->format('Y-m-d H:i:s.v');
+            } catch (\Exception $e) {
+                throw new Exception("Invalid datetime string: {$dateTime}");
+            }
+        }
+
+        // This is unreachable code but kept for completeness - all valid types are handled above
+        // @phpstan-ignore-next-line
+        throw new Exception('DateTime must be a DateTime object or string');
+    }
+
+    /**
      * Create an audit log entry.
      *
+     * @param array<string, mixed> $log The log data
      * @throws Exception
      */
     public function create(array $log): Log
     {
-        $id = uniqid('', true);
-        $time = (new \DateTime())->format('Y-m-d H:i:s.v');
+        $logId = uniqid('', true);
+
+        // Format time - use provided time or current time
+        /** @var string|\DateTime|null $providedTime */
+        $providedTime = $log['time'] ?? null;
+        $formattedTime = $this->formatDateTime($providedTime);
 
         $tableName = $this->getTableName();
 
-        // Build column list and values based on sharedTables setting
-        $columns = ['id', 'userId', 'event', 'resource', 'userAgent', 'ip', 'location', 'time', 'data'];
-        $placeholders = ['{id:String}', '{userId:Nullable(String)}', '{event:String}', '{resource:String}', '{userAgent:String}', '{ip:String}', '{location:Nullable(String)}', '{time:String}', '{data:String}'];
+        // Extract additional attributes from the data array
+        /** @var array<string, mixed> $logData */
+        $logData = $log['data'] ?? [];
 
-        $params = [
-            'id' => $id,
-            'userId' => $log['userId'] ?? null,
-            'event' => $log['event'],
-            'resource' => $log['resource'],
-            'userAgent' => $log['userAgent'],
-            'ip' => $log['ip'],
-            'location' => $log['location'] ?? null,
-            'time' => $time,
-            'data' => json_encode($log['data'] ?? []),
+        // Build column list and placeholders dynamically from attributes
+        $insertColumns = ['id', 'time'];
+        $valuePlaceholders = ['{id:String}', '{time:String}'];
+        $queryParams = [
+            'id' => $logId,
+            'time' => $formattedTime,
         ];
 
+        // Get all column names from attributes
+        $schemaColumns = $this->getColumnNames();
+
+        // Separate data for the data column (non-schema attributes)
+        $nonSchemaData = $logData;
+
+        foreach ($schemaColumns as $columnName) {
+            if ($columnName === 'time') {
+                // Skip time - already handled above
+                continue;
+            }
+
+            // Get attribute metadata to determine if required and nullable
+            $attributeMetadata = $this->getAttribute($columnName);
+            $isRequiredAttribute = $attributeMetadata !== null && isset($attributeMetadata['required']) && $attributeMetadata['required'];
+            $isNullableAttribute = $attributeMetadata !== null && (!isset($attributeMetadata['required']) || !$attributeMetadata['required']);
+
+            // For 'data' column, we'll handle it separately at the end
+            if ($columnName === 'data') {
+                continue;
+            }
+
+            // Check if value exists in main log first, then in data array
+            $attributeValue = null;
+            $hasAttributeValue = false;
+
+            if (isset($log[$columnName])) {
+                // Value is in main log (e.g., userId, event, resource, etc.)
+                $attributeValue = $log[$columnName];
+                $hasAttributeValue = true;
+            } elseif (isset($logData[$columnName])) {
+                // Value is in data array (additional attributes)
+                $attributeValue = $logData[$columnName];
+                $hasAttributeValue = true;
+                // Remove from non-schema data as it's now a dedicated column
+                unset($nonSchemaData[$columnName]);
+            }
+
+            // Validate required attributes
+            if ($isRequiredAttribute && !$hasAttributeValue) {
+                throw new \InvalidArgumentException("Required attribute '{$columnName}' is missing in log entry");
+            }
+
+            if ($hasAttributeValue) {
+                $insertColumns[] = $columnName;
+                $queryParams[$columnName] = $attributeValue;
+
+                // Determine placeholder type based on attribute metadata
+                if ($isNullableAttribute) {
+                    $valuePlaceholders[] = '{' . $columnName . ':Nullable(String)}';
+                } else {
+                    $valuePlaceholders[] = '{' . $columnName . ':String}';
+                }
+            }
+        }
+
+        // Add the data column with remaining non-schema attributes
+        $insertColumns[] = 'data';
+        $queryParams['data'] = json_encode($nonSchemaData);
+        $valuePlaceholders[] = '{data:Nullable(String)}';
+
         if ($this->sharedTables) {
-            $columns[] = 'tenant';
-            $placeholders[] = '{tenant:Nullable(UInt64)}';
-            $params['tenant'] = $this->tenant;
+            $insertColumns[] = 'tenant';
+            $valuePlaceholders[] = '{tenant:Nullable(UInt64)}';
+            $queryParams['tenant'] = $this->tenant;
         }
 
         $escapedDatabaseAndTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
         $insertSql = "
             INSERT INTO {$escapedDatabaseAndTable}
-            (" . implode(', ', $columns) . ")
+            (" . implode(', ', $insertColumns) . ")
             VALUES (
-                " . implode(", ", $placeholders) . "
+                " . implode(", ", $valuePlaceholders) . "
             )
         ";
 
-        $this->query($insertSql, $params);
+        $this->query($insertSql, $queryParams);
 
-        $result = [
-            '$id' => $id,
-            'userId' => $log['userId'] ?? null,
-            'event' => $log['event'],
-            'resource' => $log['resource'],
-            'userAgent' => $log['userAgent'],
-            'ip' => $log['ip'],
-            'location' => $log['location'] ?? null,
-            'time' => $time,
-            'data' => $log['data'] ?? [],
-        ];
-
-        if ($this->sharedTables) {
-            $result['tenant'] = $this->tenant;
+        // Retrieve the created log using getById to ensure consistency
+        $createdLog = $this->getById($logId);
+        if ($createdLog === null) {
+            throw new Exception("Failed to retrieve created log with ID: {$logId}");
         }
 
-        return new Log($result);
+        return $createdLog;
+    }
+
+    /**
+     * Get a single log by its ID.
+     *
+     * @param string $id
+     * @return Log|null The log entry or null if not found
+     * @throws Exception
+     */
+    public function getById(string $id): ?Log
+    {
+        $tableName = $this->getTableName();
+        $tenantFilter = $this->getTenantFilter();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $escapedId = $this->escapeIdentifier('id');
+
+        $sql = "
+            SELECT " . $this->getSelectColumns() . "
+            FROM {$escapedTable}
+            WHERE {$escapedId} = {id:String}{$tenantFilter}
+            LIMIT 1
+            FORMAT TabSeparated
+        ";
+
+        $result = $this->query($sql, ['id' => $id]);
+        $logs = $this->parseResults($result);
+
+        return $logs[0] ?? null;
+    }
+
+    /**
+     * Find logs using Query objects.
+     *
+     * @param array<Query> $queries
+     * @return array<Log>
+     * @throws Exception
+     */
+    public function find(array $queries = []): array
+    {
+        $tableName = $this->getTableName();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+
+        // Parse queries
+        $parsed = $this->parseQueries($queries);
+
+        // Build SELECT clause
+        $selectColumns = $this->getSelectColumns();
+
+        // Build WHERE clause
+        $whereClause = '';
+        $tenantFilter = $this->getTenantFilter();
+        if (!empty($parsed['filters']) || $tenantFilter) {
+            $conditions = $parsed['filters'];
+            if ($tenantFilter) {
+                $conditions[] = ltrim($tenantFilter, ' AND');
+            }
+            $whereClause = ' WHERE ' . implode(' AND ', $conditions);
+        }
+
+        // Build ORDER BY clause
+        $orderClause = '';
+        if (!empty($parsed['orderBy'])) {
+            $orderClause = ' ORDER BY ' . implode(', ', $parsed['orderBy']);
+        }
+
+        // Build LIMIT and OFFSET
+        $limitClause = isset($parsed['limit']) ? ' LIMIT {limit:UInt64}' : '';
+        $offsetClause = isset($parsed['offset']) ? ' OFFSET {offset:UInt64}' : '';
+
+        $sql = "
+            SELECT {$selectColumns}
+            FROM {$escapedTable}{$whereClause}{$orderClause}{$limitClause}{$offsetClause}
+            FORMAT TabSeparated
+        ";
+
+        $result = $this->query($sql, $parsed['params']);
+        return $this->parseResults($result);
+    }
+
+    /**
+     * Count logs using Query objects.
+     *
+     * @param array<Query> $queries
+     * @return int
+     * @throws Exception
+     */
+    public function count(array $queries = []): int
+    {
+        $tableName = $this->getTableName();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+
+        // Parse queries - we only need filters and params, not ordering/limit/offset
+        $parsed = $this->parseQueries($queries);
+
+        // Build WHERE clause
+        $whereClause = '';
+        $tenantFilter = $this->getTenantFilter();
+        if (!empty($parsed['filters']) || $tenantFilter) {
+            $conditions = $parsed['filters'];
+            if ($tenantFilter) {
+                $conditions[] = ltrim($tenantFilter, ' AND');
+            }
+            $whereClause = ' WHERE ' . implode(' AND ', $conditions);
+        }
+
+        // Remove limit and offset from params as they don't apply to count
+        $params = $parsed['params'];
+        unset($params['limit'], $params['offset']);
+
+        $sql = "
+            SELECT COUNT(*) as count
+            FROM {$escapedTable}{$whereClause}
+            FORMAT TabSeparated
+        ";
+
+        $result = $this->query($sql, $params);
+        $trimmed = trim($result);
+
+        return $trimmed !== '' ? (int) $trimmed : 0;
+    }
+
+    /**
+     * Parse Query objects into SQL components.
+     *
+     * @param array<Query> $queries
+     * @return array{filters: array<string>, params: array<string, mixed>, orderBy?: array<string>, limit?: int, offset?: int}
+     * @throws Exception
+     */
+    private function parseQueries(array $queries): array
+    {
+        $filters = [];
+        $params = [];
+        $orderBy = [];
+        $limit = null;
+        $offset = null;
+        $paramCounter = 0;
+
+        foreach ($queries as $query) {
+            if (!$query instanceof Query) {
+                /** @phpstan-ignore-next-line ternary.alwaysTrue - runtime validation despite type hint */
+                $type = is_object($query) ? get_class($query) : gettype($query);
+                throw new \InvalidArgumentException("Invalid query item: expected instance of Query, got {$type}");
+            }
+
+            $method = $query->getMethod();
+            $attribute = $query->getAttribute();
+            /** @var string $attribute */
+
+            $values = $query->getValues();
+            $values = $query->getValues();
+
+            switch ($method) {
+                case Query::TYPE_EQUAL:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier((string) $attribute);
+                    $paramName = 'param_' . $paramCounter++;
+                    $filters[] = "{$escapedAttr} = {{$paramName}:String}";
+                    $params[$paramName] = $this->formatParamValue($values[0]);
+                    break;
+
+                case Query::TYPE_LESSER:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier((string) $attribute);
+                    $paramName = 'param_' . $paramCounter++;
+                    if ($attribute === 'time') {
+                        $filters[] = "{$escapedAttr} < {{$paramName}:DateTime64(3)}";
+                        /** @var \DateTime|string|null $val */
+                        $val = $values[0];
+                        $params[$paramName] = $this->formatDateTime($val);
+                    } else {
+                        $filters[] = "{$escapedAttr} < {{$paramName}:String}";
+                        $params[$paramName] = $this->formatParamValue($values[0]);
+                    }
+                    break;
+
+                case Query::TYPE_GREATER:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier((string) $attribute);
+                    $paramName = 'param_' . $paramCounter++;
+                    if ($attribute === 'time') {
+                        $filters[] = "{$escapedAttr} > {{$paramName}:DateTime64(3)}";
+                        /** @var \DateTime|string|null $val */
+                        $val = $values[0];
+                        $params[$paramName] = $this->formatDateTime($val);
+                    } else {
+                        $filters[] = "{$escapedAttr} > {{$paramName}:String}";
+                        $params[$paramName] = $this->formatParamValue($values[0]);
+                    }
+                    break;
+
+                case Query::TYPE_BETWEEN:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier((string) $attribute);
+                    $paramName1 = 'param_' . $paramCounter++;
+                    $paramName2 = 'param_' . $paramCounter++;
+                    // Use DateTime64 type for time column, String for others
+                    // This prevents type mismatch when comparing DateTime64 with timezone-suffixed strings
+                    if ($attribute === 'time') {
+                        $paramType = 'DateTime64(3)';
+                        $filters[] = "{$escapedAttr} BETWEEN {{$paramName1}:{$paramType}} AND {{$paramName2}:{$paramType}}";
+                        /** @var \DateTime|string|null $val1 */
+                        $val1 = $values[0];
+                        /** @var \DateTime|string|null $val2 */
+                        $val2 = $values[1];
+                        $params[$paramName1] = $this->formatDateTime($val1);
+                        $params[$paramName2] = $this->formatDateTime($val2);
+                    } else {
+                        $filters[] = "{$escapedAttr} BETWEEN {{$paramName1}:String} AND {{$paramName2}:String}";
+                        $params[$paramName1] = $this->formatParamValue($values[0]);
+                        $params[$paramName2] = $this->formatParamValue($values[1]);
+                    }
+                    break;
+
+                case Query::TYPE_IN:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier((string) $attribute);
+                    $inParams = [];
+                    foreach ($values as $value) {
+                        $paramName = 'param_' . $paramCounter++;
+                        $inParams[] = "{{$paramName}:String}";
+                        $params[$paramName] = $this->formatParamValue($value);
+                    }
+                    $filters[] = "{$escapedAttr} IN (" . implode(', ', $inParams) . ")";
+                    break;
+
+                case Query::TYPE_ORDER_DESC:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $orderBy[] = "{$escapedAttr} DESC";
+                    break;
+
+                case Query::TYPE_ORDER_ASC:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $orderBy[] = "{$escapedAttr} ASC";
+                    break;
+
+                case Query::TYPE_LIMIT:
+                    if (!\is_int($values[0])) {
+                        throw new \Exception('Invalid limit value. Expected int');
+                    }
+                    $limit = $values[0];
+                    $params['limit'] = $limit;
+                    break;
+
+                case Query::TYPE_OFFSET:
+                    if (!\is_int($values[0])) {
+                        throw new \Exception('Invalid offset value. Expected int');
+                    }
+                    $offset = $values[0];
+                    $params['offset'] = $offset;
+                    break;
+            }
+        }
+
+        $result = [
+            'filters' => $filters,
+            'params' => $params,
+        ];
+
+        if (!empty($orderBy)) {
+            $result['orderBy'] = $orderBy;
+        }
+
+        if ($limit !== null) {
+            $result['limit'] = $limit;
+        }
+
+        if ($offset !== null) {
+            $result['offset'] = $offset;
+        }
+
+        return $result;
     }
 
     /**
      * Create multiple audit log entries in batch.
      *
+     * @param array<array<string, mixed>> $logs The logs to insert
      * @throws Exception
      */
     public function createBatch(array $logs): bool
@@ -509,81 +1129,155 @@ class ClickHouse extends SQL
         $tableName = $this->getTableName();
         $escapedDatabaseAndTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
-        // Build column list based on sharedTables setting
-        $columns = ['id', 'userId', 'event', 'resource', 'userAgent', 'ip', 'location', 'time', 'data'];
-        if ($this->sharedTables) {
-            $columns[] = 'tenant';
-        }
+        // Get all attribute column names
+        $schemaColumns = $this->getColumnNames();
 
-        $ids = [];
-        $paramCounter = 0;
-        $params = [];
-        $valueClauses = [];
-
+        // Process each log to extract additional attributes from data
+        $processedLogs = [];
         foreach ($logs as $log) {
-            $id = uniqid('', true);
-            $ids[] = $id;
+            /** @var array<string, mixed> $logData */
+            $logData = $log['data'] ?? [];
 
-            // Create parameter placeholders for this row
-            $paramKeys = [];
-            $paramKeys[] = 'id_' . $paramCounter;
-            $paramKeys[] = 'userId_' . $paramCounter;
-            $paramKeys[] = 'event_' . $paramCounter;
-            $paramKeys[] = 'resource_' . $paramCounter;
-            $paramKeys[] = 'userAgent_' . $paramCounter;
-            $paramKeys[] = 'ip_' . $paramCounter;
-            $paramKeys[] = 'location_' . $paramCounter;
-            $paramKeys[] = 'time_' . $paramCounter;
-            $paramKeys[] = 'data_' . $paramCounter;
+            // Separate data for non-schema attributes
+            $nonSchemaData = $logData;
+            $processedLog = $log;
 
-            // Set parameter values
-            $params[$paramKeys[0]] = $id;
-            $params[$paramKeys[1]] = $log['userId'] ?? null;
-            $params[$paramKeys[2]] = $log['event'];
-            $params[$paramKeys[3]] = $log['resource'];
-            $params[$paramKeys[4]] = $log['userAgent'];
-            $params[$paramKeys[5]] = $log['ip'];
-            $params[$paramKeys[6]] = $log['location'] ?? null;
+            // Extract schema attributes: check main log first, then data array
+            foreach ($schemaColumns as $columnName) {
+                if ($columnName === 'data' || $columnName === 'time') {
+                    continue;
+                }
 
-            $time = $log['time'] ?? new \DateTime();
-            if (is_string($time)) {
-                $time = new \DateTime($time);
-            }
-            $params[$paramKeys[7]] = $time->format('Y-m-d H:i:s.v');
-            $params[$paramKeys[8]] = json_encode($log['data'] ?? []);
-
-            if ($this->sharedTables) {
-                $paramKeys[] = 'tenant_' . $paramCounter;
-                $params[$paramKeys[9]] = $this->tenant;
-            }
-
-            // Build placeholder string for this row
-            $placeholders = [];
-            for ($i = 0; $i < count($paramKeys); $i++) {
-                if ($i === 1 || $i === 6) { // userId and location are nullable
-                    $placeholders[] = '{' . $paramKeys[$i] . ':Nullable(String)}';
-                } elseif ($this->sharedTables && $i === 9) { // tenant is nullable UInt64
-                    $placeholders[] = '{' . $paramKeys[$i] . ':Nullable(UInt64)}';
-                } else {
-                    $placeholders[] = '{' . $paramKeys[$i] . ':String}';
+                // If attribute not in main log, check data array
+                if (!isset($processedLog[$columnName]) && isset($logData[$columnName])) {
+                    $processedLog[$columnName] = $logData[$columnName];
+                    unset($nonSchemaData[$columnName]);
+                } elseif (isset($processedLog[$columnName]) && isset($logData[$columnName])) {
+                    // If in both, main log takes precedence, remove from data
+                    unset($nonSchemaData[$columnName]);
                 }
             }
 
-            $valueClauses[] = '(' . implode(', ', $placeholders) . ')';
+            // Update data with remaining non-schema attributes
+            $processedLog['data'] = $nonSchemaData;
+            $processedLogs[] = $processedLog;
+        }
+
+        // Build column list starting with id and time
+        $insertColumns = ['id', 'time'];
+
+        // Determine which attribute columns are present in any log
+        $presentColumns = [];
+        foreach ($processedLogs as $processedLog) {
+            foreach ($schemaColumns as $columnName) {
+                if ($columnName === 'time') {
+                    continue; // Already in insertColumns
+                }
+                if (isset($processedLog[$columnName]) && !in_array($columnName, $presentColumns, true)) {
+                    $presentColumns[] = $columnName;
+                }
+            }
+        }
+
+        // Add present columns in the order they're defined in attributes
+        foreach ($schemaColumns as $columnName) {
+            if ($columnName === 'time') {
+                continue; // Already added
+            }
+            if (in_array($columnName, $presentColumns, true)) {
+                $insertColumns[] = $columnName;
+            }
+        }
+
+        if ($this->sharedTables) {
+            $insertColumns[] = 'tenant';
+        }
+
+        $paramCounter = 0;
+        $queryParams = [];
+        $valueClauses = [];
+
+        foreach ($processedLogs as $processedLog) {
+            $logId = uniqid('', true);
+            $valuePlaceholders = [];
+
+            // Add id
+            $paramKey = 'id_' . $paramCounter;
+            $queryParams[$paramKey] = $logId;
+            $valuePlaceholders[] = '{' . $paramKey . ':String}';
+
+            // Add time
+            /** @var string|\DateTime|null $providedTime */
+            $providedTime = $processedLog['time'] ?? null;
+            $formattedTime = $this->formatDateTime($providedTime);
+            $paramKey = 'time_' . $paramCounter;
+            $queryParams[$paramKey] = $formattedTime;
+            $valuePlaceholders[] = '{' . $paramKey . ':String}';
+
+            // Add all other present columns
+            foreach ($insertColumns as $columnName) {
+                if ($columnName === 'id' || $columnName === 'time' || $columnName === 'tenant') {
+                    continue; // Already handled
+                }
+
+                $paramKey = $columnName . '_' . $paramCounter;
+
+                // Get attribute metadata to determine if required and nullable
+                $attributeMetadata = $this->getAttribute($columnName);
+                $isRequiredAttribute = $attributeMetadata !== null && isset($attributeMetadata['required']) && $attributeMetadata['required'];
+                $isNullableAttribute = $attributeMetadata !== null && (!isset($attributeMetadata['required']) || !$attributeMetadata['required']);
+
+                $attributeValue = null;
+                $hasAttributeValue = false;
+
+                if ($columnName === 'data') {
+                    // Data column - encode as JSON
+                    /** @var array<string, mixed> $dataValue */
+                    $dataValue = $processedLog['data'];
+                    $attributeValue = json_encode($dataValue);
+                    $hasAttributeValue = true;
+                } elseif (isset($processedLog[$columnName])) {
+                    $attributeValue = $processedLog[$columnName];
+                    $hasAttributeValue = true;
+                }
+
+                // Validate required attributes
+                if ($isRequiredAttribute && !$hasAttributeValue) {
+                    throw new \InvalidArgumentException("Required attribute '{$columnName}' is missing in batch log entry");
+                }
+
+                $queryParams[$paramKey] = $attributeValue;
+
+                // Determine placeholder type based on attribute metadata
+                if ($isNullableAttribute) {
+                    $valuePlaceholders[] = '{' . $paramKey . ':Nullable(String)}';
+                } else {
+                    $valuePlaceholders[] = '{' . $paramKey . ':String}';
+                }
+            }
+
+            if ($this->sharedTables) {
+                $paramKey = 'tenant_' . $paramCounter;
+                $queryParams[$paramKey] = $this->tenant;
+                $valuePlaceholders[] = '{' . $paramKey . ':Nullable(UInt64)}';
+            }
+
+            $valueClauses[] = '(' . implode(', ', $valuePlaceholders) . ')';
             $paramCounter++;
         }
 
         $insertSql = "
             INSERT INTO {$escapedDatabaseAndTable}
-            (" . implode(', ', $columns) . ")
+            (" . implode(', ', $insertColumns) . ")
             VALUES " . implode(', ', $valueClauses);
 
-        $this->query($insertSql, $params);
+        $this->query($insertSql, $queryParams);
         return true;
     }
 
     /**
      * Parse ClickHouse query result into Log objects.
+     * Dynamically maps columns based on current attribute definitions.
      *
      * @return array<int, Log>
      */
@@ -596,26 +1290,30 @@ class ClickHouse extends SQL
         $lines = explode("\n", trim($result));
         $documents = [];
 
+        // Build the expected column order dynamically (matching getSelectColumns order)
+        $selectColumns = ['id'];
+        foreach ($this->getAttributes() as $attribute) {
+            $id = $attribute['$id'];
+            if ($id !== 'data') {
+                $selectColumns[] = $id;
+            }
+        }
+        $selectColumns[] = 'data';
+
+        if ($this->sharedTables) {
+            $selectColumns[] = 'tenant';
+        }
+
+        $expectedColumns = count($selectColumns);
+
         foreach ($lines as $line) {
             if (empty(trim($line))) {
                 continue;
             }
 
             $columns = explode("\t", $line);
-            // Expect 9 columns without sharedTables, 10 with sharedTables
-            $expectedColumns = $this->sharedTables ? 10 : 9;
             if (count($columns) < $expectedColumns) {
                 continue;
-            }
-
-            $data = json_decode($columns[8], true) ?? [];
-
-            // Convert ClickHouse timestamp format back to ISO 8601
-            // ClickHouse: 2025-12-07 23:33:54.493
-            // ISO 8601:   2025-12-07T23:33:54.493+00:00
-            $time = $columns[7];
-            if (strpos($time, 'T') === false) {
-                $time = str_replace(' ', 'T', $time) . '+00:00';
             }
 
             // Helper function to parse nullable string fields
@@ -627,21 +1325,49 @@ class ClickHouse extends SQL
                 return $value;
             };
 
-            $document = [
-                '$id' => $columns[0],
-                'userId' => $parseNullableString($columns[1]),
-                'event' => $columns[2],
-                'resource' => $columns[3],
-                'userAgent' => $columns[4],
-                'ip' => $columns[5],
-                'location' => $parseNullableString($columns[6]),
-                'time' => $time,
-                'data' => $data,
-            ];
+            // Build document dynamically by mapping columns to values
+            $document = [];
+            foreach ($selectColumns as $index => $columnName) {
+                if (!isset($columns[$index])) {
+                    continue;
+                }
 
-            // Add tenant only if sharedTables is enabled
-            if ($this->sharedTables && isset($columns[9])) {
-                $document['tenant'] = $columns[9] === '\\N' || $columns[9] === '' ? null : (int) $columns[9];
+                $value = $columns[$index];
+
+                if ($columnName === 'data') {
+                    // Decode JSON data column
+                    $document[$columnName] = json_decode($value, true) ?? [];
+                } elseif ($columnName === 'tenant') {
+                    // Parse tenant as integer or null
+                    $document[$columnName] = ($value === '\\N' || $value === '') ? null : (int) $value;
+                } elseif ($columnName === 'time') {
+                    // Convert ClickHouse timestamp format back to ISO 8601
+                    // ClickHouse: 2025-12-07 23:33:54.493
+                    // ISO 8601:   2025-12-07T23:33:54.493+00:00
+                    $parsedTime = $value;
+                    if (strpos($parsedTime, 'T') === false) {
+                        $parsedTime = str_replace(' ', 'T', $parsedTime) . '+00:00';
+                    }
+                    $document[$columnName] = $parsedTime;
+                } else {
+                    // Get attribute metadata to check if nullable
+                    $col = $columnName;
+                    /** @var string $col */
+                    $attribute = $this->getAttribute($col);
+                    if ($attribute && !$attribute['required']) {
+                        // Nullable field - parse null values
+                        $document[$columnName] = $parseNullableString($value);
+                    } else {
+                        // Required field - use value as-is
+                        $document[$columnName] = $value;
+                    }
+                }
+            }
+
+            // Add special $id field if present
+            if (isset($document['id'])) {
+                $document['$id'] = $document['id'];
+                unset($document['id']);
             }
 
             $documents[] = new Log($document);
@@ -652,20 +1378,41 @@ class ClickHouse extends SQL
 
     /**
      * Get the SELECT column list for queries.
-     * Returns 9 columns if not using shared tables, 10 if using shared tables.
+     * Dynamically builds the column list from attributes, excluding 'data' column.
+     * Escapes all column names to prevent SQL injection.
      *
      * @return string
      */
     private function getSelectColumns(): string
     {
-        if ($this->sharedTables) {
-            return 'id, userId, event, resource, userAgent, ip, location, time, data, tenant';
+        $columns = [];
+
+        // Add id column first (not part of attributes)
+        $columns[] = $this->escapeIdentifier('id');
+
+        // Dynamically add all attribute columns except 'data'
+        foreach ($this->getAttributes() as $attribute) {
+            $id = $attribute['$id'];
+            /** @var string $id */
+            if ($id !== 'data') {
+                $columns[] = $this->escapeIdentifier($id);
+            }
         }
-        return 'id, userId, event, resource, userAgent, ip, location, time, data';
+
+        // Add data column at the end
+        $columns[] = $this->escapeIdentifier('data');
+
+        // Add tenant column if shared tables are enabled
+        if ($this->sharedTables) {
+            $columns[] = $this->escapeIdentifier('tenant');
+        }
+
+        return implode(', ', $columns);
     }
 
     /**
      * Build tenant filter clause based on current tenant context.
+     * Escapes column name to prevent SQL injection.
      *
      * @return string
      */
@@ -675,16 +1422,19 @@ class ClickHouse extends SQL
             return '';
         }
 
-        return " AND tenant = {$this->tenant}";
+        $escapedTenant = $this->escapeIdentifier('tenant');
+        return " AND {$escapedTenant} = {$this->tenant}";
     }
 
     /**
      * Build time WHERE clause and parameters with safe parameter placeholders.
+     * Escapes column name to prevent SQL injection.
      *
      * @param \DateTime|null $after
      * @param \DateTime|null $before
      * @return array{clause: string, params: array<string, mixed>}
      */
+    /** @phpstan-ignore-next-line */
     private function buildTimeClause(?\DateTime $after, ?\DateTime $before): array
     {
         $params = [];
@@ -703,8 +1453,10 @@ class ClickHouse extends SQL
             $beforeStr = \Utopia\Database\DateTime::format($before);
         }
 
+        $escapedTime = $this->escapeIdentifier('time');
+
         if ($afterStr !== null && $beforeStr !== null) {
-            $conditions[] = 'time BETWEEN {after:String} AND {before:String}';
+            $conditions[] = "{$escapedTime} BETWEEN {after:String} AND {before:String}";
             $params['after'] = $afterStr;
             $params['before'] = $beforeStr;
 
@@ -712,12 +1464,12 @@ class ClickHouse extends SQL
         }
 
         if ($afterStr !== null) {
-            $conditions[] = 'time > {after:String}';
+            $conditions[] = "{$escapedTime} > {after:String}";
             $params['after'] = $afterStr;
         }
 
         if ($beforeStr !== null) {
-            $conditions[] = 'time < {before:String}';
+            $conditions[] = "{$escapedTime} < {before:String}";
             $params['before'] = $beforeStr;
         }
 
@@ -739,6 +1491,7 @@ class ClickHouse extends SQL
      * @param int $paramOffset Base parameter number for creating unique param names
      * @return array{clause: string, params: array<string, string>}
      */
+    /** @phpstan-ignore-next-line */
     private function buildEventsList(array $events, int $paramOffset = 0): array
     {
         $placeholders = [];
@@ -759,6 +1512,9 @@ class ClickHouse extends SQL
     /**
      * Get ClickHouse-specific SQL column definition for a given attribute ID.
      *
+     * Dynamically determines the ClickHouse type based on attribute metadata.
+     * DateTime attributes use DateTime64(3), all others use String.
+     *
      * @param string $id Attribute identifier
      * @return string ClickHouse column definition with appropriate types and nullability
      * @throws Exception
@@ -771,12 +1527,11 @@ class ClickHouse extends SQL
             throw new Exception("Attribute {$id} not found");
         }
 
-        // ClickHouse-specific type mapping
-        $type = match ($id) {
-            'userId', 'event', 'resource', 'userAgent', 'ip', 'location', 'data' => 'String',
-            'time' => 'DateTime64(3)',
-            default => 'String',
-        };
+        // Dynamically determine type based on attribute metadata
+        // DateTime attributes use DateTime64(3), all others use String
+        $type = (isset($attribute['type']) && $attribute['type'] === Database::VAR_DATETIME)
+            ? 'DateTime64(3)'
+            : 'String';
 
         $nullable = !$attribute['required'] ? 'Nullable(' . $type . ')' : $type;
 
@@ -796,29 +1551,23 @@ class ClickHouse extends SQL
         int $offset = 0,
         bool $ascending = false,
     ): array {
-        $time = $this->buildTimeClause($after, $before);
-        $order = $ascending ? 'ASC' : 'DESC';
+        $queries = [
+            Query::equal('userId', $userId),
+        ];
 
-        $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        if ($after !== null && $before !== null) {
+            $queries[] = Query::between('time', $after, $before);
+        } elseif ($after !== null) {
+            $queries[] = Query::greaterThan('time', $after);
+        } elseif ($before !== null) {
+            $queries[] = Query::lessThan('time', $before);
+        }
 
-        $sql = "
-            SELECT " . $this->getSelectColumns() . "
-            FROM {$escapedTable}
-            WHERE userId = {userId:String}{$tenantFilter}{$time['clause']}
-            ORDER BY time {$order}
-            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
-            FORMAT TabSeparated
-        ";
+        $queries[] = $ascending ? Query::orderAsc('time') : Query::orderDesc('time');
+        $queries[] = Query::limit($limit);
+        $queries[] = Query::offset($offset);
 
-        $result = $this->query($sql, array_merge([
-            'userId' => $userId,
-            'limit' => $limit,
-            'offset' => $offset,
-        ], $time['params']));
-
-        return $this->parseResults($result);
+        return $this->find($queries);
     }
 
     /**
@@ -831,24 +1580,19 @@ class ClickHouse extends SQL
         ?\DateTime $after = null,
         ?\DateTime $before = null,
     ): int {
-        $time = $this->buildTimeClause($after, $before);
+        $queries = [
+            Query::equal('userId', $userId),
+        ];
 
-        $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        if ($after !== null && $before !== null) {
+            $queries[] = Query::between('time', $after, $before);
+        } elseif ($after !== null) {
+            $queries[] = Query::greaterThan('time', $after);
+        } elseif ($before !== null) {
+            $queries[] = Query::lessThan('time', $before);
+        }
 
-        $sql = "
-            SELECT count()
-            FROM {$escapedTable}
-            WHERE userId = {userId:String}{$tenantFilter}{$time['clause']}
-            FORMAT TabSeparated
-        ";
-
-        $result = $this->query($sql, array_merge([
-            'userId' => $userId,
-        ], $time['params']));
-
-        return (int) trim($result);
+        return count($this->find($queries));
     }
 
     /**
@@ -864,29 +1608,23 @@ class ClickHouse extends SQL
         int $offset = 0,
         bool $ascending = false,
     ): array {
-        $time = $this->buildTimeClause($after, $before);
-        $order = $ascending ? 'ASC' : 'DESC';
+        $queries = [
+            Query::equal('resource', $resource),
+        ];
 
-        $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        if ($after !== null && $before !== null) {
+            $queries[] = Query::between('time', $after, $before);
+        } elseif ($after !== null) {
+            $queries[] = Query::greaterThan('time', $after);
+        } elseif ($before !== null) {
+            $queries[] = Query::lessThan('time', $before);
+        }
 
-        $sql = "
-            SELECT " . $this->getSelectColumns() . "
-            FROM {$escapedTable}
-            WHERE resource = {resource:String}{$tenantFilter}{$time['clause']}
-            ORDER BY time {$order}
-            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
-            FORMAT TabSeparated
-        ";
+        $queries[] = $ascending ? Query::orderAsc('time') : Query::orderDesc('time');
+        $queries[] = Query::limit($limit);
+        $queries[] = Query::offset($offset);
 
-        $result = $this->query($sql, array_merge([
-            'resource' => $resource,
-            'limit' => $limit,
-            'offset' => $offset,
-        ], $time['params']));
-
-        return $this->parseResults($result);
+        return $this->find($queries);
     }
 
     /**
@@ -899,24 +1637,19 @@ class ClickHouse extends SQL
         ?\DateTime $after = null,
         ?\DateTime $before = null,
     ): int {
-        $time = $this->buildTimeClause($after, $before);
+        $queries = [
+            Query::equal('resource', $resource),
+        ];
 
-        $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        if ($after !== null && $before !== null) {
+            $queries[] = Query::between('time', $after, $before);
+        } elseif ($after !== null) {
+            $queries[] = Query::greaterThan('time', $after);
+        } elseif ($before !== null) {
+            $queries[] = Query::lessThan('time', $before);
+        }
 
-        $sql = "
-            SELECT count()
-            FROM {$escapedTable}
-            WHERE resource = {resource:String}{$tenantFilter}{$time['clause']}
-            FORMAT TabSeparated
-        ";
-
-        $result = $this->query($sql, array_merge([
-            'resource' => $resource,
-        ], $time['params']));
-
-        return (int) trim($result);
+        return count($this->find($queries));
     }
 
     /**
@@ -933,29 +1666,24 @@ class ClickHouse extends SQL
         int $offset = 0,
         bool $ascending = false,
     ): array {
-        $time = $this->buildTimeClause($after, $before);
-        $order = $ascending ? 'ASC' : 'DESC';
-        $eventList = $this->buildEventsList($events, 0);
-        $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $queries = [
+            Query::equal('userId', $userId),
+            Query::in('event', $events),
+        ];
 
-        $sql = "
-            SELECT " . $this->getSelectColumns() . "
-            FROM {$escapedTable}
-            WHERE userId = {userId:String} AND event IN ({$eventList['clause']}){$tenantFilter}{$time['clause']}
-            ORDER BY time {$order}
-            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
-            FORMAT TabSeparated
-        ";
+        if ($after !== null && $before !== null) {
+            $queries[] = Query::between('time', $after, $before);
+        } elseif ($after !== null) {
+            $queries[] = Query::greaterThan('time', $after);
+        } elseif ($before !== null) {
+            $queries[] = Query::lessThan('time', $before);
+        }
 
-        $result = $this->query($sql, array_merge([
-            'userId' => $userId,
-            'limit' => $limit,
-            'offset' => $offset,
-        ], $eventList['params'], $time['params']));
+        $queries[] = $ascending ? Query::orderAsc('time') : Query::orderDesc('time');
+        $queries[] = Query::limit($limit);
+        $queries[] = Query::offset($offset);
 
-        return $this->parseResults($result);
+        return $this->find($queries);
     }
 
     /**
@@ -969,24 +1697,20 @@ class ClickHouse extends SQL
         ?\DateTime $after = null,
         ?\DateTime $before = null,
     ): int {
-        $time = $this->buildTimeClause($after, $before);
-        $eventList = $this->buildEventsList($events, 0);
-        $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $queries = [
+            Query::equal('userId', $userId),
+            Query::in('event', $events),
+        ];
 
-        $sql = "
-            SELECT count()
-            FROM {$escapedTable}
-            WHERE userId = {userId:String} AND event IN ({$eventList['clause']}){$tenantFilter}{$time['clause']}
-            FORMAT TabSeparated
-        ";
+        if ($after !== null && $before !== null) {
+            $queries[] = Query::between('time', $after, $before);
+        } elseif ($after !== null) {
+            $queries[] = Query::greaterThan('time', $after);
+        } elseif ($before !== null) {
+            $queries[] = Query::lessThan('time', $before);
+        }
 
-        $result = $this->query($sql, array_merge([
-            'userId' => $userId,
-        ], $eventList['params'], $time['params']));
-
-        return (int) trim($result);
+        return count($this->find($queries));
     }
 
     /**
@@ -1003,29 +1727,24 @@ class ClickHouse extends SQL
         int $offset = 0,
         bool $ascending = false,
     ): array {
-        $time = $this->buildTimeClause($after, $before);
-        $order = $ascending ? 'ASC' : 'DESC';
-        $eventList = $this->buildEventsList($events, 0);
-        $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $queries = [
+            Query::equal('resource', $resource),
+            Query::in('event', $events),
+        ];
 
-        $sql = "
-            SELECT " . $this->getSelectColumns() . "
-            FROM {$escapedTable}
-            WHERE resource = {resource:String} AND event IN ({$eventList['clause']}){$tenantFilter}{$time['clause']}
-            ORDER BY time {$order}
-            LIMIT {limit:UInt64} OFFSET {offset:UInt64}
-            FORMAT TabSeparated
-        ";
+        if ($after !== null && $before !== null) {
+            $queries[] = Query::between('time', $after, $before);
+        } elseif ($after !== null) {
+            $queries[] = Query::greaterThan('time', $after);
+        } elseif ($before !== null) {
+            $queries[] = Query::lessThan('time', $before);
+        }
 
-        $result = $this->query($sql, array_merge([
-            'resource' => $resource,
-            'limit' => $limit,
-            'offset' => $offset,
-        ], $eventList['params'], $time['params']));
+        $queries[] = $ascending ? Query::orderAsc('time') : Query::orderDesc('time');
+        $queries[] = Query::limit($limit);
+        $queries[] = Query::offset($offset);
 
-        return $this->parseResults($result);
+        return $this->find($queries);
     }
 
     /**
@@ -1039,24 +1758,20 @@ class ClickHouse extends SQL
         ?\DateTime $after = null,
         ?\DateTime $before = null,
     ): int {
-        $time = $this->buildTimeClause($after, $before);
-        $eventList = $this->buildEventsList($events, 0);
-        $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $queries = [
+            Query::equal('resource', $resource),
+            Query::in('event', $events),
+        ];
 
-        $sql = "
-            SELECT count()
-            FROM {$escapedTable}
-            WHERE resource = {resource:String} AND event IN ({$eventList['clause']}){$tenantFilter}{$time['clause']}
-            FORMAT TabSeparated
-        ";
+        if ($after !== null && $before !== null) {
+            $queries[] = Query::between('time', $after, $before);
+        } elseif ($after !== null) {
+            $queries[] = Query::greaterThan('time', $after);
+        } elseif ($before !== null) {
+            $queries[] = Query::lessThan('time', $before);
+        }
 
-        $result = $this->query($sql, array_merge([
-            'resource' => $resource,
-        ], $eventList['params'], $time['params']));
-
-        return (int) trim($result);
+        return count($this->find($queries));
     }
 
     /**

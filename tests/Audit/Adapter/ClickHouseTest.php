@@ -34,6 +34,25 @@ class ClickHouseTest extends TestCase
     }
 
     /**
+     * Provide required attributes for ClickHouse adapter tests.
+     *
+     * @return array<string, mixed>
+     */
+    protected function getRequiredAttributes(): array
+    {
+        return [
+            'userType' => 'member',
+            'resourceType' => 'document',
+            'resourceId' => 'res-1',
+            'projectId' => 'proj-1',
+            'projectInternalId' => 'proj-int-1',
+            'teamId' => 'team-1',
+            'teamInternalId' => 'team-int-1',
+            'hostname' => 'example.org',
+        ];
+    }
+
+    /**
      * Test constructor validates host
      */
     public function testConstructorValidatesHost(): void
@@ -315,5 +334,83 @@ class ClickHouseTest extends TestCase
         // Verify retrieval
         $logs = $this->audit->getLogsByUser('user`with`backticks');
         $this->assertGreaterThan(0, count($logs));
+    }
+
+    /**
+     * Test that ClickHouse adapter has all required attributes
+     */
+    public function testClickHouseAdapterAttributes(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $attributes = $adapter->getAttributes();
+        $attributeIds = array_map(fn ($attr) => $attr['$id'], $attributes);
+
+        // Verify all expected attributes exist
+        $expectedAttributes = [
+            'userType',
+            'userId',
+            'userInternalId',
+            'resourceParent',
+            'resourceType',
+            'resourceId',
+            'resourceInternalId',
+            'event',
+            'resource',
+            'userAgent',
+            'ip',
+            'country',
+            'time',
+            'data',
+            'projectId',
+            'projectInternalId',
+            'teamId',
+            'teamInternalId',
+            'hostname'
+        ];
+
+        foreach ($expectedAttributes as $expected) {
+            $this->assertContains($expected, $attributeIds, "Attribute '{$expected}' not found in ClickHouse adapter");
+        }
+    }
+
+    /**
+     * Test that ClickHouse adapter has all required indexes
+     */
+    public function testClickHouseAdapterIndexes(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $indexes = $adapter->getIndexes();
+        $indexIds = array_map(fn ($idx) => $idx['$id'], $indexes);
+
+        // Verify all ClickHouse-specific indexes exist
+        $expectedClickHouseIndexes = [
+            '_key_user_internal_and_event',
+            '_key_project_internal_id',
+            '_key_team_internal_id',
+            '_key_user_internal_id',
+            '_key_user_type',
+            '_key_country',
+            '_key_hostname'
+        ];
+
+        foreach ($expectedClickHouseIndexes as $expected) {
+            $this->assertContains($expected, $indexIds, "ClickHouse index '{$expected}' not found in ClickHouse adapter");
+        }
+
+        // Verify parent indexes are also included (with parent naming convention)
+        $parentExpectedIndexes = ['idx_event', 'idx_userId_event', 'idx_resource_event', 'idx_time_desc'];
+        foreach ($parentExpectedIndexes as $expected) {
+            $this->assertContains($expected, $indexIds, "Parent index '{$expected}' not found in ClickHouse adapter");
+        }
     }
 }

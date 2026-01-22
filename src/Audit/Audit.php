@@ -60,7 +60,8 @@ class Audit
      */
     public function log(?string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): Log
     {
-        return $this->adapter->create([
+        /** @var array{userId?: string|null, event: string, resource: string, userAgent: string, ip: string, location?: string, data?: array<string, mixed>} $log */
+        $log = [
             'userId' => $userId,
             'event' => $event,
             'resource' => $resource,
@@ -68,7 +69,9 @@ class Audit
             'ip' => $ip,
             'location' => $location,
             'data' => $data,
-        ]);
+        ];
+
+        return $this->adapter->create($log);
     }
 
     /**
@@ -82,6 +85,19 @@ class Audit
     public function logBatch(array $events): bool
     {
         return $this->adapter->createBatch($events);
+    }
+
+    /**
+     * Get a single log by its ID.
+     *
+     * @param string $id
+     * @return Log|null The log entry or null if not found
+     *
+     * @throws \Exception
+     */
+    public function getLogById(string $id): ?Log
+    {
+        return $this->adapter->getById($id);
     }
 
     /**
@@ -242,5 +258,31 @@ class Audit
     public function cleanup(\DateTime $datetime): bool
     {
         return $this->adapter->cleanup($datetime);
+    }
+
+    /**
+     * Find logs using custom queries.
+     *
+     * @param array<Query> $queries Array of Audit Query objects
+     * @return array<Log>
+     *
+     * @throws \Exception
+     */
+    public function find(array $queries = []): array
+    {
+        return $this->adapter->find($queries);
+    }
+
+    /**
+     * Count logs using custom queries.
+     *
+     * @param array<Query> $queries Array of Audit Query objects
+     * @return int
+     *
+     * @throws \Exception
+     */
+    public function count(array $queries = []): int
+    {
+        return $this->adapter->count($queries);
     }
 }

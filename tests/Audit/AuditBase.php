@@ -54,10 +54,13 @@ trait AuditBase
         $location = 'US';
         $data = ['key1' => 'value1', 'key2' => 'value2'];
 
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log(null, 'insert', 'user/null', $userAgent, $ip, $location, $data));
+        $requiredAttributes = $this->getRequiredAttributes();
+        $dataWithAttributes = array_merge($data, $requiredAttributes);
+
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $dataWithAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $dataWithAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $dataWithAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log(null, 'insert', 'user/null', $userAgent, $ip, $location, $dataWithAttributes));
     }
 
     public function testGetLogsByUser(): void
@@ -155,6 +158,38 @@ trait AuditBase
         $this->assertEquals('127.0.0.1', $logs5[0]['ip']);
     }
 
+    public function testGetLogById(): void
+    {
+        // Create a test log
+        $userId = 'testGetByIdUser';
+        $userAgent = 'Mozilla/5.0 Test';
+        $ip = '192.168.1.100';
+        $location = 'US';
+        $data = ['test' => 'getById'];
+
+        $requiredAttributes = $this->getRequiredAttributes();
+        $dataWithAttributes = array_merge($data, $requiredAttributes);
+        $log = $this->audit->log($userId, 'create', 'test/resource/123', $userAgent, $ip, $location, $dataWithAttributes);
+        $logId = $log->getId();
+
+        // Retrieve the log by ID
+        $retrievedLog = $this->audit->getLogById($logId);
+
+        $this->assertNotNull($retrievedLog);
+        $this->assertEquals($logId, $retrievedLog->getId());
+        $this->assertEquals($userId, $retrievedLog->getAttribute('userId'));
+        $this->assertEquals('create', $retrievedLog->getAttribute('event'));
+        $this->assertEquals('test/resource/123', $retrievedLog->getAttribute('resource'));
+        $this->assertEquals($userAgent, $retrievedLog->getAttribute('userAgent'));
+        $this->assertEquals($ip, $retrievedLog->getAttribute('ip'));
+        $this->assertEquals($location, $retrievedLog->getAttribute('location'));
+        $this->assertEquals($data, $retrievedLog->getAttribute('data'));
+
+        // Test with non-existent ID
+        $nonExistentLog = $this->audit->getLogById('non-existent-id-12345');
+        $this->assertNull($nonExistentLog);
+    }
+
     public function testLogByBatch(): void
     {
         // First cleanup existing logs
@@ -213,7 +248,11 @@ trait AuditBase
             ]
         ];
 
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
+
         // Test batch insertion
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
+
         $result = $this->audit->logBatch($batchEvents);
         $this->assertTrue($result);
 
@@ -294,6 +333,7 @@ trait AuditBase
         }
 
         // Insert batch
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
         $result = $this->audit->logBatch($batchEvents);
         $this->assertTrue($result);
 
@@ -338,6 +378,7 @@ trait AuditBase
             ]
         ];
 
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
         $this->audit->logBatch($batchEvents);
 
         // Test getting all logs
@@ -366,11 +407,14 @@ trait AuditBase
         $location = 'US';
         $data = ['key1' => 'value1', 'key2' => 'value2'];
 
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $data));
+        $requiredAttributes = $this->getRequiredAttributes();
+        $dataWithAttributes = array_merge($data, $requiredAttributes);
+
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $dataWithAttributes));
         sleep(5);
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $data));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $dataWithAttributes));
         sleep(5);
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $data));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $dataWithAttributes));
         sleep(5);
 
         // DELETE logs older than 11 seconds and check that status is true
@@ -416,6 +460,8 @@ trait AuditBase
                 'time' => $timestamp
             ];
         }
+
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
 
         $this->audit->logBatch($batchEvents);
 
@@ -555,5 +601,238 @@ trait AuditBase
             ascending: true
         );
         $this->assertGreaterThanOrEqual(0, \count($logsResEvt));
+    }
+
+    public function testFind(): void
+    {
+        // Setup: Create specific test data for find queries
+        $this->audit->cleanup(new \DateTime());
+
+        $userId = 'userId';
+        $userAgent = 'Mozilla/5.0';
+        $ip = '192.168.1.1';
+        $location = 'US';
+
+        // Create test logs with specific attributes
+        $baseTime = new \DateTime('2024-06-15 12:00:00');
+        $batchEvents = [];
+        for ($i = 0; $i < 3; $i++) {
+            $offset = $i * 60;
+            $logTime = new \DateTime('2024-06-15 12:00:00');
+            $logTime->modify("+{$offset} seconds");
+            $timestamp = DateTime::format($logTime);
+            $batchEvents[] = [
+                'userId' => $userId,
+                'event' => 'event_' . $i,
+                'resource' => 'doc/' . $i,
+                'userAgent' => $userAgent,
+                'ip' => $ip,
+                'location' => $location,
+                'data' => ['sequence' => $i],
+                'time' => $timestamp
+            ];
+        }
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
+
+        $this->audit->logBatch($batchEvents);
+
+        // Test 1: Find with equal filter
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+        ]);
+        $this->assertEquals(3, \count($logs));
+
+        // Test 2: Find with equal and limit
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::limit(2),
+        ]);
+        $this->assertEquals(2, \count($logs));
+
+        // Test 3: Find with equal, limit and offset
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::limit(2),
+            \Utopia\Audit\Query::offset(1),
+        ]);
+        $this->assertEquals(2, \count($logs));
+
+        // Test 4: Find with multiple filters
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::equal('resource', 'doc/0'),
+        ]);
+        $this->assertEquals(1, \count($logs));
+
+        // Test 5: Find with ordering
+        $logsDesc = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::orderDesc('time'),
+        ]);
+        $logsAsc = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::orderAsc('time'),
+        ]);
+        $this->assertEquals(3, \count($logsDesc));
+        $this->assertEquals(3, \count($logsAsc));
+
+        // Verify order is reversed
+        if (\count($logsDesc) === \count($logsAsc)) {
+            for ($i = 0; $i < \count($logsDesc); $i++) {
+                $this->assertEquals(
+                    $logsDesc[$i]->getId(),
+                    $logsAsc[\count($logsAsc) - 1 - $i]->getId()
+                );
+            }
+        }
+
+        // Test 6: Find with IN filter
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::in('event', ['event_0', 'event_1']),
+        ]);
+        $this->assertGreaterThanOrEqual(2, \count($logs));
+
+        // Test 7: Find with between query for time range
+        $afterTime = new \DateTime('2024-06-15 12:01:00');
+        $beforeTime = new \DateTime('2024-06-15 12:04:00');
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::between('time', DateTime::format($afterTime), DateTime::format($beforeTime)),
+        ]);
+        $this->assertGreaterThanOrEqual(0, \count($logs));
+
+        // Test 8: Find with greater than
+        $afterTime = new \DateTime('2024-06-15 12:02:00');
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::greaterThan('time', DateTime::format($afterTime)),
+        ]);
+        $this->assertGreaterThanOrEqual(0, \count($logs));
+
+        // Test 9: Find with less than
+        $beforeTime = new \DateTime('2024-06-15 12:03:00');
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::lessThan('time', DateTime::format($beforeTime)),
+        ]);
+        $this->assertGreaterThanOrEqual(0, \count($logs));
+    }
+
+    public function testCount(): void
+    {
+        // Setup: Create specific test data for count queries
+        $this->audit->cleanup(new \DateTime());
+
+        $userId = 'userId';
+        $userAgent = 'Mozilla/5.0';
+        $ip = '192.168.1.1';
+        $location = 'US';
+
+        // Create test logs with specific attributes
+        $baseTime = new \DateTime('2024-06-15 12:00:00');
+        $batchEvents = [];
+        for ($i = 0; $i < 3; $i++) {
+            $offset = $i * 60;
+            $logTime = new \DateTime('2024-06-15 12:00:00');
+            $logTime->modify("+{$offset} seconds");
+            $timestamp = DateTime::format($logTime);
+            $batchEvents[] = [
+                'userId' => $userId,
+                'event' => 'event_' . $i,
+                'resource' => 'doc/' . $i,
+                'userAgent' => $userAgent,
+                'ip' => $ip,
+                'location' => $location,
+                'data' => ['sequence' => $i],
+                'time' => $timestamp
+            ];
+        }
+        $this->audit->logBatch($batchEvents);
+
+        // Test 1: Count with simple filter
+        $count = $this->audit->count([
+            \Utopia\Audit\Query::equal('userId', $userId),
+        ]);
+        $this->assertEquals(3, $count);
+
+        // Test 2: Count with multiple filters
+        $count = $this->audit->count([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::equal('resource', 'doc/0'),
+        ]);
+        $this->assertEquals(1, $count);
+
+        // Test 3: Count with IN filter
+        $count = $this->audit->count([
+            \Utopia\Audit\Query::in('event', ['event_0', 'event_1']),
+        ]);
+        $this->assertGreaterThanOrEqual(2, $count);
+
+        // Test 4: Count ignores limit and offset
+        $count = $this->audit->count([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::limit(2),
+            \Utopia\Audit\Query::offset(1),
+        ]);
+        $this->assertEquals(3, $count); // Should count all 3, not affected by limit/offset
+
+        // Test 5: Count with between query
+        $afterTime = new \DateTime('2024-06-15 12:01:00');
+        $beforeTime = new \DateTime('2024-06-15 12:04:00');
+        $count = $this->audit->count([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::between('time', DateTime::format($afterTime), DateTime::format($beforeTime)),
+        ]);
+        $this->assertGreaterThanOrEqual(0, $count);
+
+        // Test 6: Count with greater than
+        $afterTime = new \DateTime('2024-06-15 12:02:00');
+        $count = $this->audit->count([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::greaterThan('time', DateTime::format($afterTime)),
+        ]);
+        $this->assertGreaterThanOrEqual(0, $count);
+
+        // Test 7: Count with less than
+        $beforeTime = new \DateTime('2024-06-15 12:03:00');
+        $count = $this->audit->count([
+            \Utopia\Audit\Query::equal('userId', $userId),
+            \Utopia\Audit\Query::lessThan('time', DateTime::format($beforeTime)),
+        ]);
+        $this->assertGreaterThanOrEqual(0, $count);
+
+        // Test 8: Count returns zero for no matches
+        $count = $this->audit->count([
+            \Utopia\Audit\Query::equal('userId', 'nonExistentUser'),
+        ]);
+        $this->assertEquals(0, $count);
+    }
+
+    /**
+     * Apply adapter-specific required attributes to batch events.
+     *
+     * @param array<int, array<string, mixed>> $batchEvents
+     * @return array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, time: string, data?: array<string, mixed>}>
+     */
+    protected function applyRequiredAttributesToBatch(array $batchEvents): array
+    {
+        $requiredAttributes = $this->getRequiredAttributes();
+        if ($requiredAttributes === []) {
+            /** @var array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, time: string, data?: array<string, mixed>}> */
+            return $batchEvents;
+        }
+
+        /** @var array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, time: string, data?: array<string, mixed>}> */
+        return array_map(static fn (array $event) => array_merge($event, $requiredAttributes), $batchEvents);
+    }
+
+    /**
+     * Override in adapter-specific tests to provide required attribute defaults.
+     *
+     * @return array<string, mixed>
+     */
+    protected function getRequiredAttributes(): array
+    {
+        return [];
     }
 }
