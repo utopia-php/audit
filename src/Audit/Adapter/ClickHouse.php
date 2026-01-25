@@ -994,7 +994,7 @@ class ClickHouse extends SQL
                 case Query::TYPE_EQUAL:
                     $this->validateAttributeName($attribute);
                     $escapedAttr = $this->escapeIdentifier((string) $attribute);
-                    $paramName = 'param_' . $paramCounter++;
+                    $paramName = 'p' . $paramCounter++;
                     $filters[] = "{$escapedAttr} = {{$paramName}:String}";
                     $params[$paramName] = $this->formatParamValue($values[0]);
                     break;
@@ -1002,7 +1002,7 @@ class ClickHouse extends SQL
                 case Query::TYPE_LESSER:
                     $this->validateAttributeName($attribute);
                     $escapedAttr = $this->escapeIdentifier((string) $attribute);
-                    $paramName = 'param_' . $paramCounter++;
+                    $paramName = 'p' . $paramCounter++;
                     if ($attribute === 'time') {
                         $filters[] = "{$escapedAttr} < {{$paramName}:DateTime64(3)}";
                         /** @var \DateTime|string|null $val */
@@ -1017,7 +1017,7 @@ class ClickHouse extends SQL
                 case Query::TYPE_GREATER:
                     $this->validateAttributeName($attribute);
                     $escapedAttr = $this->escapeIdentifier((string) $attribute);
-                    $paramName = 'param_' . $paramCounter++;
+                    $paramName = 'p' . $paramCounter++;
                     if ($attribute === 'time') {
                         $filters[] = "{$escapedAttr} > {{$paramName}:DateTime64(3)}";
                         /** @var \DateTime|string|null $val */
@@ -1032,8 +1032,8 @@ class ClickHouse extends SQL
                 case Query::TYPE_BETWEEN:
                     $this->validateAttributeName($attribute);
                     $escapedAttr = $this->escapeIdentifier((string) $attribute);
-                    $paramName1 = 'param_' . $paramCounter++;
-                    $paramName2 = 'param_' . $paramCounter++;
+                    $paramName1 = 'p' . $paramCounter++;
+                    $paramName2 = 'p' . $paramCounter++;
                     // Use DateTime64 type for time column, String for others
                     // This prevents type mismatch when comparing DateTime64 with timezone-suffixed strings
                     if ($attribute === 'time') {
@@ -1057,7 +1057,7 @@ class ClickHouse extends SQL
                     $escapedAttr = $this->escapeIdentifier((string) $attribute);
                     $inParams = [];
                     foreach ($values as $value) {
-                        $paramName = 'param_' . $paramCounter++;
+                        $paramName = 'p' . $paramCounter++;
                         $inParams[] = "{{$paramName}:String}";
                         $params[$paramName] = $this->formatParamValue($value);
                     }
