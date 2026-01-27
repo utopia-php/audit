@@ -246,9 +246,9 @@ abstract class SQL extends Adapter
         }
 
         return [
-            'id' => $resourceId,
-            'type' => $resourceType,
-            'parent' => $resourceParent,
+            'resourceId' => $resourceId,
+            'resourceType' => $resourceType,
+            'resourceParent' => $resourceParent,
         ];
     }
 }
