@@ -760,6 +760,8 @@ class ClickHouse extends SQL
         // Separate data for the data column (non-schema attributes)
         $nonSchemaData = $logData;
 
+        $resource = $this->parseResource($log['resource'] ?? '');
+
         foreach ($schemaColumns as $columnName) {
             if ($columnName === 'time') {
                 // Skip time - already handled above
@@ -790,6 +792,10 @@ class ClickHouse extends SQL
                 $hasAttributeValue = true;
                 // Remove from non-schema data as it's now a dedicated column
                 unset($nonSchemaData[$columnName]);
+            } elseif (isset($resource[$columnName])) {
+                // Value is in parsed resource (e.g., resourceType, resourceId, resourceParent)
+                $attributeValue = $resource[$columnName];
+                $hasAttributeValue = true;
             }
 
             // Validate required attributes
@@ -1140,6 +1146,7 @@ class ClickHouse extends SQL
 
             // Separate data for non-schema attributes
             $nonSchemaData = $logData;
+            $resource = $this->parseResource($log['resource'] ?? '');
             $processedLog = $log;
 
             // Extract schema attributes: check main log first, then data array
@@ -1152,6 +1159,9 @@ class ClickHouse extends SQL
                 if (!isset($processedLog[$columnName]) && isset($logData[$columnName])) {
                     $processedLog[$columnName] = $logData[$columnName];
                     unset($nonSchemaData[$columnName]);
+                } elseif (!isset($processedLog[$columnName]) && isset($resource[$columnName])) {
+                    // Check parsed resource for resourceType, resourceId, resourceParent
+                    $processedLog[$columnName] = $resource[$columnName];
                 } elseif (isset($processedLog[$columnName]) && isset($logData[$columnName])) {
                     // If in both, main log takes precedence, remove from data
                     unset($nonSchemaData[$columnName]);
