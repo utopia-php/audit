@@ -221,6 +221,9 @@ abstract class SQL extends Adapter
 
     /**
      * Parses the resource string from the payload and extracts its ID, type, and parent.
+     *
+     * @param string $resource
+     * @return array{ resourceId: string, resourceType: string, resourceParent: string }
      */
     protected function parseResource(string $resource): array
     {

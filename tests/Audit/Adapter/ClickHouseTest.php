@@ -429,7 +429,13 @@ class ClickHouseTest extends TestCase
         // Ensure we don't provide resourceType/resourceId in data so adapter must parse it
         $data = ['example' => 'value'];
 
-        $log = $this->audit->log($userId, 'create', $resource, $userAgent, $ip, $location, $data);
+        // Merge required adapter attributes so ClickHouse won't reject the log,
+        // but ensure we do NOT supply resourceType/resourceId/resourceParent so adapter parses them
+        $required = $this->getRequiredAttributes();
+        unset($required['resourceType'], $required['resourceId'], $required['resourceParent']);
+        $dataWithAttributes = array_merge($data, $required);
+
+        $log = $this->audit->log($userId, 'create', $resource, $userAgent, $ip, $location, $dataWithAttributes);
 
         $this->assertInstanceOf(\Utopia\Audit\Log::class, $log);
 
@@ -456,9 +462,9 @@ class ClickHouseTest extends TestCase
         $parsed = $method->invoke($adapter, $resource);
 
         $this->assertIsArray($parsed);
-        $this->assertArrayHasKey('id', $parsed);
-        $this->assertArrayHasKey('type', $parsed);
-        $this->assertArrayHasKey('parent', $parsed);
+        $this->assertArrayHasKey('resourceId', $parsed);
+        $this->assertArrayHasKey('resourceType', $parsed);
+        $this->assertArrayHasKey('resourceParent', $parsed);
 
         $this->assertEquals('697848498066e3d2ef64', $parsed['resourceId']);
         $this->assertEquals('table', $parsed['resourceType']);

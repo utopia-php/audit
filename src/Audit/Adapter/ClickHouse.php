@@ -760,7 +760,11 @@ class ClickHouse extends SQL
         // Separate data for the data column (non-schema attributes)
         $nonSchemaData = $logData;
 
-        $resource = $this->parseResource($log['resource'] ?? '');
+        $resourceValue = $log['resource'] ?? null;
+        if (!\is_string($resourceValue)) {
+            $resourceValue = '';
+        }
+        $resource = $this->parseResource($resourceValue);
 
         foreach ($schemaColumns as $columnName) {
             if ($columnName === 'time') {
@@ -1146,7 +1150,11 @@ class ClickHouse extends SQL
 
             // Separate data for non-schema attributes
             $nonSchemaData = $logData;
-            $resource = $this->parseResource($log['resource'] ?? '');
+            $resourceValue = $log['resource'] ?? null;
+            if (!\is_string($resourceValue)) {
+                $resourceValue = '';
+            }
+            $resource = $this->parseResource($resourceValue);
             $processedLog = $log;
 
             // Extract schema attributes: check main log first, then data array
