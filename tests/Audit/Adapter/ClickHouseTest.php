@@ -413,4 +413,61 @@ class ClickHouseTest extends TestCase
             $this->assertContains($expected, $indexIds, "Parent index '{$expected}' not found in ClickHouse adapter");
         }
     }
+
+    /**
+     * Test parsing of complex resource paths into resourceType/resourceId/resourceParent
+     */
+    public function testParseResourceComplexPath(): void
+    {
+        $userId = 'parseUser';
+        $userAgent = 'UnitTestAgent/1.0';
+        $ip = '127.0.0.1';
+        $location = 'US';
+
+        $resource = 'database/6978484940ff05762e1a/table/697848498066e3d2ef64';
+
+        // Ensure we don't provide resourceType/resourceId in data so adapter must parse it
+        $data = ['example' => 'value'];
+
+        // Merge required adapter attributes so ClickHouse won't reject the log,
+        // but ensure we do NOT supply resourceType/resourceId/resourceParent so adapter parses them
+        $required = $this->getRequiredAttributes();
+        unset($required['resourceType'], $required['resourceId'], $required['resourceParent']);
+        $dataWithAttributes = array_merge($data, $required);
+
+        $log = $this->audit->log($userId, 'create', $resource, $userAgent, $ip, $location, $dataWithAttributes);
+
+        $this->assertInstanceOf(\Utopia\Audit\Log::class, $log);
+
+        $this->assertEquals('table', $log->getAttribute('resourceType'));
+        $this->assertEquals('697848498066e3d2ef64', $log->getAttribute('resourceId'));
+        $this->assertEquals('database/6978484940ff05762e1a', $log->getAttribute('resourceParent'));
+    }
+
+    /**
+     * Directly test the protected parseResource method via reflection.
+     */
+    public function testParseResourceMethod(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $method = new \ReflectionMethod($adapter, 'parseResource');
+        $method->setAccessible(true);
+
+        $resource = 'database/6978484940ff05762e1a/table/697848498066e3d2ef64';
+        $parsed = $method->invoke($adapter, $resource);
+
+        $this->assertIsArray($parsed);
+        $this->assertArrayHasKey('resourceId', $parsed);
+        $this->assertArrayHasKey('resourceType', $parsed);
+        $this->assertArrayHasKey('resourceParent', $parsed);
+
+        $this->assertEquals('697848498066e3d2ef64', $parsed['resourceId']);
+        $this->assertEquals('table', $parsed['resourceType']);
+        $this->assertEquals('database/6978484940ff05762e1a', $parsed['resourceParent']);
+    }
 }

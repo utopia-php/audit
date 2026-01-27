@@ -218,4 +218,40 @@ abstract class SQL extends Adapter
 
         return $definitions;
     }
+
+    /**
+     * Parses the resource string from the payload and extracts its ID, type, and parent.
+     *
+     * @param string $resource
+     * @return array{ resourceId: string, resourceType: string, resourceParent: string }
+     */
+    protected function parseResource(string $resource): array
+    {
+        $parts = explode('/', $resource);
+
+        $resourceType = '';
+        $resourceParent = '';
+
+        // resource/resourceId/subResource/subResourceId
+        if (count($parts) === 4) {
+            $resourceId = $parts[3];
+            $resourceType = $parts[2];
+
+            // resource/resourceId
+            $resourceParent = "{$parts[0]}/{$parts[1]}";
+        } // resource/resourceId
+        elseif (count($parts) === 2) {
+            $resourceId = $parts[1];
+            $resourceType = $parts[0];
+        } else {
+            // default fallback
+            $resourceId = $resource;
+        }
+
+        return [
+            'resourceId' => $resourceId,
+            'resourceType' => $resourceType,
+            'resourceParent' => $resourceParent,
+        ];
+    }
 }
