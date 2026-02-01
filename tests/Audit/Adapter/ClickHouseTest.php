@@ -328,6 +328,7 @@ class ClickHouseTest extends TestCase
             ]
         ];
 
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
         $result = $this->audit->logBatch($batchEvents);
         $this->assertTrue($result);
 
