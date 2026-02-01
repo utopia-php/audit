@@ -532,6 +532,59 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Execute a ClickHouse query with JSON body using JSONEachRow format.
+     *
+     * This method is optimized for INSERT operations using ClickHouse's JSONEachRow format.
+     * Each row is sent as a JSON object on a separate line, which ClickHouse can parse efficiently.
+     *
+     * @param string $sql The SQL query (should end with FORMAT JSONEachRow)
+     * @param array<int, array<string, mixed>> $rows Array of rows to insert, each row as associative array
+     * @return string Response body
+     * @throws Exception
+     */
+    private function queryWithJsonBody(string $sql, array $rows): string
+    {
+        $scheme = $this->secure ? 'https' : 'http';
+        $url = "{$scheme}://{$this->host}:{$this->port}/?query=" . urlencode($sql);
+
+        // Update the database header for each query (in case setDatabase was called)
+        $this->client->addHeader('X-ClickHouse-Database', $this->database);
+
+        // Build JSONEachRow body - each row on a separate line
+        $jsonLines = [];
+        foreach ($rows as $row) {
+            $encoded = json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if ($encoded === false) {
+                throw new Exception('Failed to encode row to JSON: ' . json_last_error_msg());
+            }
+            $jsonLines[] = $encoded;
+        }
+        $body = implode("\n", $jsonLines);
+
+        try {
+            $response = $this->client->fetch(
+                url: $url,
+                method: Client::METHOD_POST,
+                body: $body
+            );
+            if ($response->getStatusCode() !== 200) {
+                $bodyStr = $response->getBody();
+                $bodyStr = is_string($bodyStr) ? $bodyStr : '';
+                throw new Exception("ClickHouse query failed with HTTP {$response->getStatusCode()}: {$bodyStr}");
+            }
+
+            $responseBody = $response->getBody();
+            return is_string($responseBody) ? $responseBody : '';
+        } catch (Exception $e) {
+            throw new Exception(
+                "ClickHouse JSON insert failed: {$e->getMessage()}",
+                0,
+                $e
+            );
+        }
+    }
+
+    /**
      * Format a parameter value for safe transmission to ClickHouse.
      *
      * Converts PHP values to their string representation without SQL quoting.
@@ -726,7 +779,7 @@ class ClickHouse extends SQL
     }
 
     /**
-     * Create an audit log entry.
+     * Create an audit log entry using JSONEachRow format for optimal performance.
      *
      * @param array<string, mixed> $log The log data
      * @throws Exception
@@ -746,10 +799,8 @@ class ClickHouse extends SQL
         /** @var array<string, mixed> $logData */
         $logData = $log['data'] ?? [];
 
-        // Build column list and placeholders dynamically from attributes
-        $insertColumns = ['id', 'time'];
-        $valuePlaceholders = ['{id:String}', '{time:String}'];
-        $queryParams = [
+        // Build JSON row for JSONEachRow format
+        $row = [
             'id' => $logId,
             'time' => $formattedTime,
         ];
@@ -766,10 +817,9 @@ class ClickHouse extends SQL
                 continue;
             }
 
-            // Get attribute metadata to determine if required and nullable
+            // Get attribute metadata to determine if required
             $attributeMetadata = $this->getAttribute($columnName);
             $isRequiredAttribute = $attributeMetadata !== null && isset($attributeMetadata['required']) && $attributeMetadata['required'];
-            $isNullableAttribute = $attributeMetadata !== null && (!isset($attributeMetadata['required']) || !$attributeMetadata['required']);
 
             // For 'data' column, we'll handle it separately at the end
             if ($columnName === 'data') {
@@ -798,39 +848,21 @@ class ClickHouse extends SQL
             }
 
             if ($hasAttributeValue) {
-                $insertColumns[] = $columnName;
-                $queryParams[$columnName] = $attributeValue;
-
-                // Determine placeholder type based on attribute metadata
-                if ($isNullableAttribute) {
-                    $valuePlaceholders[] = '{' . $columnName . ':Nullable(String)}';
-                } else {
-                    $valuePlaceholders[] = '{' . $columnName . ':String}';
-                }
+                $row[$columnName] = $attributeValue;
             }
         }
 
         // Add the data column with remaining non-schema attributes
-        $insertColumns[] = 'data';
-        $queryParams['data'] = json_encode($nonSchemaData);
-        $valuePlaceholders[] = '{data:Nullable(String)}';
+        $row['data'] = json_encode($nonSchemaData);
 
         if ($this->sharedTables) {
-            $insertColumns[] = 'tenant';
-            $valuePlaceholders[] = '{tenant:Nullable(UInt64)}';
-            $queryParams['tenant'] = $this->tenant;
+            $row['tenant'] = $this->tenant;
         }
 
         $escapedDatabaseAndTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
-        $insertSql = "
-            INSERT INTO {$escapedDatabaseAndTable}
-            (" . implode(', ', $insertColumns) . ")
-            VALUES (
-                " . implode(", ", $valuePlaceholders) . "
-            )
-        ";
+        $insertSql = "INSERT INTO {$escapedDatabaseAndTable} FORMAT JSONEachRow";
 
-        $this->query($insertSql, $queryParams);
+        $this->queryWithJsonBody($insertSql, [$row]);
 
         // Retrieve the created log using getById to ensure consistency
         $createdLog = $this->getById($logId);
@@ -842,7 +874,7 @@ class ClickHouse extends SQL
     }
 
     /**
-     * Get a single log by its ID.
+     * Get a single log by its ID using JSON format for reliable parsing.
      *
      * @param string $id
      * @return Log|null The log entry or null if not found
@@ -860,17 +892,17 @@ class ClickHouse extends SQL
             FROM {$escapedTable}
             WHERE {$escapedId} = {id:String}{$tenantFilter}
             LIMIT 1
-            FORMAT TabSeparated
+            FORMAT JSON
         ";
 
         $result = $this->query($sql, ['id' => $id]);
-        $logs = $this->parseResults($result);
+        $logs = $this->parseJsonResults($result);
 
         return $logs[0] ?? null;
     }
 
     /**
-     * Find logs using Query objects.
+     * Find logs using Query objects with JSON format for reliable parsing.
      *
      * @param array<Query> $queries
      * @return array<Log>
@@ -911,11 +943,11 @@ class ClickHouse extends SQL
         $sql = "
             SELECT {$selectColumns}
             FROM {$escapedTable}{$whereClause}{$orderClause}{$limitClause}{$offsetClause}
-            FORMAT TabSeparated
+            FORMAT JSON
         ";
 
         $result = $this->query($sql, $parsed['params']);
-        return $this->parseResults($result);
+        return $this->parseJsonResults($result);
     }
 
     /**
@@ -1115,7 +1147,7 @@ class ClickHouse extends SQL
     }
 
     /**
-     * Create multiple audit log entries in batch.
+     * Create multiple audit log entries in batch using JSONEachRow format for optimal performance.
      *
      * @param array<array<string, mixed>> $logs The logs to insert
      * @throws Exception
@@ -1132,8 +1164,9 @@ class ClickHouse extends SQL
         // Get all attribute column names
         $schemaColumns = $this->getColumnNames();
 
-        // Process each log to extract additional attributes from data
-        $processedLogs = [];
+        // Build JSON rows for JSONEachRow format
+        $rows = [];
+
         foreach ($logs as $log) {
             /** @var array<string, mixed> $logData */
             $logData = $log['data'] ?? [];
@@ -1158,128 +1191,60 @@ class ClickHouse extends SQL
                 }
             }
 
-            // Update data with remaining non-schema attributes
-            $processedLog['data'] = $nonSchemaData;
-            $processedLogs[] = $processedLog;
-        }
-
-        // Build column list starting with id and time
-        $insertColumns = ['id', 'time'];
-
-        // Determine which attribute columns are present in any log
-        $presentColumns = [];
-        foreach ($processedLogs as $processedLog) {
-            foreach ($schemaColumns as $columnName) {
-                if ($columnName === 'time') {
-                    continue; // Already in insertColumns
-                }
-                if (isset($processedLog[$columnName]) && !in_array($columnName, $presentColumns, true)) {
-                    $presentColumns[] = $columnName;
-                }
-            }
-        }
-
-        // Add present columns in the order they're defined in attributes
-        foreach ($schemaColumns as $columnName) {
-            if ($columnName === 'time') {
-                continue; // Already added
-            }
-            if (in_array($columnName, $presentColumns, true)) {
-                $insertColumns[] = $columnName;
-            }
-        }
-
-        if ($this->sharedTables) {
-            $insertColumns[] = 'tenant';
-        }
-
-        $paramCounter = 0;
-        $queryParams = [];
-        $valueClauses = [];
-
-        foreach ($processedLogs as $processedLog) {
+            // Build JSON row
             $logId = uniqid('', true);
-            $valuePlaceholders = [];
 
-            // Add id
-            $paramKey = 'id_' . $paramCounter;
-            $queryParams[$paramKey] = $logId;
-            $valuePlaceholders[] = '{' . $paramKey . ':String}';
-
-            // Add time
             /** @var string|\DateTime|null $providedTime */
             $providedTime = $processedLog['time'] ?? null;
             $formattedTime = $this->formatDateTime($providedTime);
-            $paramKey = 'time_' . $paramCounter;
-            $queryParams[$paramKey] = $formattedTime;
-            $valuePlaceholders[] = '{' . $paramKey . ':String}';
 
-            // Add all other present columns
-            foreach ($insertColumns as $columnName) {
-                if ($columnName === 'id' || $columnName === 'time' || $columnName === 'tenant') {
+            $row = [
+                'id' => $logId,
+                'time' => $formattedTime,
+            ];
+
+            // Add all other columns
+            foreach ($schemaColumns as $columnName) {
+                if ($columnName === 'time') {
                     continue; // Already handled
                 }
 
-                $paramKey = $columnName . '_' . $paramCounter;
-
-                // Get attribute metadata to determine if required and nullable
+                // Get attribute metadata to determine if required
                 $attributeMetadata = $this->getAttribute($columnName);
                 $isRequiredAttribute = $attributeMetadata !== null && isset($attributeMetadata['required']) && $attributeMetadata['required'];
-                $isNullableAttribute = $attributeMetadata !== null && (!isset($attributeMetadata['required']) || !$attributeMetadata['required']);
-
-                $attributeValue = null;
-                $hasAttributeValue = false;
 
                 if ($columnName === 'data') {
-                    // Data column - encode as JSON
-                    /** @var array<string, mixed> $dataValue */
-                    $dataValue = $processedLog['data'];
-                    $attributeValue = json_encode($dataValue);
-                    $hasAttributeValue = true;
+                    // Data column - encode remaining non-schema data as JSON
+                    $row['data'] = json_encode($nonSchemaData);
                 } elseif (isset($processedLog[$columnName])) {
-                    $attributeValue = $processedLog[$columnName];
-                    $hasAttributeValue = true;
-                }
-
-                // Validate required attributes
-                if ($isRequiredAttribute && !$hasAttributeValue) {
+                    $row[$columnName] = $processedLog[$columnName];
+                } elseif ($isRequiredAttribute) {
                     throw new \InvalidArgumentException("Required attribute '{$columnName}' is missing in batch log entry");
-                }
-
-                $queryParams[$paramKey] = $attributeValue;
-
-                // Determine placeholder type based on attribute metadata
-                if ($isNullableAttribute) {
-                    $valuePlaceholders[] = '{' . $paramKey . ':Nullable(String)}';
-                } else {
-                    $valuePlaceholders[] = '{' . $paramKey . ':String}';
                 }
             }
 
             if ($this->sharedTables) {
-                $paramKey = 'tenant_' . $paramCounter;
-                $queryParams[$paramKey] = $this->tenant;
-                $valuePlaceholders[] = '{' . $paramKey . ':Nullable(UInt64)}';
+                $row['tenant'] = $this->tenant;
             }
 
-            $valueClauses[] = '(' . implode(', ', $valuePlaceholders) . ')';
-            $paramCounter++;
+            $rows[] = $row;
         }
 
-        $insertSql = "
-            INSERT INTO {$escapedDatabaseAndTable}
-            (" . implode(', ', $insertColumns) . ")
-            VALUES " . implode(', ', $valueClauses);
+        $insertSql = "INSERT INTO {$escapedDatabaseAndTable} FORMAT JSONEachRow";
 
-        $this->query($insertSql, $queryParams);
+        $this->queryWithJsonBody($insertSql, $rows);
         return true;
     }
 
     /**
-     * Parse ClickHouse query result into Log objects.
+     * Parse ClickHouse TabSeparated query result into Log objects.
      * Dynamically maps columns based on current attribute definitions.
      *
+     * This method is kept for backwards compatibility and potential future use.
+     * The primary parsing method is now parseJsonResults() which uses JSON format.
+     *
      * @return array<int, Log>
+     * @phpstan-ignore-next-line method.unused
      */
     private function parseResults(string $result): array
     {
@@ -1361,6 +1326,85 @@ class ClickHouse extends SQL
                         // Required field - use value as-is
                         $document[$columnName] = $value;
                     }
+                }
+            }
+
+            // Add special $id field if present
+            if (isset($document['id'])) {
+                $document['$id'] = $document['id'];
+                unset($document['id']);
+            }
+
+            $documents[] = new Log($document);
+        }
+
+        return $documents;
+    }
+
+    /**
+     * Parse ClickHouse JSON format results into Log objects.
+     * JSON format provides structured data with automatic type handling.
+     *
+     * @param string $result The JSON response from ClickHouse
+     * @return array<int, Log>
+     * @throws Exception If JSON parsing fails
+     */
+    private function parseJsonResults(string $result): array
+    {
+        if (empty(trim($result))) {
+            return [];
+        }
+
+        /** @var array<string, mixed>|null $decoded */
+        $decoded = json_decode($result, true);
+        if ($decoded === null && json_last_error() !== JSON_ERROR_NONE) {
+            throw new Exception('Failed to parse ClickHouse JSON response: ' . json_last_error_msg());
+        }
+
+        if (!is_array($decoded) || !isset($decoded['data']) || !is_array($decoded['data'])) {
+            return [];
+        }
+
+        /** @var array<int, array<string, mixed>> $data */
+        $data = $decoded['data'];
+        $documents = [];
+
+        foreach ($data as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $document = [];
+
+            foreach ($row as $columnName => $value) {
+                if ($columnName === 'data') {
+                    // Decode JSON data column
+                    if (is_string($value)) {
+                        $document[$columnName] = json_decode($value, true) ?? [];
+                    } else {
+                        $document[$columnName] = $value ?? [];
+                    }
+                } elseif ($columnName === 'tenant') {
+                    // Parse tenant as integer or null
+                    if ($value === null || $value === '') {
+                        $document[$columnName] = null;
+                    } elseif (is_numeric($value)) {
+                        $document[$columnName] = (int) $value;
+                    } else {
+                        $document[$columnName] = null;
+                    }
+                } elseif ($columnName === 'time') {
+                    // Convert ClickHouse timestamp format back to ISO 8601
+                    // ClickHouse JSON: "2025-12-07 23:33:54.493"
+                    // ISO 8601:        "2025-12-07T23:33:54.493+00:00"
+                    $parsedTime = is_string($value) ? $value : (is_scalar($value) ? (string) $value : '');
+                    if (strpos($parsedTime, 'T') === false && $parsedTime !== '') {
+                        $parsedTime = str_replace(' ', 'T', $parsedTime) . '+00:00';
+                    }
+                    $document[$columnName] = $parsedTime;
+                } else {
+                    // For other fields, handle null values
+                    $document[$columnName] = $value;
                 }
             }
 
