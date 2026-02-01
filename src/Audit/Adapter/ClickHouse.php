@@ -511,9 +511,10 @@ class ClickHouse extends SQL
                 // Build JSONEachRow body - each row on a separate line
                 $jsonLines = [];
                 foreach ($jsonRows as $row) {
-                    $encoded = json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                    if ($encoded === false) {
-                        throw new Exception('Failed to encode row to JSON: ' . json_last_error_msg());
+                    try {
+                        $encoded = json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+                    } catch (\JsonException $e) {
+                        throw new Exception('Failed to encode row to JSON: ' . $e->getMessage());
                     }
                     $jsonLines[] = $encoded;
                 }
@@ -576,8 +577,11 @@ class ClickHouse extends SQL
         }
 
         if (is_array($value)) {
-            $encoded = json_encode($value);
-            return is_string($encoded) ? $encoded : '';
+            try {
+                return json_encode($value, JSON_THROW_ON_ERROR);
+            } catch (\JsonException $e) {
+                throw new Exception('Failed to encode array parameter to JSON: ' . $e->getMessage());
+            }
         }
 
         if (is_string($value)) {
@@ -831,9 +835,10 @@ class ClickHouse extends SQL
         }
 
         // Add the data column with remaining non-schema attributes
-        $encodedData = json_encode($nonSchemaData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        if ($encodedData === false) {
-            throw new Exception('Failed to encode data column to JSON: ' . json_last_error_msg());
+        try {
+            $encodedData = json_encode($nonSchemaData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new Exception('Failed to encode data column to JSON: ' . $e->getMessage());
         }
         $row['data'] = $encodedData;
 
@@ -1205,9 +1210,10 @@ class ClickHouse extends SQL
 
                 if ($columnName === 'data') {
                     // Data column - encode remaining non-schema data as JSON
-                    $encodedData = json_encode($nonSchemaData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                    if ($encodedData === false) {
-                        throw new Exception('Failed to encode data column to JSON: ' . json_last_error_msg());
+                    try {
+                        $encodedData = json_encode($nonSchemaData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+                    } catch (\JsonException $e) {
+                        throw new Exception('Failed to encode data column to JSON: ' . $e->getMessage());
                     }
                     $row['data'] = $encodedData;
                 } elseif (isset($processedLog[$columnName])) {
