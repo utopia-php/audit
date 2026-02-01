@@ -475,109 +475,77 @@ class ClickHouse extends SQL
     /**
      * Execute a ClickHouse query via HTTP interface using Fetch Client.
      *
-     * Uses ClickHouse query parameters (sent as POST multipart form data) to prevent SQL injection.
-     * This is ClickHouse's native parameter mechanism - parameters are safely
-     * transmitted separately from the query structure.
+     * This unified method supports two modes of operation:
      *
-     * Parameters are referenced in the SQL using the syntax: {paramName:Type}.
-     * For example: SELECT * WHERE id = {id:String}
+     * 1. **Parameterized queries** (when $params is provided):
+     *    Uses ClickHouse query parameters sent as POST multipart form data.
+     *    Parameters are referenced in SQL using syntax: {paramName:Type}
+     *    Example: SELECT * WHERE id = {id:String}
+     *
+     * 2. **JSON body queries** (when $jsonRows is provided):
+     *    Uses JSONEachRow format for optimal INSERT performance.
+     *    SQL is sent via URL query string, JSON data as POST body.
+     *    Each row is a JSON object on a separate line.
      *
      * ClickHouse handles all parameter escaping and type conversion internally,
-     * making this approach fully injection-safe without needing manual escaping.
+     * making both approaches fully injection-safe.
      *
-     * Using POST body avoids URL length limits for batch operations with many parameters.
-     * Equivalent to: curl -X POST -F 'query=...' -F 'param_key=value' http://host/
-     *
-     * @param array<string, mixed> $params Key-value pairs for query parameters
-     * @throws Exception
-     */
-    private function query(string $sql, array $params = []): string
-    {
-        $scheme = $this->secure ? 'https' : 'http';
-        $url = "{$scheme}://{$this->host}:{$this->port}/";
-
-        // Update the database header for each query (in case setDatabase was called)
-        $this->client->addHeader('X-ClickHouse-Database', $this->database);
-
-        // Build multipart form data body with query and parameters
-        // The Fetch client will automatically encode arrays as multipart/form-data
-        $body = ['query' => $sql];
-        foreach ($params as $key => $value) {
-            $body['param_' . $key] = $this->formatParamValue($value);
-        }
-
-        try {
-            $response = $this->client->fetch(
-                url: $url,
-                method: Client::METHOD_POST,
-                body: $body
-            );
-            if ($response->getStatusCode() !== 200) {
-                $bodyStr = $response->getBody();
-                $bodyStr = is_string($bodyStr) ? $bodyStr : '';
-                throw new Exception("ClickHouse query failed with HTTP {$response->getStatusCode()}: {$bodyStr}");
-            }
-
-            $body = $response->getBody();
-            return is_string($body) ? $body : '';
-        } catch (Exception $e) {
-            // Preserve the original exception context for better debugging
-            // Re-throw with additional context while maintaining the original exception chain
-            throw new Exception(
-                "ClickHouse query execution failed: {$e->getMessage()}",
-                0,
-                $e
-            );
-        }
-    }
-
-    /**
-     * Execute a ClickHouse query with JSON body using JSONEachRow format.
-     *
-     * This method is optimized for INSERT operations using ClickHouse's JSONEachRow format.
-     * Each row is sent as a JSON object on a separate line, which ClickHouse can parse efficiently.
-     *
-     * @param string $sql The SQL query (should end with FORMAT JSONEachRow)
-     * @param array<int, array<string, mixed>> $rows Array of rows to insert, each row as associative array
+     * @param string $sql The SQL query to execute
+     * @param array<string, mixed> $params Key-value pairs for query parameters (for SELECT/UPDATE/DELETE)
+     * @param array<int, array<string, mixed>>|null $jsonRows Array of rows for JSONEachRow INSERT operations
      * @return string Response body
      * @throws Exception
      */
-    private function queryWithJsonBody(string $sql, array $rows): string
+    private function query(string $sql, array $params = [], ?array $jsonRows = null): string
     {
         $scheme = $this->secure ? 'https' : 'http';
-        $url = "{$scheme}://{$this->host}:{$this->port}/?query=" . urlencode($sql);
 
         // Update the database header for each query (in case setDatabase was called)
         $this->client->addHeader('X-ClickHouse-Database', $this->database);
 
-        // Build JSONEachRow body - each row on a separate line
-        $jsonLines = [];
-        foreach ($rows as $row) {
-            $encoded = json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            if ($encoded === false) {
-                throw new Exception('Failed to encode row to JSON: ' . json_last_error_msg());
-            }
-            $jsonLines[] = $encoded;
-        }
-        $body = implode("\n", $jsonLines);
-
         try {
+            if ($jsonRows !== null) {
+                // JSON body mode for INSERT operations with JSONEachRow format
+                $url = "{$scheme}://{$this->host}:{$this->port}/?query=" . urlencode($sql);
+
+                // Build JSONEachRow body - each row on a separate line
+                $jsonLines = [];
+                foreach ($jsonRows as $row) {
+                    $encoded = json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    if ($encoded === false) {
+                        throw new Exception('Failed to encode row to JSON: ' . json_last_error_msg());
+                    }
+                    $jsonLines[] = $encoded;
+                }
+                $body = implode("\n", $jsonLines);
+            } else {
+                // Parameterized query mode using multipart form data
+                $url = "{$scheme}://{$this->host}:{$this->port}/";
+
+                // Build multipart form data body with query and parameters
+                $body = ['query' => $sql];
+                foreach ($params as $key => $value) {
+                    $body['param_' . $key] = $this->formatParamValue($value);
+                }
+            }
+
             $response = $this->client->fetch(
                 url: $url,
                 method: Client::METHOD_POST,
                 body: $body
             );
+
             if ($response->getStatusCode() !== 200) {
-                $bodyStr = $response->getBody();
-                $bodyStr = is_string($bodyStr) ? $bodyStr : '';
-                throw new Exception("ClickHouse query failed with HTTP {$response->getStatusCode()}: {$bodyStr}");
+                $responseBody = $response->getBody();
+                $responseBody = is_string($responseBody) ? $responseBody : '';
+                throw new Exception("ClickHouse query failed with HTTP {$response->getStatusCode()}: {$responseBody}");
             }
 
             $responseBody = $response->getBody();
             return is_string($responseBody) ? $responseBody : '';
         } catch (Exception $e) {
             throw new Exception(
-                "ClickHouse JSON insert failed: {$e->getMessage()}",
+                "ClickHouse query execution failed: {$e->getMessage()}",
                 0,
                 $e
             );
@@ -872,7 +840,7 @@ class ClickHouse extends SQL
         $escapedDatabaseAndTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
         $insertSql = "INSERT INTO {$escapedDatabaseAndTable} FORMAT JSONEachRow";
 
-        $this->queryWithJsonBody($insertSql, [$row]);
+        $this->query($insertSql, [], [$row]);
 
         // Retrieve the created log using getById to ensure consistency
         $createdLog = $this->getById($logId);
@@ -1250,7 +1218,7 @@ class ClickHouse extends SQL
 
         $insertSql = "INSERT INTO {$escapedDatabaseAndTable} FORMAT JSONEachRow";
 
-        $this->queryWithJsonBody($insertSql, $rows);
+        $this->query($insertSql, [], $rows);
         return true;
     }
 
