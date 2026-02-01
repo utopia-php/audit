@@ -831,7 +831,11 @@ class ClickHouse extends SQL
         }
 
         // Add the data column with remaining non-schema attributes
-        $row['data'] = json_encode($nonSchemaData);
+        $encodedData = json_encode($nonSchemaData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($encodedData === false) {
+            throw new Exception('Failed to encode data column to JSON: ' . json_last_error_msg());
+        }
+        $row['data'] = $encodedData;
 
         if ($this->sharedTables) {
             $row['tenant'] = $this->tenant;
@@ -1201,7 +1205,11 @@ class ClickHouse extends SQL
 
                 if ($columnName === 'data') {
                     // Data column - encode remaining non-schema data as JSON
-                    $row['data'] = json_encode($nonSchemaData);
+                    $encodedData = json_encode($nonSchemaData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    if ($encodedData === false) {
+                        throw new Exception('Failed to encode data column to JSON: ' . json_last_error_msg());
+                    }
+                    $row['data'] = $encodedData;
                 } elseif (isset($processedLog[$columnName])) {
                     $row[$columnName] = $processedLog[$columnName];
                 } elseif ($isRequiredAttribute) {
