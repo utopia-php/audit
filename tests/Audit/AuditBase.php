@@ -747,6 +747,7 @@ trait AuditBase
                 'time' => $timestamp
             ];
         }
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
         $this->audit->logBatch($batchEvents);
 
         // Test 1: Count with simple filter
