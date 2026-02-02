@@ -751,7 +751,7 @@ class ClickHouse extends SQL
     }
 
     /**
-     * Create an audit log entry using JSONEachRow format for optimal performance.
+     * Create an audit log entry
      *
      * @param array<string, mixed> $log The log data
      * @throws Exception
@@ -803,7 +803,7 @@ class ClickHouse extends SQL
     }
 
     /**
-     * Find logs using Query objects with JSON format for reliable parsing.
+     * Find logs using Query objects.
      *
      * @param array<Query> $queries
      * @return array<Log>
@@ -1048,7 +1048,7 @@ class ClickHouse extends SQL
     }
 
     /**
-     * Create multiple audit log entries in batch using JSONEachRow format for optimal performance.
+     * Create multiple audit log entries in batch.
      *
      * @param array<array<string, mixed>> $logs The logs to insert
      * @throws Exception
