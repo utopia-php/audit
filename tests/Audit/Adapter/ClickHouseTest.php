@@ -416,6 +416,279 @@ class ClickHouseTest extends TestCase
     }
 
     /**
+     * Test compression setting validation with invalid type
+     */
+    public function testSetCompressionValidatesInvalidType(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage("Invalid compression type 'invalid'");
+
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $adapter->setCompression('invalid');
+    }
+
+    /**
+     * Test constructor with invalid compression type
+     */
+    public function testConstructorValidatesInvalidCompression(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage("Invalid compression type 'bzip2'");
+
+        new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            compression: 'bzip2'
+        );
+    }
+
+    /**
+     * Test valid compression types
+     */
+    public function testCompressionSettings(): void
+    {
+        // Test constructor with each valid compression type
+        $adapterNone = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            compression: ClickHouse::COMPRESSION_NONE
+        );
+        $this->assertEquals(ClickHouse::COMPRESSION_NONE, $adapterNone->getCompression());
+
+        $adapterGzip = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            compression: ClickHouse::COMPRESSION_GZIP
+        );
+        $this->assertEquals(ClickHouse::COMPRESSION_GZIP, $adapterGzip->getCompression());
+
+        $adapterLz4 = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            compression: ClickHouse::COMPRESSION_LZ4
+        );
+        $this->assertEquals(ClickHouse::COMPRESSION_LZ4, $adapterLz4->getCompression());
+
+        // Test setter method
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $result = $adapter->setCompression(ClickHouse::COMPRESSION_GZIP);
+        $this->assertInstanceOf(ClickHouse::class, $result);
+        $this->assertEquals(ClickHouse::COMPRESSION_GZIP, $adapter->getCompression());
+
+        $adapter->setCompression(ClickHouse::COMPRESSION_NONE);
+        $this->assertEquals(ClickHouse::COMPRESSION_NONE, $adapter->getCompression());
+    }
+
+    /**
+     * Test timeout validation - too low
+     */
+    public function testTimeoutValidationTooLow(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Timeout must be between');
+
+        new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            timeout: 500 // Below minimum of 1000ms
+        );
+    }
+
+    /**
+     * Test timeout validation - too high
+     */
+    public function testTimeoutValidationTooHigh(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Timeout must be between');
+
+        new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            timeout: 700_000 // Above maximum of 600000ms
+        );
+    }
+
+    /**
+     * Test valid timeout settings
+     */
+    public function testTimeoutSettings(): void
+    {
+        // Test constructor with custom timeout
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            timeout: 60_000
+        );
+        $this->assertEquals(60_000, $adapter->getTimeout());
+
+        // Test setter method
+        $result = $adapter->setTimeout(120_000);
+        $this->assertInstanceOf(ClickHouse::class, $result);
+        $this->assertEquals(120_000, $adapter->getTimeout());
+    }
+
+    /**
+     * Test setTimeout validates range
+     */
+    public function testSetTimeoutValidatesRange(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Timeout must be between');
+
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $adapter->setTimeout(100); // Below minimum
+    }
+
+    /**
+     * Test ping method returns true for healthy connection
+     */
+    public function testPingHealthyConnection(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $result = $adapter->ping();
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Test ping method returns false for bad connection
+     */
+    public function testPingUnhealthyConnection(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'wrongpassword'
+        );
+
+        // Should return false instead of throwing exception
+        $result = $adapter->ping();
+        $this->assertFalse($result);
+    }
+
+    /**
+     * Test getServerVersion returns version string
+     */
+    public function testGetServerVersion(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $version = $adapter->getServerVersion();
+        $this->assertNotNull($version);
+        $this->assertIsString($version);
+        // ClickHouse version format: XX.Y.Z.W
+        $this->assertMatchesRegularExpression('/^\d+\.\d+/', $version);
+    }
+
+    /**
+     * Test getServerVersion returns null for bad connection
+     */
+    public function testGetServerVersionBadConnection(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'wrongpassword'
+        );
+
+        $version = $adapter->getServerVersion();
+        $this->assertNull($version);
+    }
+
+    /**
+     * Test that operations work with gzip compression enabled
+     */
+    public function testOperationsWithGzipCompression(): void
+    {
+        $clickHouse = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            port: 8123,
+            compression: ClickHouse::COMPRESSION_GZIP
+        );
+
+        $clickHouse->setDatabase('default');
+        $clickHouse->setNamespace('gzip_test');
+
+        $audit = new \Utopia\Audit\Audit($clickHouse);
+        $audit->setup();
+
+        // Test single log insertion with compression
+        $requiredAttributes = $this->getRequiredAttributes();
+        $data = array_merge(['test' => 'gzip_compression'], $requiredAttributes);
+
+        $log = $audit->log(
+            'gzipuser',
+            'create',
+            'document/gzip1',
+            'Mozilla/5.0',
+            '127.0.0.1',
+            'US',
+            $data
+        );
+
+        $this->assertInstanceOf(\Utopia\Audit\Log::class, $log);
+        $this->assertEquals('gzipuser', $log->getAttribute('userId'));
+
+        // Test batch insertion with compression
+        $batchEvents = [
+            [
+                'userId' => 'gzipuser',
+                'event' => 'update',
+                'resource' => 'document/gzip2',
+                'userAgent' => 'Mozilla/5.0',
+                'ip' => '127.0.0.1',
+                'location' => 'US',
+                'data' => ['batch' => 'gzip'],
+                'time' => \Utopia\Database\DateTime::formatTz(\Utopia\Database\DateTime::now()) ?? ''
+            ]
+        ];
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
+
+        $result = $audit->logBatch($batchEvents);
+        $this->assertTrue($result);
+
+        // Verify retrieval works
+        $logs = $audit->getLogsByUser('gzipuser');
+        $this->assertGreaterThanOrEqual(2, count($logs));
+
+        // Cleanup
+        $audit->cleanup(new \DateTime('+1 hour'));
+    }
+
+    /**
      * Test parsing of complex resource paths into resourceType/resourceId/resourceParent
      */
     public function testParseResourceComplexPath(): void

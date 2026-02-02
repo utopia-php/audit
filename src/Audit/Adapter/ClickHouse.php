@@ -14,14 +14,69 @@ use Utopia\Validator\Hostname;
  *
  * This adapter stores audit logs in ClickHouse using HTTP interface.
  * ClickHouse is optimized for analytical queries and can handle massive amounts of log data.
+ *
+ * Features:
+ * - HTTP compression support (gzip, lz4) for reduced bandwidth
+ * - Configurable connection timeouts
+ * - Connection health checking
+ * - Parameterized queries for SQL injection prevention
+ * - Multi-tenant support with shared tables
  */
 class ClickHouse extends SQL
 {
+    /**
+     * Default HTTP port for ClickHouse
+     */
     private const DEFAULT_PORT = 8123;
 
+    /**
+     * Default table name for audit logs
+     */
     private const DEFAULT_TABLE = 'audits';
 
+    /**
+     * Default database name
+     */
     private const DEFAULT_DATABASE = 'default';
+
+    /**
+     * Default connection timeout in milliseconds
+     */
+    private const DEFAULT_TIMEOUT = 30_000;
+
+    /**
+     * Minimum allowed timeout in milliseconds
+     */
+    private const MIN_TIMEOUT = 1_000;
+
+    /**
+     * Maximum allowed timeout in milliseconds (10 minutes)
+     */
+    private const MAX_TIMEOUT = 600_000;
+
+    /**
+     * Compression type: No compression
+     */
+    public const COMPRESSION_NONE = 'none';
+
+    /**
+     * Compression type: gzip compression (best for HTTP)
+     */
+    public const COMPRESSION_GZIP = 'gzip';
+
+    /**
+     * Compression type: lz4 compression (fastest, ClickHouse native)
+     */
+    public const COMPRESSION_LZ4 = 'lz4';
+
+    /**
+     * Valid compression types
+     */
+    private const VALID_COMPRESSION_TYPES = [
+        self::COMPRESSION_NONE,
+        self::COMPRESSION_GZIP,
+        self::COMPRESSION_LZ4,
+    ];
 
     private string $host;
 
@@ -35,8 +90,20 @@ class ClickHouse extends SQL
 
     private string $password;
 
-    /** @var bool Whether to use HTTPS for ClickHouse HTTP interface */
+    /**
+     * @var bool Whether to use HTTPS for ClickHouse HTTP interface
+     */
     private bool $secure = false;
+
+    /**
+     * @var string Compression type for HTTP requests/responses
+     */
+    private string $compression = self::COMPRESSION_NONE;
+
+    /**
+     * @var int Connection timeout in milliseconds
+     */
+    private int $timeout = self::DEFAULT_TIMEOUT;
 
     private Client $client;
 
@@ -47,11 +114,15 @@ class ClickHouse extends SQL
     protected bool $sharedTables = false;
 
     /**
-     * @param string $host ClickHouse host
+     * Create a new ClickHouse adapter instance.
+     *
+     * @param string $host ClickHouse host (hostname or IP address)
      * @param string $username ClickHouse username (default: 'default')
      * @param string $password ClickHouse password (default: '')
      * @param int $port ClickHouse HTTP port (default: 8123)
      * @param bool $secure Whether to use HTTPS (default: false)
+     * @param string $compression Compression type: 'none', 'gzip', or 'lz4' (default: 'none')
+     * @param int $timeout Connection timeout in milliseconds (default: 30000)
      * @throws Exception If validation fails
      */
     public function __construct(
@@ -59,22 +130,43 @@ class ClickHouse extends SQL
         string $username = 'default',
         string $password = '',
         int $port = self::DEFAULT_PORT,
-        bool $secure = false
+        bool $secure = false,
+        string $compression = self::COMPRESSION_NONE,
+        int $timeout = self::DEFAULT_TIMEOUT
     ) {
         $this->validateHost($host);
         $this->validatePort($port);
+        $this->validateCompression($compression);
+        $this->validateTimeout($timeout);
 
         $this->host = $host;
         $this->port = $port;
         $this->username = $username;
         $this->password = $password;
         $this->secure = $secure;
+        $this->compression = $compression;
+        $this->timeout = $timeout;
 
-        // Initialize the HTTP client for connection reuse
+        $this->initializeClient();
+    }
+
+    /**
+     * Initialize the HTTP client with current configuration.
+     */
+    private function initializeClient(): void
+    {
         $this->client = new Client();
         $this->client->addHeader('X-ClickHouse-User', $this->username);
         $this->client->addHeader('X-ClickHouse-Key', $this->password);
-        $this->client->setTimeout(30_000); // 30 seconds
+        $this->client->setTimeout($this->timeout);
+
+        // Configure compression headers
+        if ($this->compression !== self::COMPRESSION_NONE) {
+            // Request compressed responses from ClickHouse
+            $this->client->addHeader('Accept-Encoding', $this->compression);
+            // Tell ClickHouse to decompress our requests if we send compressed data
+            $this->client->addHeader('Content-Encoding', $this->compression);
+        }
     }
 
     /**
@@ -109,6 +201,35 @@ class ClickHouse extends SQL
     {
         if ($port < 1 || $port > 65535) {
             throw new Exception('ClickHouse port must be between 1 and 65535');
+        }
+    }
+
+    /**
+     * Validate compression parameter.
+     *
+     * @param string $compression
+     * @throws Exception
+     */
+    private function validateCompression(string $compression): void
+    {
+        if (!in_array($compression, self::VALID_COMPRESSION_TYPES, true)) {
+            $validTypes = implode(', ', self::VALID_COMPRESSION_TYPES);
+            throw new Exception("Invalid compression type '{$compression}'. Valid types are: {$validTypes}");
+        }
+    }
+
+    /**
+     * Validate timeout parameter.
+     *
+     * @param int $timeout
+     * @throws Exception
+     */
+    private function validateTimeout(int $timeout): void
+    {
+        if ($timeout < self::MIN_TIMEOUT || $timeout > self::MAX_TIMEOUT) {
+            throw new Exception(
+                "Timeout must be between " . self::MIN_TIMEOUT . " and " . self::MAX_TIMEOUT . " milliseconds"
+            );
         }
     }
 
@@ -187,11 +308,105 @@ class ClickHouse extends SQL
 
     /**
      * Enable or disable HTTPS for ClickHouse HTTP interface.
+     *
+     * @param bool $secure Whether to use HTTPS
+     * @return self
      */
     public function setSecure(bool $secure): self
     {
         $this->secure = $secure;
         return $this;
+    }
+
+    /**
+     * Set the compression type for HTTP requests/responses.
+     *
+     * Compression can significantly reduce bandwidth usage:
+     * - 'none': No compression (default)
+     * - 'gzip': Standard gzip compression, widely supported
+     * - 'lz4': ClickHouse native compression, fastest
+     *
+     * @param string $compression Compression type
+     * @return self
+     * @throws Exception If compression type is invalid
+     */
+    public function setCompression(string $compression): self
+    {
+        $this->validateCompression($compression);
+        $this->compression = $compression;
+        $this->initializeClient();
+        return $this;
+    }
+
+    /**
+     * Get the current compression type.
+     *
+     * @return string
+     */
+    public function getCompression(): string
+    {
+        return $this->compression;
+    }
+
+    /**
+     * Set the connection timeout.
+     *
+     * @param int $timeout Timeout in milliseconds (1000-600000)
+     * @return self
+     * @throws Exception If timeout is out of range
+     */
+    public function setTimeout(int $timeout): self
+    {
+        $this->validateTimeout($timeout);
+        $this->timeout = $timeout;
+        $this->client->setTimeout($timeout);
+        return $this;
+    }
+
+    /**
+     * Get the current timeout.
+     *
+     * @return int Timeout in milliseconds
+     */
+    public function getTimeout(): int
+    {
+        return $this->timeout;
+    }
+
+    /**
+     * Check if the ClickHouse server is reachable and responding.
+     *
+     * This method performs a lightweight ping query to verify:
+     * - Network connectivity to the server
+     * - Server is accepting HTTP connections
+     * - Authentication credentials are valid
+     *
+     * @return bool True if server is healthy, false otherwise
+     */
+    public function ping(): bool
+    {
+        try {
+            $result = $this->query('SELECT 1 FORMAT TabSeparated');
+            return trim($result) === '1';
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get server version information.
+     *
+     * @return string|null Server version string or null if unavailable
+     */
+    public function getServerVersion(): ?string
+    {
+        try {
+            $result = $this->query('SELECT version() FORMAT TabSeparated');
+            $version = trim($result);
+            return $version !== '' ? $version : null;
+        } catch (Exception $e) {
+            return null;
+        }
     }
 
     /**
@@ -490,6 +705,10 @@ class ClickHouse extends SQL
      * ClickHouse handles all parameter escaping and type conversion internally,
      * making both approaches fully injection-safe.
      *
+     * When compression is enabled:
+     * - Request bodies are compressed before sending (for INSERT operations)
+     * - Response decompression is handled automatically via Accept-Encoding header
+     *
      * @param string $sql The SQL query to execute
      * @param array<string, mixed> $params Key-value pairs for query parameters (for SELECT/UPDATE/DELETE)
      * @param array<int, array<string, mixed>>|null $jsonRows Array of rows for JSONEachRow INSERT operations
@@ -519,6 +738,9 @@ class ClickHouse extends SQL
                     $jsonLines[] = $encoded;
                 }
                 $body = implode("\n", $jsonLines);
+
+                // Apply compression to the request body if enabled
+                $body = $this->compressBody($body);
             } else {
                 // Parameterized query mode using multipart form data
                 $url = "{$scheme}://{$this->host}:{$this->port}/";
@@ -536,21 +758,115 @@ class ClickHouse extends SQL
                 body: $body
             );
 
-            if ($response->getStatusCode() !== 200) {
-                $responseBody = $response->getBody();
-                $responseBody = is_string($responseBody) ? $responseBody : '';
-                throw new Exception("ClickHouse query failed with HTTP {$response->getStatusCode()}: {$responseBody}");
+            $statusCode = $response->getStatusCode();
+            $responseBody = $response->getBody();
+            $responseBody = is_string($responseBody) ? $responseBody : '';
+
+            if ($statusCode !== 200) {
+                $this->handleQueryError($statusCode, $responseBody, $sql);
             }
 
-            $responseBody = $response->getBody();
-            return is_string($responseBody) ? $responseBody : '';
+            return $responseBody;
         } catch (Exception $e) {
+            // Re-throw our own exceptions without wrapping
+            if (strpos($e->getMessage(), 'ClickHouse') === 0) {
+                throw $e;
+            }
             throw new Exception(
                 "ClickHouse query execution failed: {$e->getMessage()}",
                 0,
                 $e
             );
         }
+    }
+
+    /**
+     * Compress a request body based on the configured compression type.
+     *
+     * @param string $body The uncompressed body
+     * @return string The compressed body (or original if compression is disabled/unavailable)
+     */
+    private function compressBody(string $body): string
+    {
+        if ($this->compression === self::COMPRESSION_NONE) {
+            return $body;
+        }
+
+        if ($this->compression === self::COMPRESSION_GZIP) {
+            $compressed = gzencode($body, 6);
+            if ($compressed === false) {
+                // Fall back to uncompressed if compression fails
+                return $body;
+            }
+            return $compressed;
+        }
+
+        // LZ4 compression requires the lz4 extension
+        // If not available, fall back to uncompressed
+        if ($this->compression === self::COMPRESSION_LZ4) {
+            if (function_exists('lz4_compress')) {
+                /** @var string|false $compressed */
+                $compressed = lz4_compress($body);
+                if ($compressed !== false) {
+                    return $compressed;
+                }
+            }
+            // Fall back to uncompressed if lz4 extension not available
+            return $body;
+        }
+
+        return $body;
+    }
+
+    /**
+     * Handle query error responses from ClickHouse.
+     *
+     * @param int $statusCode HTTP status code
+     * @param string $responseBody Response body
+     * @param string $sql The SQL query that failed
+     * @throws Exception
+     */
+    private function handleQueryError(int $statusCode, string $responseBody, string $sql): void
+    {
+        // Extract meaningful error message from ClickHouse response
+        $errorMessage = $this->parseClickHouseError($responseBody);
+
+        $context = '';
+        if ($statusCode === 401) {
+            $context = ' (authentication failed - check username/password)';
+        } elseif ($statusCode === 403) {
+            $context = ' (access denied - check permissions)';
+        } elseif ($statusCode === 404) {
+            $context = ' (database or table not found)';
+        }
+
+        throw new Exception(
+            "ClickHouse query failed with HTTP {$statusCode}{$context}: {$errorMessage}"
+        );
+    }
+
+    /**
+     * Parse ClickHouse error response to extract a meaningful error message.
+     *
+     * @param string $responseBody The raw response body
+     * @return string Parsed error message
+     */
+    private function parseClickHouseError(string $responseBody): string
+    {
+        if (empty($responseBody)) {
+            return 'Empty response from server';
+        }
+
+        // ClickHouse error format: Code: XXX. DB::Exception: Message
+        if (preg_match('/Code:\s*(\d+).*?DB::Exception:\s*(.+?)(?:\s*\(|$)/s', $responseBody, $matches)) {
+            return "Code {$matches[1]}: {$matches[2]}";
+        }
+
+        // Return the first line of the response as fallback
+        // strtok() on a non-empty string will always return a string
+        /** @var string $firstLine */
+        $firstLine = strtok($responseBody, "\n");
+        return $firstLine;
     }
 
     /**
@@ -923,7 +1239,6 @@ class ClickHouse extends SQL
             $attribute = $query->getAttribute();
             /** @var string $attribute */
 
-            $values = $query->getValues();
             $values = $query->getValues();
 
             switch ($method) {
