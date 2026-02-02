@@ -760,7 +760,9 @@ class ClickHouse extends SQL
     {
         // Generate ID if not provided
         $logId = $log['id'] ?? uniqid('', true);
-        assert(is_string($logId));
+        if (!is_string($logId)) {
+            throw new Exception('Log ID must be a string');
+        }
         $log['id'] = $logId;
 
         // Use createBatch for the actual insertion
