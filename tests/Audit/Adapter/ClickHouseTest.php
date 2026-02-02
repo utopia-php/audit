@@ -416,6 +416,279 @@ class ClickHouseTest extends TestCase
     }
 
     /**
+     * Test compression setting validation with invalid type
+     */
+    public function testSetCompressionValidatesInvalidType(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage("Invalid compression type 'invalid'");
+
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $adapter->setCompression('invalid');
+    }
+
+    /**
+     * Test constructor with invalid compression type
+     */
+    public function testConstructorValidatesInvalidCompression(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage("Invalid compression type 'bzip2'");
+
+        new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            compression: 'bzip2'
+        );
+    }
+
+    /**
+     * Test valid compression types
+     */
+    public function testCompressionSettings(): void
+    {
+        // Test constructor with each valid compression type
+        $adapterNone = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            compression: ClickHouse::COMPRESSION_NONE
+        );
+        $this->assertEquals(ClickHouse::COMPRESSION_NONE, $adapterNone->getCompression());
+
+        $adapterGzip = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            compression: ClickHouse::COMPRESSION_GZIP
+        );
+        $this->assertEquals(ClickHouse::COMPRESSION_GZIP, $adapterGzip->getCompression());
+
+        $adapterLz4 = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            compression: ClickHouse::COMPRESSION_LZ4
+        );
+        $this->assertEquals(ClickHouse::COMPRESSION_LZ4, $adapterLz4->getCompression());
+
+        // Test setter method
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $result = $adapter->setCompression(ClickHouse::COMPRESSION_GZIP);
+        $this->assertInstanceOf(ClickHouse::class, $result);
+        $this->assertEquals(ClickHouse::COMPRESSION_GZIP, $adapter->getCompression());
+
+        $adapter->setCompression(ClickHouse::COMPRESSION_NONE);
+        $this->assertEquals(ClickHouse::COMPRESSION_NONE, $adapter->getCompression());
+    }
+
+    /**
+     * Test timeout validation - too low
+     */
+    public function testTimeoutValidationTooLow(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Timeout must be between');
+
+        new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            timeout: 500 // Below minimum of 1000ms
+        );
+    }
+
+    /**
+     * Test timeout validation - too high
+     */
+    public function testTimeoutValidationTooHigh(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Timeout must be between');
+
+        new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            timeout: 700_000 // Above maximum of 600000ms
+        );
+    }
+
+    /**
+     * Test valid timeout settings
+     */
+    public function testTimeoutSettings(): void
+    {
+        // Test constructor with custom timeout
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            timeout: 60_000
+        );
+        $this->assertEquals(60_000, $adapter->getTimeout());
+
+        // Test setter method
+        $result = $adapter->setTimeout(120_000);
+        $this->assertInstanceOf(ClickHouse::class, $result);
+        $this->assertEquals(120_000, $adapter->getTimeout());
+    }
+
+    /**
+     * Test setTimeout validates range
+     */
+    public function testSetTimeoutValidatesRange(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Timeout must be between');
+
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $adapter->setTimeout(100); // Below minimum
+    }
+
+    /**
+     * Test ping method returns true for healthy connection
+     */
+    public function testPingHealthyConnection(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $result = $adapter->ping();
+        $this->assertTrue($result);
+    }
+
+    /**
+     * Test ping method returns false for bad connection
+     */
+    public function testPingUnhealthyConnection(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'wrongpassword'
+        );
+
+        // Should return false instead of throwing exception
+        $result = $adapter->ping();
+        $this->assertFalse($result);
+    }
+
+    /**
+     * Test getServerVersion returns version string
+     */
+    public function testGetServerVersion(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $version = $adapter->getServerVersion();
+        $this->assertNotNull($version);
+        $this->assertIsString($version);
+        // ClickHouse version format: XX.Y.Z.W
+        $this->assertMatchesRegularExpression('/^\d+\.\d+/', $version);
+    }
+
+    /**
+     * Test getServerVersion returns null for bad connection
+     */
+    public function testGetServerVersionBadConnection(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'wrongpassword'
+        );
+
+        $version = $adapter->getServerVersion();
+        $this->assertNull($version);
+    }
+
+    /**
+     * Test that operations work with gzip compression enabled
+     */
+    public function testOperationsWithGzipCompression(): void
+    {
+        $clickHouse = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            port: 8123,
+            compression: ClickHouse::COMPRESSION_GZIP
+        );
+
+        $clickHouse->setDatabase('default');
+        $clickHouse->setNamespace('gzip_test');
+
+        $audit = new \Utopia\Audit\Audit($clickHouse);
+        $audit->setup();
+
+        // Test single log insertion with compression
+        $requiredAttributes = $this->getRequiredAttributes();
+        $data = array_merge(['test' => 'gzip_compression'], $requiredAttributes);
+
+        $log = $audit->log(
+            'gzipuser',
+            'create',
+            'document/gzip1',
+            'Mozilla/5.0',
+            '127.0.0.1',
+            'US',
+            $data
+        );
+
+        $this->assertInstanceOf(\Utopia\Audit\Log::class, $log);
+        $this->assertEquals('gzipuser', $log->getAttribute('userId'));
+
+        // Test batch insertion with compression
+        $batchEvents = [
+            [
+                'userId' => 'gzipuser',
+                'event' => 'update',
+                'resource' => 'document/gzip2',
+                'userAgent' => 'Mozilla/5.0',
+                'ip' => '127.0.0.1',
+                'location' => 'US',
+                'data' => ['batch' => 'gzip'],
+                'time' => \Utopia\Database\DateTime::formatTz(\Utopia\Database\DateTime::now()) ?? ''
+            ]
+        ];
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
+
+        $result = $audit->logBatch($batchEvents);
+        $this->assertTrue($result);
+
+        // Verify retrieval works
+        $logs = $audit->getLogsByUser('gzipuser');
+        $this->assertGreaterThanOrEqual(2, count($logs));
+
+        // Cleanup
+        $audit->cleanup(new \DateTime('+1 hour'));
+    }
+
+    /**
      * Test parsing of complex resource paths into resourceType/resourceId/resourceParent
      */
     public function testParseResourceComplexPath(): void
@@ -470,5 +743,271 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('697848498066e3d2ef64', $parsed['resourceId']);
         $this->assertEquals('table', $parsed['resourceType']);
         $this->assertEquals('database/6978484940ff05762e1a', $parsed['resourceParent']);
+    }
+
+    /**
+     * Test comprehensive health check method
+     */
+    public function testHealthCheck(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $health = $adapter->healthCheck();
+
+        $this->assertIsArray($health);
+        $this->assertArrayHasKey('healthy', $health);
+        $this->assertArrayHasKey('host', $health);
+        $this->assertArrayHasKey('port', $health);
+        $this->assertArrayHasKey('database', $health);
+        $this->assertArrayHasKey('secure', $health);
+        $this->assertArrayHasKey('compression', $health);
+        $this->assertArrayHasKey('version', $health);
+        $this->assertArrayHasKey('uptime', $health);
+        $this->assertArrayHasKey('responseTime', $health);
+
+        $this->assertTrue($health['healthy']);
+        $this->assertEquals('clickhouse', $health['host']);
+        $this->assertEquals(8123, $health['port']);
+        $this->assertNotNull($health['version']);
+        $this->assertIsInt($health['uptime']);
+        $this->assertGreaterThan(0, $health['uptime']);
+        $this->assertIsFloat($health['responseTime']);
+        $this->assertGreaterThan(0, $health['responseTime']);
+    }
+
+    /**
+     * Test health check with bad credentials
+     */
+    public function testHealthCheckUnhealthy(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'wrongpassword'
+        );
+
+        /** @var array<string, mixed> $health */
+        $health = $adapter->healthCheck();
+
+        $this->assertFalse($health['healthy']);
+        // Error key should be present when health check fails
+        $this->assertArrayHasKey('error', $health);
+        $this->assertNotEmpty($health['error']);
+    }
+
+    /**
+     * Test retry configuration - max retries
+     */
+    public function testSetMaxRetries(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        // Default value
+        $this->assertEquals(3, $adapter->getMaxRetries());
+
+        // Set valid value
+        $result = $adapter->setMaxRetries(5);
+        $this->assertInstanceOf(ClickHouse::class, $result);
+        $this->assertEquals(5, $adapter->getMaxRetries());
+
+        // Set to 0 (disable retries)
+        $adapter->setMaxRetries(0);
+        $this->assertEquals(0, $adapter->getMaxRetries());
+    }
+
+    /**
+     * Test retry configuration - max retries validation
+     */
+    public function testSetMaxRetriesValidation(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Max retries must be between 0 and 10');
+
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $adapter->setMaxRetries(15); // Above max of 10
+    }
+
+    /**
+     * Test retry configuration - delay
+     */
+    public function testSetRetryDelay(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        // Default value
+        $this->assertEquals(100, $adapter->getRetryDelay());
+
+        // Set valid value
+        $result = $adapter->setRetryDelay(500);
+        $this->assertInstanceOf(ClickHouse::class, $result);
+        $this->assertEquals(500, $adapter->getRetryDelay());
+    }
+
+    /**
+     * Test retry delay validation - too low
+     */
+    public function testSetRetryDelayTooLow(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Retry delay must be between');
+
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $adapter->setRetryDelay(5); // Below min of 10
+    }
+
+    /**
+     * Test retry delay validation - too high
+     */
+    public function testSetRetryDelayTooHigh(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Retry delay must be between');
+
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $adapter->setRetryDelay(10000); // Above max of 5000
+    }
+
+    /**
+     * Test query logging functionality
+     */
+    public function testQueryLogging(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        // Query logging is disabled by default
+        $this->assertFalse($adapter->isQueryLoggingEnabled());
+        $this->assertEmpty($adapter->getQueryLog());
+
+        // Enable query logging
+        $result = $adapter->enableQueryLogging(true);
+        $this->assertInstanceOf(ClickHouse::class, $result);
+        $this->assertTrue($adapter->isQueryLoggingEnabled());
+
+        // Perform a query (ping uses query internally)
+        $adapter->ping();
+
+        // Check query log
+        $log = $adapter->getQueryLog();
+        $this->assertNotEmpty($log);
+        $this->assertCount(1, $log);
+
+        $entry = $log[0];
+        $this->assertArrayHasKey('sql', $entry);
+        $this->assertArrayHasKey('params', $entry);
+        $this->assertArrayHasKey('duration', $entry);
+        $this->assertArrayHasKey('timestamp', $entry);
+        $this->assertArrayHasKey('success', $entry);
+        $this->assertTrue($entry['success']);
+        $this->assertIsFloat($entry['duration']);
+        $this->assertGreaterThan(0, $entry['duration']);
+
+        // Clear log
+        $adapter->clearQueryLog();
+        $this->assertEmpty($adapter->getQueryLog());
+
+        // Disable logging
+        $adapter->enableQueryLogging(false);
+        $this->assertFalse($adapter->isQueryLoggingEnabled());
+    }
+
+    /**
+     * Test connection statistics
+     */
+    public function testGetStats(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        // Get initial stats
+        $stats = $adapter->getStats();
+
+        $this->assertIsArray($stats);
+        $this->assertArrayHasKey('queryCount', $stats);
+        $this->assertArrayHasKey('failedQueryCount', $stats);
+        $this->assertArrayHasKey('successRate', $stats);
+        $this->assertArrayHasKey('host', $stats);
+        $this->assertArrayHasKey('port', $stats);
+        $this->assertArrayHasKey('database', $stats);
+        $this->assertArrayHasKey('secure', $stats);
+        $this->assertArrayHasKey('compression', $stats);
+        $this->assertArrayHasKey('timeout', $stats);
+        $this->assertArrayHasKey('maxRetries', $stats);
+        $this->assertArrayHasKey('retryDelay', $stats);
+        $this->assertArrayHasKey('queryLoggingEnabled', $stats);
+        $this->assertArrayHasKey('queryLogSize', $stats);
+
+        $this->assertEquals(0, $stats['queryCount']);
+        $this->assertEquals(0, $stats['failedQueryCount']);
+        $this->assertEquals(100.0, $stats['successRate']);
+
+        // Perform some queries
+        $adapter->ping();
+        $adapter->ping();
+
+        $stats = $adapter->getStats();
+        $this->assertEquals(2, $stats['queryCount']);
+        $this->assertEquals(0, $stats['failedQueryCount']);
+        $this->assertEquals(100.0, $stats['successRate']);
+
+        // Reset stats
+        $result = $adapter->resetStats();
+        $this->assertInstanceOf(ClickHouse::class, $result);
+
+        $stats = $adapter->getStats();
+        $this->assertEquals(0, $stats['queryCount']);
+    }
+
+    /**
+     * Test that stats track failed queries
+     */
+    public function testStatsTrackFailedQueries(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'wrongpassword' // Bad credentials
+        );
+
+        // Attempt a query that will fail
+        $adapter->ping(); // Should fail but return false, not throw
+
+        $stats = $adapter->getStats();
+        $this->assertEquals(1, $stats['queryCount']);
+        $this->assertEquals(1, $stats['failedQueryCount']);
+        $this->assertEquals(0.0, $stats['successRate']);
     }
 }

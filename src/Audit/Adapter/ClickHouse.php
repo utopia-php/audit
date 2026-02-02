@@ -14,14 +14,99 @@ use Utopia\Validator\Hostname;
  *
  * This adapter stores audit logs in ClickHouse using HTTP interface.
  * ClickHouse is optimized for analytical queries and can handle massive amounts of log data.
+ *
+ * Features:
+ * - HTTP compression support (gzip, lz4) for reduced bandwidth
+ * - Configurable connection timeouts
+ * - Connection health checking
+ * - Parameterized queries for SQL injection prevention
+ * - Multi-tenant support with shared tables
  */
 class ClickHouse extends SQL
 {
+    /**
+     * Default HTTP port for ClickHouse
+     */
     private const DEFAULT_PORT = 8123;
 
+    /**
+     * Default table name for audit logs
+     */
     private const DEFAULT_TABLE = 'audits';
 
+    /**
+     * Default database name
+     */
     private const DEFAULT_DATABASE = 'default';
+
+    /**
+     * Default connection timeout in milliseconds
+     */
+    private const DEFAULT_TIMEOUT = 30_000;
+
+    /**
+     * Minimum allowed timeout in milliseconds
+     */
+    private const MIN_TIMEOUT = 1_000;
+
+    /**
+     * Maximum allowed timeout in milliseconds (10 minutes)
+     */
+    private const MAX_TIMEOUT = 600_000;
+
+    /**
+     * Compression type: No compression
+     */
+    public const COMPRESSION_NONE = 'none';
+
+    /**
+     * Compression type: gzip compression (best for HTTP)
+     */
+    public const COMPRESSION_GZIP = 'gzip';
+
+    /**
+     * Compression type: lz4 compression (fastest, ClickHouse native)
+     */
+    public const COMPRESSION_LZ4 = 'lz4';
+
+    /**
+     * Valid compression types
+     */
+    private const VALID_COMPRESSION_TYPES = [
+        self::COMPRESSION_NONE,
+        self::COMPRESSION_GZIP,
+        self::COMPRESSION_LZ4,
+    ];
+
+    /**
+     * Default maximum retry attempts
+     */
+    private const DEFAULT_MAX_RETRIES = 3;
+
+    /**
+     * Default retry delay in milliseconds
+     */
+    private const DEFAULT_RETRY_DELAY = 100;
+
+    /**
+     * Minimum retry delay in milliseconds
+     */
+    private const MIN_RETRY_DELAY = 10;
+
+    /**
+     * Maximum retry delay in milliseconds
+     */
+    private const MAX_RETRY_DELAY = 5000;
+
+    /**
+     * Maximum allowed retry attempts
+     */
+    private const MAX_RETRY_ATTEMPTS = 10;
+
+    /**
+     * HTTP status codes that are retryable
+     */
+    private const RETRYABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504];
 
     private string $host;
 
@@ -35,8 +120,50 @@ class ClickHouse extends SQL
 
     private string $password;
 
-    /** @var bool Whether to use HTTPS for ClickHouse HTTP interface */
+    /**
+     * @var bool Whether to use HTTPS for ClickHouse HTTP interface
+     */
     private bool $secure = false;
+
+    /**
+     * @var string Compression type for HTTP requests/responses
+     */
+    private string $compression = self::COMPRESSION_NONE;
+
+    /**
+     * @var int Connection timeout in milliseconds
+     */
+    private int $timeout = self::DEFAULT_TIMEOUT;
+
+    /**
+     * @var int Maximum number of retry attempts for transient failures
+     */
+    private int $maxRetries = self::DEFAULT_MAX_RETRIES;
+
+    /**
+     * @var int Base delay between retries in milliseconds (doubles with each retry)
+     */
+    private int $retryDelay = self::DEFAULT_RETRY_DELAY;
+
+    /**
+     * @var bool Whether query logging is enabled
+     */
+    private bool $queryLoggingEnabled = false;
+
+    /**
+     * @var array<int, array{sql: string, params: array<string, mixed>, duration: float, timestamp: string, success: bool, error?: string, retries?: int}> Query log entries
+     */
+    private array $queryLog = [];
+
+    /**
+     * @var int Total number of queries executed
+     */
+    private int $queryCount = 0;
+
+    /**
+     * @var int Total number of failed queries
+     */
+    private int $failedQueryCount = 0;
 
     private Client $client;
 
@@ -47,11 +174,15 @@ class ClickHouse extends SQL
     protected bool $sharedTables = false;
 
     /**
-     * @param string $host ClickHouse host
+     * Create a new ClickHouse adapter instance.
+     *
+     * @param string $host ClickHouse host (hostname or IP address)
      * @param string $username ClickHouse username (default: 'default')
      * @param string $password ClickHouse password (default: '')
      * @param int $port ClickHouse HTTP port (default: 8123)
      * @param bool $secure Whether to use HTTPS (default: false)
+     * @param string $compression Compression type: 'none', 'gzip', or 'lz4' (default: 'none')
+     * @param int $timeout Connection timeout in milliseconds (default: 30000)
      * @throws Exception If validation fails
      */
     public function __construct(
@@ -59,22 +190,41 @@ class ClickHouse extends SQL
         string $username = 'default',
         string $password = '',
         int $port = self::DEFAULT_PORT,
-        bool $secure = false
+        bool $secure = false,
+        string $compression = self::COMPRESSION_NONE,
+        int $timeout = self::DEFAULT_TIMEOUT
     ) {
         $this->validateHost($host);
         $this->validatePort($port);
+        $this->validateCompression($compression);
+        $this->validateTimeout($timeout);
 
         $this->host = $host;
         $this->port = $port;
         $this->username = $username;
         $this->password = $password;
         $this->secure = $secure;
+        $this->compression = $compression;
+        $this->timeout = $timeout;
 
-        // Initialize the HTTP client for connection reuse
+        $this->initializeClient();
+    }
+
+    /**
+     * Initialize the HTTP client with current configuration.
+     */
+    private function initializeClient(): void
+    {
         $this->client = new Client();
         $this->client->addHeader('X-ClickHouse-User', $this->username);
         $this->client->addHeader('X-ClickHouse-Key', $this->password);
-        $this->client->setTimeout(30_000); // 30 seconds
+        $this->client->setTimeout($this->timeout);
+
+        // Request compressed responses from ClickHouse (safe for all requests)
+        if ($this->compression !== self::COMPRESSION_NONE) {
+            $this->client->addHeader('Accept-Encoding', $this->compression);
+        }
+        // Note: Content-Encoding is set per-request only when we actually compress the body
     }
 
     /**
@@ -109,6 +259,35 @@ class ClickHouse extends SQL
     {
         if ($port < 1 || $port > 65535) {
             throw new Exception('ClickHouse port must be between 1 and 65535');
+        }
+    }
+
+    /**
+     * Validate compression parameter.
+     *
+     * @param string $compression
+     * @throws Exception
+     */
+    private function validateCompression(string $compression): void
+    {
+        if (!in_array($compression, self::VALID_COMPRESSION_TYPES, true)) {
+            $validTypes = implode(', ', self::VALID_COMPRESSION_TYPES);
+            throw new Exception("Invalid compression type '{$compression}'. Valid types are: {$validTypes}");
+        }
+    }
+
+    /**
+     * Validate timeout parameter.
+     *
+     * @param int $timeout
+     * @throws Exception
+     */
+    private function validateTimeout(int $timeout): void
+    {
+        if ($timeout < self::MIN_TIMEOUT || $timeout > self::MAX_TIMEOUT) {
+            throw new Exception(
+                "Timeout must be between " . self::MIN_TIMEOUT . " and " . self::MAX_TIMEOUT . " milliseconds"
+            );
         }
     }
 
@@ -187,10 +366,324 @@ class ClickHouse extends SQL
 
     /**
      * Enable or disable HTTPS for ClickHouse HTTP interface.
+     *
+     * @param bool $secure Whether to use HTTPS
+     * @return self
      */
     public function setSecure(bool $secure): self
     {
         $this->secure = $secure;
+        return $this;
+    }
+
+    /**
+     * Set the compression type for HTTP responses.
+     *
+     * Compression can significantly reduce bandwidth for query results:
+     * - 'none': No compression (default)
+     * - 'gzip': Standard gzip compression, widely supported
+     * - 'lz4': ClickHouse native compression, fastest decompression
+     *
+     * Note: This configures the Accept-Encoding header to request compressed
+     * responses from ClickHouse. The server will compress query results before
+     * sending them, reducing network transfer size.
+     *
+     * @param string $compression Compression type
+     * @return self
+     * @throws Exception If compression type is invalid
+     */
+    public function setCompression(string $compression): self
+    {
+        $this->validateCompression($compression);
+        $this->compression = $compression;
+        $this->initializeClient();
+        return $this;
+    }
+
+    /**
+     * Get the current compression type.
+     *
+     * @return string
+     */
+    public function getCompression(): string
+    {
+        return $this->compression;
+    }
+
+    /**
+     * Set the connection timeout.
+     *
+     * @param int $timeout Timeout in milliseconds (1000-600000)
+     * @return self
+     * @throws Exception If timeout is out of range
+     */
+    public function setTimeout(int $timeout): self
+    {
+        $this->validateTimeout($timeout);
+        $this->timeout = $timeout;
+        $this->client->setTimeout($timeout);
+        return $this;
+    }
+
+    /**
+     * Get the current timeout.
+     *
+     * @return int Timeout in milliseconds
+     */
+    public function getTimeout(): int
+    {
+        return $this->timeout;
+    }
+
+    /**
+     * Check if the ClickHouse server is reachable and responding.
+     *
+     * This method performs a lightweight ping query to verify:
+     * - Network connectivity to the server
+     * - Server is accepting HTTP connections
+     * - Authentication credentials are valid
+     *
+     * @return bool True if server is healthy, false otherwise
+     */
+    public function ping(): bool
+    {
+        try {
+            $result = $this->query('SELECT 1 FORMAT TabSeparated');
+            return trim($result) === '1';
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get server version information.
+     *
+     * @return string|null Server version string or null if unavailable
+     */
+    public function getServerVersion(): ?string
+    {
+        try {
+            $result = $this->query('SELECT version() FORMAT TabSeparated');
+            $version = trim($result);
+            return $version !== '' ? $version : null;
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Get comprehensive health check information.
+     *
+     * Returns detailed status about the ClickHouse connection including:
+     * - Connection health status
+     * - Server version and uptime
+     * - Response time measurement
+     * - Configuration details
+     *
+     * @return array{healthy: bool, host: string, port: int, database: string, secure: bool, compression: string, version: string|null, uptime: int|null, responseTime: float, error?: string}
+     */
+    public function healthCheck(): array
+    {
+        $startTime = microtime(true);
+        $healthy = false;
+        $version = null;
+        $uptime = null;
+        $error = null;
+
+        try {
+            // Query version and uptime in a single request
+            $result = $this->query("SELECT version() as version, uptime() as uptime FORMAT JSON");
+            $decoded = json_decode($result, true);
+
+            if (is_array($decoded) && isset($decoded['data'][0])) {
+                $data = $decoded['data'][0];
+                $version = $data['version'] ?? null;
+                $uptime = isset($data['uptime']) ? (int) $data['uptime'] : null;
+                $healthy = true;
+            }
+        } catch (Exception $e) {
+            $error = $e->getMessage();
+        }
+
+        $responseTime = (microtime(true) - $startTime) * 1000; // Convert to milliseconds
+
+        $result = [
+            'healthy' => $healthy,
+            'host' => $this->host,
+            'port' => $this->port,
+            'database' => $this->database,
+            'secure' => $this->secure,
+            'compression' => $this->compression,
+            'version' => $version,
+            'uptime' => $uptime,
+            'responseTime' => round($responseTime, 2),
+        ];
+
+        if ($error !== null) {
+            $result['error'] = $error;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Set the maximum number of retry attempts for transient failures.
+     *
+     * When a retryable error occurs (network timeout, server overload, etc.),
+     * the adapter will retry the request up to this many times with exponential backoff.
+     *
+     * @param int $maxRetries Maximum retries (0-10, 0 disables retries)
+     * @return self
+     * @throws Exception If maxRetries is out of range
+     */
+    public function setMaxRetries(int $maxRetries): self
+    {
+        if ($maxRetries < 0 || $maxRetries > self::MAX_RETRY_ATTEMPTS) {
+            throw new Exception("Max retries must be between 0 and " . self::MAX_RETRY_ATTEMPTS);
+        }
+        $this->maxRetries = $maxRetries;
+        return $this;
+    }
+
+    /**
+     * Get the maximum number of retry attempts.
+     *
+     * @return int
+     */
+    public function getMaxRetries(): int
+    {
+        return $this->maxRetries;
+    }
+
+    /**
+     * Set the base delay between retry attempts.
+     *
+     * The actual delay uses exponential backoff: delay * 2^(attempt-1)
+     * For example, with delay=100ms: 100ms, 200ms, 400ms, 800ms, etc.
+     *
+     * @param int $delayMs Base delay in milliseconds (10-5000)
+     * @return self
+     * @throws Exception If delay is out of range
+     */
+    public function setRetryDelay(int $delayMs): self
+    {
+        if ($delayMs < self::MIN_RETRY_DELAY || $delayMs > self::MAX_RETRY_DELAY) {
+            throw new Exception(
+                "Retry delay must be between " . self::MIN_RETRY_DELAY . " and " . self::MAX_RETRY_DELAY . " milliseconds"
+            );
+        }
+        $this->retryDelay = $delayMs;
+        return $this;
+    }
+
+    /**
+     * Get the base retry delay.
+     *
+     * @return int Delay in milliseconds
+     */
+    public function getRetryDelay(): int
+    {
+        return $this->retryDelay;
+    }
+
+    /**
+     * Enable or disable query logging.
+     *
+     * When enabled, all queries are logged with their SQL, parameters,
+     * execution duration, and success/failure status. Useful for debugging
+     * and performance monitoring.
+     *
+     * @param bool $enable Whether to enable query logging
+     * @return self
+     */
+    public function enableQueryLogging(bool $enable = true): self
+    {
+        $this->queryLoggingEnabled = $enable;
+        return $this;
+    }
+
+    /**
+     * Check if query logging is enabled.
+     *
+     * @return bool
+     */
+    public function isQueryLoggingEnabled(): bool
+    {
+        return $this->queryLoggingEnabled;
+    }
+
+    /**
+     * Get the query log.
+     *
+     * Each entry contains:
+     * - sql: The SQL query
+     * - params: Query parameters
+     * - duration: Execution time in milliseconds
+     * - timestamp: ISO 8601 timestamp
+     * - success: Whether the query succeeded
+     * - error: Error message (if failed)
+     * - retries: Number of retry attempts (if any)
+     *
+     * @return array<int, array{sql: string, params: array<string, mixed>, duration: float, timestamp: string, success: bool, error?: string, retries?: int}>
+     */
+    public function getQueryLog(): array
+    {
+        return $this->queryLog;
+    }
+
+    /**
+     * Clear the query log.
+     *
+     * @return self
+     */
+    public function clearQueryLog(): self
+    {
+        $this->queryLog = [];
+        return $this;
+    }
+
+    /**
+     * Get connection and query statistics.
+     *
+     * Returns operational metrics about the adapter's usage:
+     * - Total queries executed
+     * - Failed query count
+     * - Configuration settings
+     *
+     * @return array{queryCount: int, failedQueryCount: int, successRate: float, host: string, port: int, database: string, secure: bool, compression: string, timeout: int, maxRetries: int, retryDelay: int, queryLoggingEnabled: bool, queryLogSize: int}
+     */
+    public function getStats(): array
+    {
+        $successRate = $this->queryCount > 0
+            ? round(($this->queryCount - $this->failedQueryCount) / $this->queryCount * 100, 2)
+            : 100.0;
+
+        return [
+            'queryCount' => $this->queryCount,
+            'failedQueryCount' => $this->failedQueryCount,
+            'successRate' => $successRate,
+            'host' => $this->host,
+            'port' => $this->port,
+            'database' => $this->database,
+            'secure' => $this->secure,
+            'compression' => $this->compression,
+            'timeout' => $this->timeout,
+            'maxRetries' => $this->maxRetries,
+            'retryDelay' => $this->retryDelay,
+            'queryLoggingEnabled' => $this->queryLoggingEnabled,
+            'queryLogSize' => count($this->queryLog),
+        ];
+    }
+
+    /**
+     * Reset query statistics.
+     *
+     * @return self
+     */
+    public function resetStats(): self
+    {
+        $this->queryCount = 0;
+        $this->failedQueryCount = 0;
         return $this;
     }
 
@@ -490,6 +983,10 @@ class ClickHouse extends SQL
      * ClickHouse handles all parameter escaping and type conversion internally,
      * making both approaches fully injection-safe.
      *
+     * When compression is enabled:
+     * - Response decompression is handled automatically via Accept-Encoding header
+     * - This significantly reduces bandwidth for query results
+     *
      * @param string $sql The SQL query to execute
      * @param array<string, mixed> $params Key-value pairs for query parameters (for SELECT/UPDATE/DELETE)
      * @param array<int, array<string, mixed>>|null $jsonRows Array of rows for JSONEachRow INSERT operations
@@ -498,59 +995,341 @@ class ClickHouse extends SQL
      */
     private function query(string $sql, array $params = [], ?array $jsonRows = null): string
     {
+        $startTime = microtime(true);
+        $retryCount = 0;
+        $lastException = null;
+
         $scheme = $this->secure ? 'https' : 'http';
 
         // Update the database header for each query (in case setDatabase was called)
         $this->client->addHeader('X-ClickHouse-Database', $this->database);
 
-        try {
-            if ($jsonRows !== null) {
-                // JSON body mode for INSERT operations with JSONEachRow format
-                $url = "{$scheme}://{$this->host}:{$this->port}/?query=" . urlencode($sql);
+        // Prepare URL and body before retry loop
+        if ($jsonRows !== null) {
+            // JSON body mode for INSERT operations with JSONEachRow format
+            $url = "{$scheme}://{$this->host}:{$this->port}/?query=" . urlencode($sql);
 
-                // Build JSONEachRow body - each row on a separate line
-                $jsonLines = [];
-                foreach ($jsonRows as $row) {
-                    try {
-                        $encoded = json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-                    } catch (\JsonException $e) {
-                        throw new Exception('Failed to encode row to JSON: ' . $e->getMessage());
-                    }
-                    $jsonLines[] = $encoded;
+            // Build JSONEachRow body - each row on a separate line
+            $jsonLines = [];
+            foreach ($jsonRows as $row) {
+                try {
+                    $encoded = json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+                } catch (\JsonException $e) {
+                    $this->logQuery($sql, $params, $startTime, false, $e->getMessage(), 0);
+                    throw new Exception('Failed to encode row to JSON: ' . $e->getMessage());
                 }
-                $body = implode("\n", $jsonLines);
-            } else {
-                // Parameterized query mode using multipart form data
-                $url = "{$scheme}://{$this->host}:{$this->port}/";
-
-                // Build multipart form data body with query and parameters
-                $body = ['query' => $sql];
-                foreach ($params as $key => $value) {
-                    $body['param_' . $key] = $this->formatParamValue($value);
-                }
+                $jsonLines[] = $encoded;
             }
+            $body = implode("\n", $jsonLines);
+        } else {
+            // Parameterized query mode using multipart form data
+            $url = "{$scheme}://{$this->host}:{$this->port}/";
 
-            $response = $this->client->fetch(
-                url: $url,
-                method: Client::METHOD_POST,
-                body: $body
-            );
+            // Build multipart form data body with query and parameters
+            $body = ['query' => $sql];
+            foreach ($params as $key => $value) {
+                $body['param_' . $key] = $this->formatParamValue($value);
+            }
+        }
 
-            if ($response->getStatusCode() !== 200) {
+        // Retry loop with exponential backoff
+        while (true) {
+            try {
+                $response = $this->client->fetch(
+                    url: $url,
+                    method: Client::METHOD_POST,
+                    body: $body
+                );
+
+                $statusCode = $response->getStatusCode();
                 $responseBody = $response->getBody();
                 $responseBody = is_string($responseBody) ? $responseBody : '';
-                throw new Exception("ClickHouse query failed with HTTP {$response->getStatusCode()}: {$responseBody}");
-            }
 
-            $responseBody = $response->getBody();
-            return is_string($responseBody) ? $responseBody : '';
-        } catch (Exception $e) {
-            throw new Exception(
-                "ClickHouse query execution failed: {$e->getMessage()}",
-                0,
-                $e
-            );
+                // Decompress response if server sent compressed data
+                $responseBody = $this->decompressResponse($response, $responseBody);
+
+                if ($statusCode !== 200) {
+                    // Check if this is a retryable error
+                    if ($this->isRetryableError($statusCode, $responseBody) && $retryCount < $this->maxRetries) {
+                        $retryCount++;
+                        $this->sleepWithBackoff($retryCount);
+                        continue;
+                    }
+                    $this->handleQueryError($statusCode, $responseBody, $sql);
+                }
+
+                // Success
+                $this->logQuery($sql, $params, $startTime, true, null, $retryCount);
+                return $responseBody;
+
+            } catch (Exception $e) {
+                $lastException = $e;
+
+                // Check if this is a retryable network error
+                if ($this->isRetryableException($e) && $retryCount < $this->maxRetries) {
+                    $retryCount++;
+                    $this->sleepWithBackoff($retryCount);
+                    continue;
+                }
+
+                // Log the failed query
+                $errorMessage = $e->getMessage();
+                $this->logQuery($sql, $params, $startTime, false, $errorMessage, $retryCount);
+
+                // Re-throw our own exceptions without wrapping
+                if (strpos($errorMessage, 'ClickHouse') === 0) {
+                    throw $e;
+                }
+                throw new Exception(
+                    "ClickHouse query execution failed: {$errorMessage}",
+                    0,
+                    $e
+                );
+            }
         }
+    }
+
+    /**
+     * Check if an HTTP status code indicates a retryable error.
+     *
+     * @param int $statusCode HTTP status code
+     * @param string $responseBody Response body for additional checks
+     * @return bool
+     */
+    private function isRetryableError(int $statusCode, string $responseBody): bool
+    {
+        // Common retryable status codes
+        if (in_array($statusCode, self::RETRYABLE_STATUS_CODES, true)) {
+            return true;
+        }
+
+        // Check response body for retryable patterns
+        $retryablePatterns = [
+            'too many simultaneous queries',
+            'memory limit exceeded',
+            'timeout',
+            'connection reset',
+        ];
+
+        $lowerBody = strtolower($responseBody);
+        foreach ($retryablePatterns as $pattern) {
+            if (strpos($lowerBody, $pattern) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if an exception indicates a retryable network error.
+     *
+     * @param Exception $e The exception to check
+     * @return bool
+     */
+    private function isRetryableException(Exception $e): bool
+    {
+        $message = strtolower($e->getMessage());
+        $retryablePatterns = [
+            'connection',
+            'timeout',
+            'refused',
+            'reset',
+            'broken pipe',
+            'network',
+            'temporary',
+            'unavailable',
+            'could not resolve',
+        ];
+
+        foreach ($retryablePatterns as $pattern) {
+            if (strpos($message, $pattern) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Sleep with exponential backoff before retry.
+     *
+     * @param int $attempt Current retry attempt (1-based)
+     */
+    private function sleepWithBackoff(int $attempt): void
+    {
+        // Exponential backoff: delay * 2^(attempt-1)
+        // With jitter to avoid thundering herd
+        $delay = $this->retryDelay * (2 ** ($attempt - 1));
+        $jitter = rand(0, (int) ($delay * 0.1)); // 10% jitter
+        $totalDelay = min($delay + $jitter, self::MAX_RETRY_DELAY);
+
+        usleep((int) ($totalDelay * 1000)); // Convert ms to microseconds
+    }
+
+    /**
+     * Log a query execution (if logging is enabled).
+     *
+     * @param string $sql The SQL query
+     * @param array<string, mixed> $params Query parameters
+     * @param float $startTime Start time from microtime(true)
+     * @param bool $success Whether the query succeeded
+     * @param string|null $error Error message if failed
+     * @param int $retries Number of retry attempts
+     */
+    private function logQuery(string $sql, array $params, float $startTime, bool $success, ?string $error, int $retries): void
+    {
+        // Always track statistics
+        $this->queryCount++;
+        if (!$success) {
+            $this->failedQueryCount++;
+        }
+
+        // Only log details if logging is enabled
+        if (!$this->queryLoggingEnabled) {
+            return;
+        }
+
+        $duration = (microtime(true) - $startTime) * 1000; // Convert to milliseconds
+
+        $entry = [
+            'sql' => $sql,
+            'params' => $params,
+            'duration' => round($duration, 2),
+            'timestamp' => date('c'),
+            'success' => $success,
+        ];
+
+        if ($error !== null) {
+            $entry['error'] = $error;
+        }
+
+        if ($retries > 0) {
+            $entry['retries'] = $retries;
+        }
+
+        $this->queryLog[] = $entry;
+    }
+
+    /**
+     * Decompress response body if the server sent compressed data.
+     *
+     * Checks the Content-Encoding header and decompresses accordingly.
+     *
+     * @param \Utopia\Fetch\Response $response The HTTP response
+     * @param string $body The response body
+     * @return string Decompressed body (or original if not compressed)
+     */
+    private function decompressResponse(\Utopia\Fetch\Response $response, string $body): string
+    {
+        if (empty($body)) {
+            return $body;
+        }
+
+        $headers = $response->getHeaders();
+        $contentEncoding = '';
+
+        // Find Content-Encoding header (case-insensitive)
+        foreach ($headers as $name => $value) {
+            if (strtolower($name) === 'content-encoding') {
+                $contentEncoding = (string) $value;
+                break;
+            }
+        }
+
+        if (empty($contentEncoding)) {
+            return $body;
+        }
+
+        $encoding = strtolower(trim($contentEncoding));
+
+        if ($encoding === 'gzip' || $encoding === 'x-gzip') {
+            $decompressed = @gzdecode($body);
+            if ($decompressed !== false) {
+                return $decompressed;
+            }
+            // If decompression fails, return original (might not actually be compressed)
+            return $body;
+        }
+
+        if ($encoding === 'deflate') {
+            $decompressed = @gzinflate($body);
+            if ($decompressed !== false) {
+                return $decompressed;
+            }
+            // Try with zlib header
+            $decompressed = @gzuncompress($body);
+            if ($decompressed !== false) {
+                return $decompressed;
+            }
+            return $body;
+        }
+
+        // LZ4 decompression requires the lz4 extension
+        if ($encoding === 'lz4') {
+            if (function_exists('lz4_uncompress')) {
+                /** @var string|false $decompressed */
+                $decompressed = lz4_uncompress($body);
+                if ($decompressed !== false) {
+                    return $decompressed;
+                }
+            }
+            return $body;
+        }
+
+        // Unknown encoding, return as-is
+        return $body;
+    }
+
+    /**
+     * Handle query error responses from ClickHouse.
+     *
+     * @param int $statusCode HTTP status code
+     * @param string $responseBody Response body
+     * @param string $sql The SQL query that failed
+     * @throws Exception
+     */
+    private function handleQueryError(int $statusCode, string $responseBody, string $sql): void
+    {
+        // Extract meaningful error message from ClickHouse response
+        $errorMessage = $this->parseClickHouseError($responseBody);
+
+        $context = '';
+        if ($statusCode === 401) {
+            $context = ' (authentication failed - check username/password)';
+        } elseif ($statusCode === 403) {
+            $context = ' (access denied - check permissions)';
+        } elseif ($statusCode === 404) {
+            $context = ' (database or table not found)';
+        }
+
+        throw new Exception(
+            "ClickHouse query failed with HTTP {$statusCode}{$context}: {$errorMessage}"
+        );
+    }
+
+    /**
+     * Parse ClickHouse error response to extract a meaningful error message.
+     *
+     * @param string $responseBody The raw response body
+     * @return string Parsed error message
+     */
+    private function parseClickHouseError(string $responseBody): string
+    {
+        if (empty($responseBody)) {
+            return 'Empty response from server';
+        }
+
+        // ClickHouse error format: Code: XXX. DB::Exception: Message
+        if (preg_match('/Code:\s*(\d+).*?DB::Exception:\s*(.+?)(?:\s*\(|$)/s', $responseBody, $matches)) {
+            return "Code {$matches[1]}: {$matches[2]}";
+        }
+
+        // Return the first line of the response as fallback
+        // strtok() on a non-empty string will always return a string
+        /** @var string $firstLine */
+        $firstLine = strtok($responseBody, "\n");
+        return $firstLine;
     }
 
     /**
@@ -923,7 +1702,6 @@ class ClickHouse extends SQL
             $attribute = $query->getAttribute();
             /** @var string $attribute */
 
-            $values = $query->getValues();
             $values = $query->getValues();
 
             switch ($method) {
