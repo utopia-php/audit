@@ -758,6 +758,10 @@ class ClickHouse extends SQL
      */
     public function create(array $log): Log
     {
+        // Generate ID if not provided
+        $logId = $log['id'] ?? uniqid('', true);
+        $log['id'] = $logId;
+
         // Use createBatch for the actual insertion
         $this->createBatch([$log]);
 
