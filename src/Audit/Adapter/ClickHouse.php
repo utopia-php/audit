@@ -758,98 +758,8 @@ class ClickHouse extends SQL
      */
     public function create(array $log): Log
     {
-        $logId = uniqid('', true);
-
-        // Format time - use provided time or current time
-        /** @var string|\DateTime|null $providedTime */
-        $providedTime = $log['time'] ?? null;
-        $formattedTime = $this->formatDateTime($providedTime);
-
-        $tableName = $this->getTableName();
-
-        // Extract additional attributes from the data array
-        /** @var array<string, mixed> $logData */
-        $logData = $log['data'] ?? [];
-
-        // Build JSON row for JSONEachRow format
-        $row = [
-            'id' => $logId,
-            'time' => $formattedTime,
-        ];
-
-        // Get all column names from attributes
-        $schemaColumns = $this->getColumnNames();
-
-        // Separate data for the data column (non-schema attributes)
-        $nonSchemaData = $logData;
-
-        $resourceValue = $log['resource'] ?? null;
-        if (!\is_string($resourceValue)) {
-            $resourceValue = '';
-        }
-        $resource = $this->parseResource($resourceValue);
-
-        foreach ($schemaColumns as $columnName) {
-            if ($columnName === 'time') {
-                // Skip time - already handled above
-                continue;
-            }
-
-            // Get attribute metadata to determine if required
-            $attributeMetadata = $this->getAttribute($columnName);
-            $isRequiredAttribute = $attributeMetadata !== null && isset($attributeMetadata['required']) && $attributeMetadata['required'];
-
-            // For 'data' column, we'll handle it separately at the end
-            if ($columnName === 'data') {
-                continue;
-            }
-
-            // Check if value exists in main log first, then in data array
-            $attributeValue = null;
-            $hasAttributeValue = false;
-
-            if (isset($log[$columnName])) {
-                // Value is in main log (e.g., userId, event, resource, etc.)
-                $attributeValue = $log[$columnName];
-                $hasAttributeValue = true;
-            } elseif (isset($logData[$columnName])) {
-                // Value is in data array (additional attributes)
-                $attributeValue = $logData[$columnName];
-                $hasAttributeValue = true;
-                // Remove from non-schema data as it's now a dedicated column
-                unset($nonSchemaData[$columnName]);
-            } elseif (isset($resource[$columnName])) {
-                // Value is in parsed resource (e.g., resourceType, resourceId, resourceParent)
-                $attributeValue = $resource[$columnName];
-                $hasAttributeValue = true;
-            }
-
-            // Validate required attributes
-            if ($isRequiredAttribute && !$hasAttributeValue) {
-                throw new \InvalidArgumentException("Required attribute '{$columnName}' is missing in log entry");
-            }
-
-            if ($hasAttributeValue) {
-                $row[$columnName] = $attributeValue;
-            }
-        }
-
-        // Add the data column with remaining non-schema attributes
-        try {
-            $encodedData = json_encode($nonSchemaData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-        } catch (\JsonException $e) {
-            throw new Exception('Failed to encode data column to JSON: ' . $e->getMessage());
-        }
-        $row['data'] = $encodedData;
-
-        if ($this->sharedTables) {
-            $row['tenant'] = $this->tenant;
-        }
-
-        $escapedDatabaseAndTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
-        $insertSql = "INSERT INTO {$escapedDatabaseAndTable} FORMAT JSONEachRow";
-
-        $this->query($insertSql, [], [$row]);
+        // Use createBatch for the actual insertion
+        $this->createBatch([$log]);
 
         // Retrieve the created log using getById to ensure consistency
         $createdLog = $this->getById($logId);
@@ -1186,8 +1096,8 @@ class ClickHouse extends SQL
                 }
             }
 
-            // Build JSON row
-            $logId = uniqid('', true);
+            // Build JSON row - use provided id or generate one
+            $logId = $log['id'] ?? uniqid('', true);
 
             /** @var string|\DateTime|null $providedTime */
             $providedTime = $processedLog['time'] ?? null;
@@ -1224,7 +1134,7 @@ class ClickHouse extends SQL
             }
 
             if ($this->sharedTables) {
-                $row['tenant'] = $this->tenant;
+                $row['tenant'] = $log['$tenant'] ?? $this->tenant;
             }
 
             $rows[] = $row;
