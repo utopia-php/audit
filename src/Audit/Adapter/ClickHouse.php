@@ -160,13 +160,11 @@ class ClickHouse extends SQL
         $this->client->addHeader('X-ClickHouse-Key', $this->password);
         $this->client->setTimeout($this->timeout);
 
-        // Configure compression headers
+        // Request compressed responses from ClickHouse (safe for all requests)
         if ($this->compression !== self::COMPRESSION_NONE) {
-            // Request compressed responses from ClickHouse
             $this->client->addHeader('Accept-Encoding', $this->compression);
-            // Tell ClickHouse to decompress our requests if we send compressed data
-            $this->client->addHeader('Content-Encoding', $this->compression);
         }
+        // Note: Content-Encoding is set per-request only when we actually compress the body
     }
 
     /**
@@ -319,12 +317,16 @@ class ClickHouse extends SQL
     }
 
     /**
-     * Set the compression type for HTTP requests/responses.
+     * Set the compression type for HTTP responses.
      *
-     * Compression can significantly reduce bandwidth usage:
+     * Compression can significantly reduce bandwidth for query results:
      * - 'none': No compression (default)
      * - 'gzip': Standard gzip compression, widely supported
-     * - 'lz4': ClickHouse native compression, fastest
+     * - 'lz4': ClickHouse native compression, fastest decompression
+     *
+     * Note: This configures the Accept-Encoding header to request compressed
+     * responses from ClickHouse. The server will compress query results before
+     * sending them, reducing network transfer size.
      *
      * @param string $compression Compression type
      * @return self
@@ -706,8 +708,8 @@ class ClickHouse extends SQL
      * making both approaches fully injection-safe.
      *
      * When compression is enabled:
-     * - Request bodies are compressed before sending (for INSERT operations)
      * - Response decompression is handled automatically via Accept-Encoding header
+     * - This significantly reduces bandwidth for query results
      *
      * @param string $sql The SQL query to execute
      * @param array<string, mixed> $params Key-value pairs for query parameters (for SELECT/UPDATE/DELETE)
@@ -738,9 +740,6 @@ class ClickHouse extends SQL
                     $jsonLines[] = $encoded;
                 }
                 $body = implode("\n", $jsonLines);
-
-                // Apply compression to the request body if enabled
-                $body = $this->compressBody($body);
             } else {
                 // Parameterized query mode using multipart form data
                 $url = "{$scheme}://{$this->host}:{$this->port}/";
@@ -778,44 +777,6 @@ class ClickHouse extends SQL
                 $e
             );
         }
-    }
-
-    /**
-     * Compress a request body based on the configured compression type.
-     *
-     * @param string $body The uncompressed body
-     * @return string The compressed body (or original if compression is disabled/unavailable)
-     */
-    private function compressBody(string $body): string
-    {
-        if ($this->compression === self::COMPRESSION_NONE) {
-            return $body;
-        }
-
-        if ($this->compression === self::COMPRESSION_GZIP) {
-            $compressed = gzencode($body, 6);
-            if ($compressed === false) {
-                // Fall back to uncompressed if compression fails
-                return $body;
-            }
-            return $compressed;
-        }
-
-        // LZ4 compression requires the lz4 extension
-        // If not available, fall back to uncompressed
-        if ($this->compression === self::COMPRESSION_LZ4) {
-            if (function_exists('lz4_compress')) {
-                /** @var string|false $compressed */
-                $compressed = lz4_compress($body);
-                if ($compressed !== false) {
-                    return $compressed;
-                }
-            }
-            // Fall back to uncompressed if lz4 extension not available
-            return $body;
-        }
-
-        return $body;
     }
 
     /**
