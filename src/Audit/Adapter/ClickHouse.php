@@ -761,6 +761,9 @@ class ClickHouse extends SQL
             $responseBody = $response->getBody();
             $responseBody = is_string($responseBody) ? $responseBody : '';
 
+            // Decompress response if server sent compressed data
+            $responseBody = $this->decompressResponse($response, $responseBody);
+
             if ($statusCode !== 200) {
                 $this->handleQueryError($statusCode, $responseBody, $sql);
             }
@@ -777,6 +780,76 @@ class ClickHouse extends SQL
                 $e
             );
         }
+    }
+
+    /**
+     * Decompress response body if the server sent compressed data.
+     *
+     * Checks the Content-Encoding header and decompresses accordingly.
+     *
+     * @param \Utopia\Fetch\Response $response The HTTP response
+     * @param string $body The response body
+     * @return string Decompressed body (or original if not compressed)
+     */
+    private function decompressResponse(\Utopia\Fetch\Response $response, string $body): string
+    {
+        if (empty($body)) {
+            return $body;
+        }
+
+        $headers = $response->getHeaders();
+        $contentEncoding = '';
+
+        // Find Content-Encoding header (case-insensitive)
+        foreach ($headers as $name => $value) {
+            if (strtolower($name) === 'content-encoding') {
+                $contentEncoding = (string) $value;
+                break;
+            }
+        }
+
+        if (empty($contentEncoding)) {
+            return $body;
+        }
+
+        $encoding = strtolower(trim($contentEncoding));
+
+        if ($encoding === 'gzip' || $encoding === 'x-gzip') {
+            $decompressed = @gzdecode($body);
+            if ($decompressed !== false) {
+                return $decompressed;
+            }
+            // If decompression fails, return original (might not actually be compressed)
+            return $body;
+        }
+
+        if ($encoding === 'deflate') {
+            $decompressed = @gzinflate($body);
+            if ($decompressed !== false) {
+                return $decompressed;
+            }
+            // Try with zlib header
+            $decompressed = @gzuncompress($body);
+            if ($decompressed !== false) {
+                return $decompressed;
+            }
+            return $body;
+        }
+
+        // LZ4 decompression requires the lz4 extension
+        if ($encoding === 'lz4') {
+            if (function_exists('lz4_uncompress')) {
+                /** @var string|false $decompressed */
+                $decompressed = lz4_uncompress($body);
+                if ($decompressed !== false) {
+                    return $decompressed;
+                }
+            }
+            return $body;
+        }
+
+        // Unknown encoding, return as-is
+        return $body;
     }
 
     /**
