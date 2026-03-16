@@ -1202,8 +1202,10 @@ class ClickHouse extends SQL
                         $document[$columnName] = null;
                     } elseif (is_numeric($value)) {
                         $document[$columnName] = (int) $value;
-                    } else {
+                    } elseif (is_scalar($value)) {
                         $document[$columnName] = (string) $value;
+                    } else {
+                        $document[$columnName] = null;
                     }
                 } elseif ($columnName === 'time') {
                     // Convert ClickHouse timestamp format back to ISO 8601
