@@ -140,10 +140,6 @@ class Log extends ArrayObject
             return $tenant;
         }
 
-        if (is_numeric($tenant)) {
-            return (int) $tenant;
-        }
-
         if (is_string($tenant)) {
             return $tenant;
         }
