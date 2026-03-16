@@ -299,10 +299,14 @@ class ClickHouseTest extends TestCase
         $this->assertInstanceOf(ClickHouse::class, $result);
         $this->assertTrue($adapter->isSharedTables());
 
-        // Test setting tenant
+        // Test setting tenant to int
         $result2 = $adapter->setTenant(12345);
         $this->assertInstanceOf(ClickHouse::class, $result2);
         $this->assertEquals(12345, $adapter->getTenant());
+
+        // Test setting tenant to string
+        $adapter->setTenant('tenant_abc');
+        $this->assertSame('tenant_abc', $adapter->getTenant());
 
         // Test setting tenant to null
         $adapter->setTenant(null);

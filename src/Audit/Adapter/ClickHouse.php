@@ -42,7 +42,7 @@ class ClickHouse extends SQL
 
     protected string $namespace = '';
 
-    protected ?int $tenant = null;
+    protected int|string|null $tenant = null;
 
     protected bool $sharedTables = false;
 
@@ -208,10 +208,10 @@ class ClickHouse extends SQL
      * Set the tenant ID for multi-tenant support.
      * Tenant is used to isolate audit logs by tenant.
      *
-     * @param int|null $tenant
+     * @param int|string|null $tenant
      * @return self
      */
-    public function setTenant(?int $tenant): self
+    public function setTenant(int|string|null $tenant): self
     {
         $this->tenant = $tenant;
         return $this;
@@ -220,9 +220,9 @@ class ClickHouse extends SQL
     /**
      * Get the tenant ID.
      *
-     * @return int|null
+     * @return int|string|null
      */
-    public function getTenant(): ?int
+    public function getTenant(): int|string|null
     {
         return $this->tenant;
     }
@@ -631,7 +631,7 @@ class ClickHouse extends SQL
 
         // Add tenant column only if tables are shared across tenants
         if ($this->sharedTables) {
-            $columns[] = 'tenant Nullable(UInt64)';  // Supports 11-digit MySQL auto-increment IDs
+            $columns[] = 'tenant Nullable(String)';
         }
 
         // Build indexes from base adapter schema
@@ -1197,13 +1197,13 @@ class ClickHouse extends SQL
                         $document[$columnName] = $value ?? [];
                     }
                 } elseif ($columnName === 'tenant') {
-                    // Parse tenant as integer or null
+                    // Parse tenant as int, string, or null
                     if ($value === null || $value === '') {
                         $document[$columnName] = null;
                     } elseif (is_numeric($value)) {
                         $document[$columnName] = (int) $value;
                     } else {
-                        $document[$columnName] = null;
+                        $document[$columnName] = (string) $value;
                     }
                 } elseif ($columnName === 'time') {
                     // Convert ClickHouse timestamp format back to ISO 8601
@@ -1279,7 +1279,8 @@ class ClickHouse extends SQL
         }
 
         $escapedTenant = $this->escapeIdentifier('tenant');
-        return " AND {$escapedTenant} = {$this->tenant}";
+        $tenantValue = "'" . addslashes((string) $this->tenant) . "'";
+        return " AND {$escapedTenant} = {$tenantValue}";
     }
 
     /**
