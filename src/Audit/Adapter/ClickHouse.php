@@ -799,7 +799,7 @@ class ClickHouse extends SQL
             FORMAT JSON
         ";
 
-        $result = $this->query($sql, ['id' => $id]);
+        $result = $this->query($sql, array_merge(['id' => $id], $this->getTenantParams()));
         $logs = $this->parseJsonResults($result);
 
         return $logs[0] ?? null;
@@ -850,7 +850,7 @@ class ClickHouse extends SQL
             FORMAT JSON
         ";
 
-        $result = $this->query($sql, $parsed['params']);
+        $result = $this->query($sql, array_merge($parsed['params'], $this->getTenantParams()));
         return $this->parseJsonResults($result);
     }
 
@@ -890,7 +890,7 @@ class ClickHouse extends SQL
             FORMAT TabSeparated
         ";
 
-        $result = $this->query($sql, $params);
+        $result = $this->query($sql, array_merge($params, $this->getTenantParams()));
         $trimmed = trim($result);
 
         return $trimmed !== '' ? (int) $trimmed : 0;
@@ -1279,8 +1279,21 @@ class ClickHouse extends SQL
         }
 
         $escapedTenant = $this->escapeIdentifier('tenant');
-        $tenantValue = "'" . addslashes((string) $this->tenant) . "'";
-        return " AND {$escapedTenant} = {$tenantValue}";
+        return " AND {$escapedTenant} = {_tenant:String}";
+    }
+
+    /**
+     * Get query parameters for tenant filtering.
+     *
+     * @return array<string, mixed>
+     */
+    private function getTenantParams(): array
+    {
+        if (!$this->sharedTables || $this->tenant === null) {
+            return [];
+        }
+
+        return ['_tenant' => (string) $this->tenant];
     }
 
     /**
@@ -1571,7 +1584,7 @@ class ClickHouse extends SQL
             WHERE time < {datetime:String}{$tenantFilter}
         ";
 
-        $this->query($sql, ['datetime' => $datetimeString]);
+        $this->query($sql, array_merge(['datetime' => $datetimeString], $this->getTenantParams()));
 
         return true;
     }
