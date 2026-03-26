@@ -4,6 +4,8 @@ namespace Utopia\Audit\Adapter;
 
 use Utopia\Audit\Adapter;
 use Utopia\Database\Database;
+use Utopia\Query\Schema\ColumnType;
+use Utopia\Query\Schema\IndexType;
 use Utopia\Database\Document;
 
 /**
@@ -45,7 +47,7 @@ abstract class SQL extends Adapter
         return [
             [
                 '$id' => 'userId',
-                'type' => Database::VAR_STRING,
+                'type' => ColumnType::String->value,
                 'size' => Database::LENGTH_KEY,
                 'required' => false,
                 'signed' => true,
@@ -54,7 +56,7 @@ abstract class SQL extends Adapter
             ],
             [
                 '$id' => 'event',
-                'type' => Database::VAR_STRING,
+                'type' => ColumnType::String->value,
                 'size' => 255,
                 'required' => true,
                 'signed' => true,
@@ -63,7 +65,7 @@ abstract class SQL extends Adapter
             ],
             [
                 '$id' => 'resource',
-                'type' => Database::VAR_STRING,
+                'type' => ColumnType::String->value,
                 'size' => 255,
                 'required' => false,
                 'signed' => true,
@@ -72,7 +74,7 @@ abstract class SQL extends Adapter
             ],
             [
                 '$id' => 'userAgent',
-                'type' => Database::VAR_STRING,
+                'type' => ColumnType::String->value,
                 'size' => 65534,
                 'required' => true,
                 'signed' => true,
@@ -81,7 +83,7 @@ abstract class SQL extends Adapter
             ],
             [
                 '$id' => 'ip',
-                'type' => Database::VAR_STRING,
+                'type' => ColumnType::String->value,
                 'size' => 45,
                 'required' => true,
                 'signed' => true,
@@ -90,7 +92,7 @@ abstract class SQL extends Adapter
             ],
             [
                 '$id' => 'location',
-                'type' => Database::VAR_STRING,
+                'type' => ColumnType::String->value,
                 'size' => 45,
                 'required' => false,
                 'signed' => true,
@@ -99,7 +101,7 @@ abstract class SQL extends Adapter
             ],
             [
                 '$id' => 'time',
-                'type' => Database::VAR_DATETIME,
+                'type' => ColumnType::Datetime->value,
                 'format' => '',
                 'size' => 0,
                 'signed' => true,
@@ -109,7 +111,7 @@ abstract class SQL extends Adapter
             ],
             [
                 '$id' => 'data',
-                'type' => Database::VAR_STRING,
+                'type' => ColumnType::String->value,
                 'size' => 16777216,
                 'required' => false,
                 'signed' => true,
