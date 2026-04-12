@@ -52,6 +52,7 @@ class ClickHouse extends SQL
      * @param string $password ClickHouse password (default: '')
      * @param int $port ClickHouse HTTP port (default: 8123)
      * @param bool $secure Whether to use HTTPS (default: false)
+     * @param string $table Table name for audit logs (default: 'audits')
      * @throws Exception If validation fails
      */
     public function __construct(
@@ -59,16 +60,21 @@ class ClickHouse extends SQL
         string $username = 'default',
         string $password = '',
         int $port = self::DEFAULT_PORT,
-        bool $secure = false
+        bool $secure = false,
+        string $table = self::DEFAULT_TABLE,
     ) {
         $this->validateHost($host);
         $this->validatePort($port);
+        if ($table !== self::DEFAULT_TABLE) {
+            $this->validateIdentifier($table, 'Table');
+        }
 
         $this->host = $host;
         $this->port = $port;
         $this->username = $username;
         $this->password = $password;
         $this->secure = $secure;
+        $this->table = $table;
 
         // Initialize the HTTP client for connection reuse
         $this->client = new Client();
@@ -183,30 +189,6 @@ class ClickHouse extends SQL
         $this->validateIdentifier($database, 'Database');
         $this->database = $database;
         return $this;
-    }
-
-    /**
-     * Set the table name for audit logs.
-     *
-     * @param string $table
-     * @return self
-     * @throws Exception
-     */
-    public function setTable(string $table): self
-    {
-        $this->validateIdentifier($table, 'Table');
-        $this->table = $table;
-        return $this;
-    }
-
-    /**
-     * Get the table name.
-     *
-     * @return string
-     */
-    public function getTable(): string
-    {
-        return $this->table;
     }
 
     /**
