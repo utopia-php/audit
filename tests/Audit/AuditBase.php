@@ -688,7 +688,7 @@ trait AuditBase
 
         // Test 6: Find with IN filter
         $logs = $this->audit->find([
-            \Utopia\Audit\Query::in('event', ['event_0', 'event_1']),
+            \Utopia\Audit\Query::contains('event', ['event_0', 'event_1']),
         ]);
         $this->assertGreaterThanOrEqual(2, \count($logs));
 
@@ -765,7 +765,7 @@ trait AuditBase
 
         // Test 3: Count with IN filter
         $count = $this->audit->count([
-            \Utopia\Audit\Query::in('event', ['event_0', 'event_1']),
+            \Utopia\Audit\Query::contains('event', ['event_0', 'event_1']),
         ]);
         $this->assertGreaterThanOrEqual(2, $count);
 

@@ -130,8 +130,9 @@ class Audit
         string $userId,
         ?\DateTime $after = null,
         ?\DateTime $before = null,
+        ?int $max = null,
     ): int {
-        return $this->adapter->countByUser($userId, $after, $before);
+        return $this->adapter->countByUser($userId, $after, $before, $max);
     }
 
     /**
@@ -165,8 +166,9 @@ class Audit
         string $resource,
         ?\DateTime $after = null,
         ?\DateTime $before = null,
+        ?int $max = null,
     ): int {
-        return $this->adapter->countByResource($resource, $after, $before);
+        return $this->adapter->countByResource($resource, $after, $before, $max);
     }
 
     /**
@@ -204,8 +206,9 @@ class Audit
         array $events,
         ?\DateTime $after = null,
         ?\DateTime $before = null,
+        ?int $max = null,
     ): int {
-        return $this->adapter->countByUserAndEvents($userId, $events, $after, $before);
+        return $this->adapter->countByUserAndEvents($userId, $events, $after, $before, $max);
     }
 
     /**
@@ -243,8 +246,9 @@ class Audit
         array $events,
         ?\DateTime $after = null,
         ?\DateTime $before = null,
+        ?int $max = null,
     ): int {
-        return $this->adapter->countByResourceAndEvents($resource, $events, $after, $before);
+        return $this->adapter->countByResourceAndEvents($resource, $events, $after, $before, $max);
     }
 
     /**
@@ -281,8 +285,8 @@ class Audit
      *
      * @throws \Exception
      */
-    public function count(array $queries = []): int
+    public function count(array $queries = [], ?int $max = null): int
     {
-        return $this->adapter->count($queries);
+        return $this->adapter->count($queries, $max);
     }
 }

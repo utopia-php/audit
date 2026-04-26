@@ -6,6 +6,7 @@ use Exception;
 use PHPUnit\Framework\TestCase;
 use Utopia\Audit\Adapter\ClickHouse;
 use Utopia\Audit\Audit;
+use Utopia\Audit\Query;
 use Utopia\Tests\Audit\AuditBase;
 
 /**
@@ -20,14 +21,25 @@ class ClickHouseTest extends TestCase
 
     protected function initializeAudit(): void
     {
+        $host = getenv('CLICKHOUSE_HOST') ?: 'clickhouse';
+        $username = getenv('CLICKHOUSE_USER') ?: 'default';
+        $password = getenv('CLICKHOUSE_PASSWORD') ?: 'clickhouse';
+        $port = (int) (getenv('CLICKHOUSE_PORT') ?: 8123);
+        $secure = (bool) (getenv('CLICKHOUSE_SECURE') ?: false);
+
         $clickHouse = new ClickHouse(
-            host: 'clickhouse',
-            username: 'default',
-            password: 'clickhouse',
-            port: 8123
+            host: $host,
+            username: $username,
+            password: $password,
+            port: $port,
+            secure: $secure
         );
 
-        $clickHouse->setDatabase('default');
+        if ($database = getenv('CLICKHOUSE_DATABASE')) {
+            $clickHouse->setDatabase($database);
+        } else {
+            $clickHouse->setDatabase('default');
+        }
 
         $this->audit = new Audit($clickHouse);
         $this->audit->setup();
@@ -470,5 +482,87 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('697848498066e3d2ef64', $parsed['resourceId']);
         $this->assertEquals('table', $parsed['resourceType']);
         $this->assertEquals('database/6978484940ff05762e1a', $parsed['resourceParent']);
+    }
+
+    public function testCursorAfterPaginatesLogs(): void
+    {
+        $page1 = $this->audit->find([
+            Query::orderAsc('id'),
+            Query::limit(2),
+        ]);
+
+        $this->assertCount(2, $page1);
+
+        $page2 = $this->audit->find([
+            Query::orderAsc('id'),
+            Query::limit(2),
+            Query::cursorAfter($page1[count($page1) - 1]),
+        ]);
+
+        $this->assertGreaterThanOrEqual(1, count($page2));
+        foreach ($page2 as $log) {
+            $this->assertNotEquals($page1[0]->getId(), $log->getId());
+            $this->assertNotEquals($page1[1]->getId(), $log->getId());
+        }
+    }
+
+    public function testCursorBeforeReversesPagination(): void
+    {
+        $all = $this->audit->find([
+            Query::orderAsc('id'),
+            Query::limit(50),
+        ]);
+
+        $this->assertGreaterThanOrEqual(3, count($all));
+
+        $before = $this->audit->find([
+            Query::orderAsc('id'),
+            Query::limit(2),
+            Query::cursorBefore($all[count($all) - 1]),
+        ]);
+
+        $this->assertCount(2, $before);
+        $this->assertEquals($all[count($all) - 3]->getId(), $before[0]->getId());
+        $this->assertEquals($all[count($all) - 2]->getId(), $before[1]->getId());
+    }
+
+    public function testCursorAcceptsAssociativeArray(): void
+    {
+        $all = $this->audit->find([
+            Query::orderAsc('id'),
+            Query::limit(50),
+        ]);
+
+        $this->assertGreaterThanOrEqual(2, count($all));
+
+        $page = $this->audit->find([
+            Query::orderAsc('id'),
+            Query::limit(50),
+            Query::cursorAfter(['id' => $all[0]->getId()]),
+        ]);
+
+        $this->assertEquals(count($all) - 1, count($page));
+        $this->assertEquals($all[1]->getId(), $page[0]->getId());
+    }
+
+    public function testCountWithMaxBound(): void
+    {
+        $unbounded = $this->audit->count();
+        $this->assertGreaterThanOrEqual(4, $unbounded);
+
+        $bounded = $this->audit->count([], max: 2);
+        $this->assertEquals(2, $bounded);
+
+        $boundedAboveTotal = $this->audit->count([], max: 10_000);
+        $this->assertEquals($unbounded, $boundedAboveTotal);
+    }
+
+    public function testCountByUserWithMaxBound(): void
+    {
+        $unbounded = $this->audit->countLogsByUser('userId');
+        $this->assertEquals(3, $unbounded);
+
+        $bounded = $this->audit->countLogsByUser('userId', max: 1);
+        $this->assertEquals(1, $bounded);
     }
 }
