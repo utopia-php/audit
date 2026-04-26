@@ -847,10 +847,10 @@ class ClickHouse extends SQL
         }
 
         // Build ORDER BY clause — when cursor is in play, rebuild from
-        // orderAttributes (including the auto-added id tiebreaker), flipping
-        // directions for `cursorBefore`.
+        // orderAttributes (always non-empty after resolveCursorOrder, which
+        // appends an id tiebreaker), flipping directions for `cursorBefore`.
         $orderClause = '';
-        if (isset($parsed['cursor']) && !empty($orderAttributes)) {
+        if (isset($parsed['cursor'])) {
             $orderSql = $this->buildOrderBySql($orderAttributes, flip: $cursorDirection === 'before');
             $orderClause = ' ORDER BY ' . implode(', ', $orderSql);
         } elseif (!empty($parsed['orderBy'])) {
@@ -1143,9 +1143,51 @@ class ClickHouse extends SQL
 
         if (!array_key_exists('id', $row) && array_key_exists('$id', $row)) {
             $row['id'] = $row['$id'];
+            unset($row['$id']);
         }
 
         return $row;
+    }
+
+    /**
+     * Resolve the ClickHouse parameter type for a cursor attribute.
+     *
+     * Cursor keyset comparisons must bind values with the column's actual
+     * SQL type — binding a numeric column as `String` would compare values
+     * lexicographically ("9" > "10") and silently skip rows on page
+     * boundaries. Throws if the column is unknown or has an unsupported type
+     * so a misconfigured cursor fails loudly instead of producing incorrect
+     * pagination.
+     *
+     * @param string $attribute
+     * @return string ClickHouse parameter type (e.g. 'String', 'DateTime64(3)')
+     * @throws Exception
+     */
+    private function getCursorParamType(string $attribute): string
+    {
+        if ($attribute === 'id') {
+            return 'String';
+        }
+
+        $meta = $this->getAttribute($attribute);
+        if ($meta === null) {
+            throw new Exception("Cursor cannot order by unknown attribute '{$attribute}'");
+        }
+
+        $type = $meta['type'] ?? null;
+
+        if ($type === Database::VAR_DATETIME) {
+            return 'DateTime64(3)';
+        }
+
+        if ($type === Database::VAR_STRING) {
+            return 'String';
+        }
+
+        $observed = is_string($type) ? $type : get_debug_type($type);
+        throw new Exception(
+            "Cursor pagination does not support ordering by attribute '{$attribute}' of type '{$observed}'"
+        );
     }
 
     /**
@@ -1218,32 +1260,38 @@ class ClickHouse extends SQL
                     throw new Exception("Cursor is missing required attribute '{$prevAttr}'");
                 }
                 $prevValue = $cursor[$prevAttr];
+                if ($prevValue === null) {
+                    throw new Exception("Cursor value for '{$prevAttr}' cannot be null");
+                }
                 $prevEscaped = $this->escapeIdentifier($prevAttr);
+                $prevType = $this->getCursorParamType($prevAttr);
                 $paramName = "cursor_eq_{$i}_{$j}";
 
-                if ($prevAttr === 'time') {
-                    /** @var \DateTime|string|null $timeValue */
+                $conditions[] = "{$prevEscaped} = {{$paramName}:{$prevType}}";
+                if ($prevType === 'DateTime64(3)') {
+                    /** @var \DateTime|string $timeValue */
                     $timeValue = $prevValue;
-                    $conditions[] = "{$prevEscaped} = {{$paramName}:DateTime64(3)}";
                     $params[$paramName] = $this->formatDateTime($timeValue);
                 } else {
-                    $conditions[] = "{$prevEscaped} = {{$paramName}:String}";
                     $params[$paramName] = $this->formatParamValue($prevValue);
                 }
             }
 
             $value = $cursor[$attr];
+            if ($value === null) {
+                throw new Exception("Cursor value for '{$attr}' cannot be null");
+            }
             $escaped = $this->escapeIdentifier($attr);
+            $chType = $this->getCursorParamType($attr);
             $operator = $direction === 'DESC' ? '<' : '>';
             $paramName = "cursor_cmp_{$i}";
 
-            if ($attr === 'time') {
-                /** @var \DateTime|string|null $timeValue */
+            $conditions[] = "{$escaped} {$operator} {{$paramName}:{$chType}}";
+            if ($chType === 'DateTime64(3)') {
+                /** @var \DateTime|string $timeValue */
                 $timeValue = $value;
-                $conditions[] = "{$escaped} {$operator} {{$paramName}:DateTime64(3)}";
                 $params[$paramName] = $this->formatDateTime($timeValue);
             } else {
-                $conditions[] = "{$escaped} {$operator} {{$paramName}:String}";
                 $params[$paramName] = $this->formatParamValue($value);
             }
 
