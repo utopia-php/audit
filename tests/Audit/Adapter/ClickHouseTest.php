@@ -565,4 +565,98 @@ class ClickHouseTest extends TestCase
         $bounded = $this->audit->countLogsByUser('userId', max: 1);
         $this->assertEquals(1, $bounded);
     }
+
+    public function testNotEqualQuery(): void
+    {
+        // Fixture: 3x event=update/delete for userId, plus 1x event=insert for null user
+        $logs = $this->audit->find([
+            Query::notEqual('event', 'update'),
+        ]);
+        // 1 delete + 1 insert = 2
+        $this->assertCount(2, $logs);
+        foreach ($logs as $log) {
+            $this->assertNotEquals('update', $log->getEvent());
+        }
+    }
+
+    public function testNotContainsQuery(): void
+    {
+        $logs = $this->audit->find([
+            Query::notContains('event', ['update', 'delete']),
+        ]);
+        // Only the insert log
+        $this->assertCount(1, $logs);
+        $this->assertEquals('insert', $logs[0]->getEvent());
+    }
+
+    public function testLesserEqualAndGreaterEqualQueries(): void
+    {
+        $now = (new \DateTime())->modify('+1 minute');
+        $past = (new \DateTime())->modify('-1 hour');
+
+        $allLe = $this->audit->find([
+            Query::lessThanEqual('time', \Utopia\Database\DateTime::format($now)),
+        ]);
+        $this->assertGreaterThanOrEqual(4, count($allLe));
+
+        $noneLe = $this->audit->find([
+            Query::lessThanEqual('time', \Utopia\Database\DateTime::format($past)),
+        ]);
+        $this->assertCount(0, $noneLe);
+
+        $allGe = $this->audit->find([
+            Query::greaterThanEqual('time', \Utopia\Database\DateTime::format($past)),
+        ]);
+        $this->assertGreaterThanOrEqual(4, count($allGe));
+    }
+
+    public function testNotBetweenQuery(): void
+    {
+        $past = (new \DateTime())->modify('-2 hour');
+        $oldPast = (new \DateTime())->modify('-3 hour');
+
+        $logs = $this->audit->find([
+            Query::notBetween(
+                'time',
+                \Utopia\Database\DateTime::format($oldPast),
+                \Utopia\Database\DateTime::format($past),
+            ),
+        ]);
+        // All 4 fixture logs are outside the past window
+        $this->assertGreaterThanOrEqual(4, count($logs));
+    }
+
+    public function testIsNullAndIsNotNullQueries(): void
+    {
+        $nullUser = $this->audit->find([
+            Query::isNull('userId'),
+        ]);
+        // Only the insert log has null userId
+        $this->assertCount(1, $nullUser);
+        $this->assertEquals('insert', $nullUser[0]->getEvent());
+
+        $notNullUser = $this->audit->find([
+            Query::isNotNull('userId'),
+        ]);
+        $this->assertCount(3, $notNullUser);
+    }
+
+    public function testStartsWithAndEndsWithQueries(): void
+    {
+        $resourcePrefix = $this->audit->find([
+            Query::startsWith('resource', 'database/'),
+        ]);
+        // 3 logs are on database/document/*
+        $this->assertCount(3, $resourcePrefix);
+        foreach ($resourcePrefix as $log) {
+            $this->assertStringStartsWith('database/', $log->getResource());
+        }
+
+        $endsWithNull = $this->audit->find([
+            Query::endsWith('resource', '/null'),
+        ]);
+        // 'user/null' is the only match
+        $this->assertCount(1, $endsWithNull);
+        $this->assertEquals('user/null', $endsWithNull[0]->getResource());
+    }
 }
