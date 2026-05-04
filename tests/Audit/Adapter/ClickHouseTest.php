@@ -214,6 +214,90 @@ class ClickHouseTest extends TestCase
     }
 
     /**
+     * Test setTable validates empty identifier
+     */
+    public function testSetTableValidatesEmpty(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Table cannot be empty');
+
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $adapter->setTable('');
+    }
+
+    /**
+     * Test setTable validates identifier length
+     */
+    public function testSetTableValidatesLength(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Table cannot exceed 255 characters');
+
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $adapter->setTable(str_repeat('a', 256));
+    }
+
+    /**
+     * Test setTable validates identifier format
+     */
+    public function testSetTableValidatesFormat(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Table must start with a letter or underscore');
+
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $adapter->setTable('123invalid');
+    }
+
+    /**
+     * Test setTable rejects SQL keywords
+     */
+    public function testSetTableRejectsKeywords(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Table cannot be a reserved SQL keyword');
+
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $adapter->setTable('SELECT');
+    }
+
+    /**
+     * Test setTable with valid identifier
+     */
+    public function testSetTableWithValidIdentifier(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $result = $adapter->setTable('my_audit_logs');
+        $this->assertInstanceOf(ClickHouse::class, $result);
+        $this->assertEquals('my_audit_logs', $adapter->getTable());
+    }
+
+    /**
      * Test setNamespace allows empty string
      */
     public function testSetNamespaceAllowsEmpty(): void

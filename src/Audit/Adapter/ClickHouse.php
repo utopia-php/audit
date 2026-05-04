@@ -186,6 +186,30 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Set the table name for subsequent operations.
+     *
+     * @param string $table
+     * @return self
+     * @throws Exception
+     */
+    public function setTable(string $table): self
+    {
+        $this->validateIdentifier($table, 'Table');
+        $this->table = $table;
+        return $this;
+    }
+
+    /**
+     * Get the table name (without namespace prefix).
+     *
+     * @return string
+     */
+    public function getTable(): string
+    {
+        return $this->table;
+    }
+
+    /**
      * Enable or disable HTTPS for ClickHouse HTTP interface.
      */
     public function setSecure(bool $secure): self
