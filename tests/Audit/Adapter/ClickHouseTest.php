@@ -659,4 +659,34 @@ class ClickHouseTest extends TestCase
         $this->assertCount(1, $endsWithNull);
         $this->assertEquals('user/null', $endsWithNull[0]->getResource());
     }
+
+    public function testContainsRejectsEmptyValues(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Contains queries require at least one value.');
+
+        $this->audit->find([
+            Query::contains('event', []),
+        ]);
+    }
+
+    public function testNotContainsRejectsEmptyValues(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('NotContains queries require at least one value.');
+
+        $this->audit->find([
+            Query::notContains('event', []),
+        ]);
+    }
+
+    public function testEqualRejectsEmptyValues(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Equal queries require at least one value.');
+
+        $this->audit->find([
+            new Query(Query::TYPE_EQUAL, 'event', []),
+        ]);
+    }
 }

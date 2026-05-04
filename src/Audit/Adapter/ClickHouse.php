@@ -23,6 +23,28 @@ class ClickHouse extends SQL
 
     private const DEFAULT_DATABASE = 'default';
 
+    /**
+     * Filter methods that must be supplied at least one value. Empty `values`
+     * arrays for these methods are rejected up front so they can't silently
+     * compile into a "no filter applied" WHERE clause.
+     *
+     * @var list<string>
+     */
+    private const VALUE_REQUIRED_METHODS = [
+        Query::TYPE_EQUAL,
+        Query::TYPE_NOT_EQUAL,
+        Query::TYPE_LESSER,
+        Query::TYPE_LESSER_EQUAL,
+        Query::TYPE_GREATER,
+        Query::TYPE_GREATER_EQUAL,
+        Query::TYPE_BETWEEN,
+        Query::TYPE_NOT_BETWEEN,
+        Query::TYPE_CONTAINS,
+        Query::TYPE_NOT_CONTAINS,
+        Query::TYPE_STARTS_WITH,
+        Query::TYPE_ENDS_WITH,
+    ];
+
     private string $host;
 
     private int $port;
@@ -965,6 +987,15 @@ class ClickHouse extends SQL
             $attribute = $query->getAttribute();
             /** @var string $attribute */
             $values = $query->getValues();
+
+            // Reject empty values for filter methods that take values — mirrors
+            // the validator in utopia-php/database (Validator/Query/Filter.php)
+            // and prevents silently dropping the WHERE fragment, which would
+            // otherwise turn `Query::contains('attr', [])` into a full-table
+            // match instead of an empty result.
+            if (\in_array($method, self::VALUE_REQUIRED_METHODS, true) && empty($values)) {
+                throw new \Exception(\ucfirst($method) . ' queries require at least one value.');
+            }
 
             switch ($method) {
                 case Query::TYPE_EQUAL:
