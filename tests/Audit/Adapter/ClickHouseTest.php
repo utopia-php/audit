@@ -214,9 +214,9 @@ class ClickHouseTest extends TestCase
     }
 
     /**
-     * Test setTableName validates empty identifier
+     * Test setTable validates empty identifier
      */
-    public function testSetTableNameValidatesEmpty(): void
+    public function testSetTableValidatesEmpty(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Table cannot be empty');
@@ -227,13 +227,13 @@ class ClickHouseTest extends TestCase
             password: 'clickhouse'
         );
 
-        $adapter->setTableName('');
+        $adapter->setTable('');
     }
 
     /**
-     * Test setTableName validates identifier length
+     * Test setTable validates identifier length
      */
-    public function testSetTableNameValidatesLength(): void
+    public function testSetTableValidatesLength(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Table cannot exceed 255 characters');
@@ -244,13 +244,13 @@ class ClickHouseTest extends TestCase
             password: 'clickhouse'
         );
 
-        $adapter->setTableName(str_repeat('a', 256));
+        $adapter->setTable(str_repeat('a', 256));
     }
 
     /**
-     * Test setTableName validates identifier format
+     * Test setTable validates identifier format
      */
-    public function testSetTableNameValidatesFormat(): void
+    public function testSetTableValidatesFormat(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Table must start with a letter or underscore');
@@ -261,13 +261,13 @@ class ClickHouseTest extends TestCase
             password: 'clickhouse'
         );
 
-        $adapter->setTableName('123invalid');
+        $adapter->setTable('123invalid');
     }
 
     /**
-     * Test setTableName rejects SQL keywords
+     * Test setTable rejects SQL keywords
      */
-    public function testSetTableNameRejectsKeywords(): void
+    public function testSetTableRejectsKeywords(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Table cannot be a reserved SQL keyword');
@@ -278,13 +278,13 @@ class ClickHouseTest extends TestCase
             password: 'clickhouse'
         );
 
-        $adapter->setTableName('SELECT');
+        $adapter->setTable('SELECT');
     }
 
     /**
-     * Test setTableName with valid identifier
+     * Test setTable with valid identifier
      */
-    public function testSetTableNameWithValidIdentifier(): void
+    public function testSetTableWithValidIdentifier(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -292,9 +292,9 @@ class ClickHouseTest extends TestCase
             password: 'clickhouse'
         );
 
-        $result = $adapter->setTableName('my_audit_logs');
+        $result = $adapter->setTable('my_audit_logs');
         $this->assertInstanceOf(ClickHouse::class, $result);
-        $this->assertEquals('my_audit_logs', $adapter->getTableNameRaw());
+        $this->assertEquals('my_audit_logs', $adapter->getTable());
     }
 
     /**

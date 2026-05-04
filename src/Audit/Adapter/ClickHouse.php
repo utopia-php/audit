@@ -192,7 +192,7 @@ class ClickHouse extends SQL
      * @return self
      * @throws Exception
      */
-    public function setTableName(string $table): self
+    public function setTable(string $table): self
     {
         $this->validateIdentifier($table, 'Table');
         $this->table = $table;
@@ -204,7 +204,7 @@ class ClickHouse extends SQL
      *
      * @return string
      */
-    public function getTableNameRaw(): string
+    public function getTable(): string
     {
         return $this->table;
     }
