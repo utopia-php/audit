@@ -6,6 +6,7 @@ use Exception;
 use PHPUnit\Framework\TestCase;
 use Utopia\Audit\Adapter\ClickHouse;
 use Utopia\Audit\Audit;
+use Utopia\Audit\Query;
 use Utopia\Tests\Audit\AuditBase;
 
 /**
@@ -20,14 +21,25 @@ class ClickHouseTest extends TestCase
 
     protected function initializeAudit(): void
     {
+        $host = getenv('CLICKHOUSE_HOST') ?: 'clickhouse';
+        $username = getenv('CLICKHOUSE_USER') ?: 'default';
+        $password = getenv('CLICKHOUSE_PASSWORD') ?: 'clickhouse';
+        $port = (int) (getenv('CLICKHOUSE_PORT') ?: 8123);
+        $secure = (bool) (getenv('CLICKHOUSE_SECURE') ?: false);
+
         $clickHouse = new ClickHouse(
-            host: 'clickhouse',
-            username: 'default',
-            password: 'clickhouse',
-            port: 8123
+            host: $host,
+            username: $username,
+            password: $password,
+            port: $port,
+            secure: $secure
         );
 
-        $clickHouse->setDatabase('default');
+        if ($database = getenv('CLICKHOUSE_DATABASE')) {
+            $clickHouse->setDatabase($database);
+        } else {
+            $clickHouse->setDatabase('default');
+        }
 
         $this->audit = new Audit($clickHouse);
         $this->audit->setup();
@@ -554,5 +566,211 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('697848498066e3d2ef64', $parsed['resourceId']);
         $this->assertEquals('table', $parsed['resourceType']);
         $this->assertEquals('database/6978484940ff05762e1a', $parsed['resourceParent']);
+    }
+
+    public function testCursorAfterPaginatesLogs(): void
+    {
+        $page1 = $this->audit->find([
+            Query::orderAsc('id'),
+            Query::limit(2),
+        ]);
+
+        $this->assertCount(2, $page1);
+
+        $page2 = $this->audit->find([
+            Query::orderAsc('id'),
+            Query::limit(2),
+            Query::cursorAfter($page1[count($page1) - 1]),
+        ]);
+
+        $this->assertGreaterThanOrEqual(1, count($page2));
+        foreach ($page2 as $log) {
+            $this->assertNotEquals($page1[0]->getId(), $log->getId());
+            $this->assertNotEquals($page1[1]->getId(), $log->getId());
+        }
+    }
+
+    public function testCursorBeforeReversesPagination(): void
+    {
+        $all = $this->audit->find([
+            Query::orderAsc('id'),
+            Query::limit(50),
+        ]);
+
+        $this->assertGreaterThanOrEqual(3, count($all));
+
+        $before = $this->audit->find([
+            Query::orderAsc('id'),
+            Query::limit(2),
+            Query::cursorBefore($all[count($all) - 1]),
+        ]);
+
+        $this->assertCount(2, $before);
+        $this->assertEquals($all[count($all) - 3]->getId(), $before[0]->getId());
+        $this->assertEquals($all[count($all) - 2]->getId(), $before[1]->getId());
+    }
+
+    public function testCursorAcceptsAssociativeArray(): void
+    {
+        $all = $this->audit->find([
+            Query::orderAsc('id'),
+            Query::limit(50),
+        ]);
+
+        $this->assertGreaterThanOrEqual(2, count($all));
+
+        $page = $this->audit->find([
+            Query::orderAsc('id'),
+            Query::limit(50),
+            Query::cursorAfter(['id' => $all[0]->getId()]),
+        ]);
+
+        $this->assertEquals(count($all) - 1, count($page));
+        $this->assertEquals($all[1]->getId(), $page[0]->getId());
+    }
+
+    public function testCountWithMaxBound(): void
+    {
+        $unbounded = $this->audit->count();
+        $this->assertGreaterThanOrEqual(4, $unbounded);
+
+        $bounded = $this->audit->count([], max: 2);
+        $this->assertEquals(2, $bounded);
+
+        $boundedAboveTotal = $this->audit->count([], max: 10_000);
+        $this->assertEquals($unbounded, $boundedAboveTotal);
+    }
+
+    public function testCountByUserWithMaxBound(): void
+    {
+        $unbounded = $this->audit->countLogsByUser('userId');
+        $this->assertEquals(3, $unbounded);
+
+        $bounded = $this->audit->countLogsByUser('userId', max: 1);
+        $this->assertEquals(1, $bounded);
+    }
+
+    public function testNotEqualQuery(): void
+    {
+        // Fixture: 3x event=update/delete for userId, plus 1x event=insert for null user
+        $logs = $this->audit->find([
+            Query::notEqual('event', 'update'),
+        ]);
+        // 1 delete + 1 insert = 2
+        $this->assertCount(2, $logs);
+        foreach ($logs as $log) {
+            $this->assertNotEquals('update', $log->getEvent());
+        }
+    }
+
+    public function testNotContainsQuery(): void
+    {
+        $logs = $this->audit->find([
+            Query::notContains('event', ['update', 'delete']),
+        ]);
+        // Only the insert log
+        $this->assertCount(1, $logs);
+        $this->assertEquals('insert', $logs[0]->getEvent());
+    }
+
+    public function testLesserEqualAndGreaterEqualQueries(): void
+    {
+        $now = (new \DateTime())->modify('+1 minute');
+        $past = (new \DateTime())->modify('-1 hour');
+
+        $allLe = $this->audit->find([
+            Query::lessThanEqual('time', \Utopia\Database\DateTime::format($now)),
+        ]);
+        $this->assertGreaterThanOrEqual(4, count($allLe));
+
+        $noneLe = $this->audit->find([
+            Query::lessThanEqual('time', \Utopia\Database\DateTime::format($past)),
+        ]);
+        $this->assertCount(0, $noneLe);
+
+        $allGe = $this->audit->find([
+            Query::greaterThanEqual('time', \Utopia\Database\DateTime::format($past)),
+        ]);
+        $this->assertGreaterThanOrEqual(4, count($allGe));
+    }
+
+    public function testNotBetweenQuery(): void
+    {
+        $past = (new \DateTime())->modify('-2 hour');
+        $oldPast = (new \DateTime())->modify('-3 hour');
+
+        $logs = $this->audit->find([
+            Query::notBetween(
+                'time',
+                \Utopia\Database\DateTime::format($oldPast),
+                \Utopia\Database\DateTime::format($past),
+            ),
+        ]);
+        // All 4 fixture logs are outside the past window
+        $this->assertGreaterThanOrEqual(4, count($logs));
+    }
+
+    public function testIsNullAndIsNotNullQueries(): void
+    {
+        $nullUser = $this->audit->find([
+            Query::isNull('userId'),
+        ]);
+        // Only the insert log has null userId
+        $this->assertCount(1, $nullUser);
+        $this->assertEquals('insert', $nullUser[0]->getEvent());
+
+        $notNullUser = $this->audit->find([
+            Query::isNotNull('userId'),
+        ]);
+        $this->assertCount(3, $notNullUser);
+    }
+
+    public function testStartsWithAndEndsWithQueries(): void
+    {
+        $resourcePrefix = $this->audit->find([
+            Query::startsWith('resource', 'database/'),
+        ]);
+        // 3 logs are on database/document/*
+        $this->assertCount(3, $resourcePrefix);
+        foreach ($resourcePrefix as $log) {
+            $this->assertStringStartsWith('database/', $log->getResource());
+        }
+
+        $endsWithNull = $this->audit->find([
+            Query::endsWith('resource', '/null'),
+        ]);
+        // 'user/null' is the only match
+        $this->assertCount(1, $endsWithNull);
+        $this->assertEquals('user/null', $endsWithNull[0]->getResource());
+    }
+
+    public function testContainsRejectsEmptyValues(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Contains queries require at least one value.');
+
+        $this->audit->find([
+            Query::contains('event', []),
+        ]);
+    }
+
+    public function testNotContainsRejectsEmptyValues(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('NotContains queries require at least one value.');
+
+        $this->audit->find([
+            Query::notContains('event', []),
+        ]);
+    }
+
+    public function testEqualRejectsEmptyValues(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Equal queries require at least one value.');
+
+        $this->audit->find([
+            new Query(Query::TYPE_EQUAL, 'event', []),
+        ]);
     }
 }

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "5c1ac810bef3135bbe906ff710194adc",
+    "content-hash": "98622ab8912612e2e13a91c7786708f3",
     "packages": [
         {
             "name": "brick/math",
@@ -2382,6 +2382,52 @@
             "time": "2026-01-28T13:12:36+00:00"
         },
         {
+            "name": "utopia-php/query",
+            "version": "0.1.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/utopia-php/query.git",
+                "reference": "964a10ed3185490505f4c0062f2eb7b89287fb27"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/utopia-php/query/zipball/964a10ed3185490505f4c0062f2eb7b89287fb27",
+                "reference": "964a10ed3185490505f4c0062f2eb7b89287fb27",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.4"
+            },
+            "require-dev": {
+                "laravel/pint": "*",
+                "phpstan/phpstan": "*",
+                "phpunit/phpunit": "^12.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Utopia\\Query\\": "src/Query"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "A simple library providing a query abstraction for filtering, ordering, and pagination",
+            "keywords": [
+                "framework",
+                "php",
+                "query",
+                "upf",
+                "utopia"
+            ],
+            "support": {
+                "issues": "https://github.com/utopia-php/query/issues",
+                "source": "https://github.com/utopia-php/query/tree/0.1.1"
+            },
+            "time": "2026-03-03T09:05:14+00:00"
+        },
+        {
             "name": "utopia-php/telemetry",
             "version": "0.1.1",
             "source": {
@@ -4397,12 +4443,12 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": [],
+    "stability-flags": {},
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
-        "php": ">=8.0"
+        "php": ">=8.4"
     },
-    "platform-dev": [],
-    "plugin-api-version": "2.6.0"
+    "platform-dev": {},
+    "plugin-api-version": "2.9.0"
 }

@@ -23,6 +23,28 @@ class ClickHouse extends SQL
 
     private const DEFAULT_DATABASE = 'default';
 
+    /**
+     * Filter methods that must be supplied at least one value. Empty `values`
+     * arrays for these methods are rejected up front so they can't silently
+     * compile into a "no filter applied" WHERE clause.
+     *
+     * @var list<string>
+     */
+    private const VALUE_REQUIRED_METHODS = [
+        Query::TYPE_EQUAL,
+        Query::TYPE_NOT_EQUAL,
+        Query::TYPE_LESSER,
+        Query::TYPE_LESSER_EQUAL,
+        Query::TYPE_GREATER,
+        Query::TYPE_GREATER_EQUAL,
+        Query::TYPE_BETWEEN,
+        Query::TYPE_NOT_BETWEEN,
+        Query::TYPE_CONTAINS,
+        Query::TYPE_NOT_CONTAINS,
+        Query::TYPE_STARTS_WITH,
+        Query::TYPE_ENDS_WITH,
+    ];
+
     private string $host;
 
     private int $port;
@@ -847,20 +869,37 @@ class ClickHouse extends SQL
         // Build SELECT clause
         $selectColumns = $this->getSelectColumns();
 
+        $filters = $parsed['filters'];
+        $params = $parsed['params'];
+        $orderAttributes = $parsed['orderAttributes'] ?? [];
+        $cursorDirection = $parsed['cursorDirection'] ?? null;
+
+        if (isset($parsed['cursor'])) {
+            $orderAttributes = $this->resolveCursorOrder($orderAttributes);
+            $cursorWhere = $this->buildCursorWhere($orderAttributes, $parsed['cursor'], $cursorDirection ?? 'after', $params);
+            $filters[] = $cursorWhere['clause'];
+            $params = $cursorWhere['params'];
+        }
+
         // Build WHERE clause
         $whereClause = '';
         $tenantFilter = $this->getTenantFilter();
-        if (!empty($parsed['filters']) || $tenantFilter) {
-            $conditions = $parsed['filters'];
+        if (!empty($filters) || $tenantFilter) {
+            $conditions = $filters;
             if ($tenantFilter) {
                 $conditions[] = ltrim($tenantFilter, ' AND');
             }
             $whereClause = ' WHERE ' . implode(' AND ', $conditions);
         }
 
-        // Build ORDER BY clause
+        // Build ORDER BY clause — when cursor is in play, rebuild from
+        // orderAttributes (always non-empty after resolveCursorOrder, which
+        // appends an id tiebreaker), flipping directions for `cursorBefore`.
         $orderClause = '';
-        if (!empty($parsed['orderBy'])) {
+        if (isset($parsed['cursor'])) {
+            $orderSql = $this->buildOrderBySql($orderAttributes, flip: $cursorDirection === 'before');
+            $orderClause = ' ORDER BY ' . implode(', ', $orderSql);
+        } elseif (!empty($parsed['orderBy'])) {
             $orderClause = ' ORDER BY ' . implode(', ', $parsed['orderBy']);
         }
 
@@ -874,23 +913,34 @@ class ClickHouse extends SQL
             FORMAT JSON
         ";
 
-        $result = $this->query($sql, $parsed['params']);
-        return $this->parseJsonResults($result);
+        $result = $this->query($sql, $params);
+        $rows = $this->parseJsonResults($result);
+
+        if ($cursorDirection === 'before') {
+            $rows = array_reverse($rows);
+        }
+
+        return $rows;
     }
 
     /**
      * Count logs using Query objects.
      *
+     * When $max is non-null the count is bounded at the database level via a
+     * `LIMIT {max}` inside a subquery — ClickHouse stops scanning once the cap
+     * is reached, keeping large counts cheap (e.g. for "5000+" UI badges).
+     *
      * @param array<Query> $queries
+     * @param int|null $max Optional upper bound (inclusive) for the count
      * @return int
      * @throws Exception
      */
-    public function count(array $queries = []): int
+    public function count(array $queries = [], ?int $max = null): int
     {
         $tableName = $this->getTableName();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
-        // Parse queries - we only need filters and params, not ordering/limit/offset
+        // Parse queries - we only need filters and params, not ordering/limit/offset/cursor
         $parsed = $this->parseQueries($queries);
 
         // Build WHERE clause
@@ -908,11 +958,22 @@ class ClickHouse extends SQL
         $params = $parsed['params'];
         unset($params['limit'], $params['offset']);
 
-        $sql = "
-            SELECT COUNT(*) as count
-            FROM {$escapedTable}{$whereClause}
-            FORMAT TabSeparated
-        ";
+        if ($max !== null) {
+            $params['max'] = $max;
+            $sql = "
+                SELECT COUNT(*) as count
+                FROM (
+                    SELECT 1 FROM {$escapedTable}{$whereClause} LIMIT {max:UInt64}
+                ) sub
+                FORMAT TabSeparated
+            ";
+        } else {
+            $sql = "
+                SELECT COUNT(*) as count
+                FROM {$escapedTable}{$whereClause}
+                FORMAT TabSeparated
+            ";
+        }
 
         $result = $this->query($sql, $params);
         $trimmed = trim($result);
@@ -924,7 +985,7 @@ class ClickHouse extends SQL
      * Parse Query objects into SQL components.
      *
      * @param array<Query> $queries
-     * @return array{filters: array<string>, params: array<string, mixed>, orderBy?: array<string>, limit?: int, offset?: int}
+     * @return array{filters: array<string>, params: array<string, mixed>, orderBy?: array<string>, orderAttributes?: array<int, array{attribute: string, direction: string}>, limit?: int, offset?: int, cursor?: array<string, mixed>, cursorDirection?: string}
      * @throws Exception
      */
     private function parseQueries(array $queries): array
@@ -932,8 +993,11 @@ class ClickHouse extends SQL
         $filters = [];
         $params = [];
         $orderBy = [];
+        $orderAttributes = [];
         $limit = null;
         $offset = null;
+        $cursor = null;
+        $cursorDirection = null;
         $paramCounter = 0;
 
         foreach ($queries as $query) {
@@ -946,94 +1010,183 @@ class ClickHouse extends SQL
             $method = $query->getMethod();
             $attribute = $query->getAttribute();
             /** @var string $attribute */
+            $values = $query->getValues();
 
-            $values = $query->getValues();
-            $values = $query->getValues();
+            // Reject empty values for filter methods that take values — mirrors
+            // the validator in utopia-php/database (Validator/Query/Filter.php)
+            // and prevents silently dropping the WHERE fragment, which would
+            // otherwise turn `Query::contains('attr', [])` into a full-table
+            // match instead of an empty result.
+            if (\in_array($method, self::VALUE_REQUIRED_METHODS, true) && empty($values)) {
+                throw new \Exception(\ucfirst($method) . ' queries require at least one value.');
+            }
 
             switch ($method) {
                 case Query::TYPE_EQUAL:
                     $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier((string) $attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $chType = $this->getParamType($attribute);
+
+                    if (count($values) > 1) {
+                        $inParams = [];
+                        foreach ($values as $value) {
+                            $paramName = 'param_' . $paramCounter++;
+                            $inParams[] = "{{$paramName}:{$chType}}";
+                            $params[$paramName] = $this->formatTypedValue($chType, $value);
+                        }
+                        $filters[] = "{$escapedAttr} IN (" . implode(', ', $inParams) . ")";
+                    } else {
+                        $paramName = 'param_' . $paramCounter++;
+                        $filters[] = "{$escapedAttr} = {{$paramName}:{$chType}}";
+                        $params[$paramName] = $this->formatTypedValue($chType, $values[0] ?? null);
+                    }
+                    break;
+
+                case Query::TYPE_NOT_EQUAL:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $chType = $this->getParamType($attribute);
                     $paramName = 'param_' . $paramCounter++;
-                    $filters[] = "{$escapedAttr} = {{$paramName}:String}";
-                    $params[$paramName] = $this->formatParamValue($values[0]);
+                    $filters[] = "{$escapedAttr} != {{$paramName}:{$chType}}";
+                    $params[$paramName] = $this->formatTypedValue($chType, $values[0] ?? null);
                     break;
 
                 case Query::TYPE_LESSER:
                     $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier((string) $attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $chType = $this->getParamType($attribute);
                     $paramName = 'param_' . $paramCounter++;
-                    if ($attribute === 'time') {
-                        $filters[] = "{$escapedAttr} < {{$paramName}:DateTime64(3)}";
-                        /** @var \DateTime|string|null $val */
-                        $val = $values[0];
-                        $params[$paramName] = $this->formatDateTime($val);
-                    } else {
-                        $filters[] = "{$escapedAttr} < {{$paramName}:String}";
-                        $params[$paramName] = $this->formatParamValue($values[0]);
-                    }
+                    $filters[] = "{$escapedAttr} < {{$paramName}:{$chType}}";
+                    $params[$paramName] = $this->formatTypedValue($chType, $values[0] ?? null);
+                    break;
+
+                case Query::TYPE_LESSER_EQUAL:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $chType = $this->getParamType($attribute);
+                    $paramName = 'param_' . $paramCounter++;
+                    $filters[] = "{$escapedAttr} <= {{$paramName}:{$chType}}";
+                    $params[$paramName] = $this->formatTypedValue($chType, $values[0] ?? null);
                     break;
 
                 case Query::TYPE_GREATER:
                     $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier((string) $attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $chType = $this->getParamType($attribute);
                     $paramName = 'param_' . $paramCounter++;
-                    if ($attribute === 'time') {
-                        $filters[] = "{$escapedAttr} > {{$paramName}:DateTime64(3)}";
-                        /** @var \DateTime|string|null $val */
-                        $val = $values[0];
-                        $params[$paramName] = $this->formatDateTime($val);
-                    } else {
-                        $filters[] = "{$escapedAttr} > {{$paramName}:String}";
-                        $params[$paramName] = $this->formatParamValue($values[0]);
-                    }
+                    $filters[] = "{$escapedAttr} > {{$paramName}:{$chType}}";
+                    $params[$paramName] = $this->formatTypedValue($chType, $values[0] ?? null);
+                    break;
+
+                case Query::TYPE_GREATER_EQUAL:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $chType = $this->getParamType($attribute);
+                    $paramName = 'param_' . $paramCounter++;
+                    $filters[] = "{$escapedAttr} >= {{$paramName}:{$chType}}";
+                    $params[$paramName] = $this->formatTypedValue($chType, $values[0] ?? null);
                     break;
 
                 case Query::TYPE_BETWEEN:
                     $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier((string) $attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $chType = $this->getParamType($attribute);
                     $paramName1 = 'param_' . $paramCounter++;
                     $paramName2 = 'param_' . $paramCounter++;
-                    // Use DateTime64 type for time column, String for others
-                    // This prevents type mismatch when comparing DateTime64 with timezone-suffixed strings
-                    if ($attribute === 'time') {
-                        $paramType = 'DateTime64(3)';
-                        $filters[] = "{$escapedAttr} BETWEEN {{$paramName1}:{$paramType}} AND {{$paramName2}:{$paramType}}";
-                        /** @var \DateTime|string|null $val1 */
-                        $val1 = $values[0];
-                        /** @var \DateTime|string|null $val2 */
-                        $val2 = $values[1];
-                        $params[$paramName1] = $this->formatDateTime($val1);
-                        $params[$paramName2] = $this->formatDateTime($val2);
-                    } else {
-                        $filters[] = "{$escapedAttr} BETWEEN {{$paramName1}:String} AND {{$paramName2}:String}";
-                        $params[$paramName1] = $this->formatParamValue($values[0]);
-                        $params[$paramName2] = $this->formatParamValue($values[1]);
-                    }
+                    $filters[] = "{$escapedAttr} BETWEEN {{$paramName1}:{$chType}} AND {{$paramName2}:{$chType}}";
+                    $params[$paramName1] = $this->formatTypedValue($chType, $values[0] ?? null);
+                    $params[$paramName2] = $this->formatTypedValue($chType, $values[1] ?? null);
                     break;
 
-                case Query::TYPE_IN:
+                case Query::TYPE_NOT_BETWEEN:
                     $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier((string) $attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $chType = $this->getParamType($attribute);
+                    $paramName1 = 'param_' . $paramCounter++;
+                    $paramName2 = 'param_' . $paramCounter++;
+                    $filters[] = "{$escapedAttr} NOT BETWEEN {{$paramName1}:{$chType}} AND {{$paramName2}:{$chType}}";
+                    $params[$paramName1] = $this->formatTypedValue($chType, $values[0] ?? null);
+                    $params[$paramName2] = $this->formatTypedValue($chType, $values[1] ?? null);
+                    break;
+
+                case Query::TYPE_CONTAINS:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $chType = $this->getParamType($attribute);
                     $inParams = [];
                     foreach ($values as $value) {
                         $paramName = 'param_' . $paramCounter++;
-                        $inParams[] = "{{$paramName}:String}";
-                        $params[$paramName] = $this->formatParamValue($value);
+                        $inParams[] = "{{$paramName}:{$chType}}";
+                        $params[$paramName] = $this->formatTypedValue($chType, $value);
                     }
-                    $filters[] = "{$escapedAttr} IN (" . implode(', ', $inParams) . ")";
+                    if (!empty($inParams)) {
+                        $filters[] = "{$escapedAttr} IN (" . implode(', ', $inParams) . ")";
+                    }
+                    break;
+
+                case Query::TYPE_NOT_CONTAINS:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $chType = $this->getParamType($attribute);
+                    $inParams = [];
+                    foreach ($values as $value) {
+                        $paramName = 'param_' . $paramCounter++;
+                        $inParams[] = "{{$paramName}:{$chType}}";
+                        $params[$paramName] = $this->formatTypedValue($chType, $value);
+                    }
+                    if (!empty($inParams)) {
+                        $filters[] = "{$escapedAttr} NOT IN (" . implode(', ', $inParams) . ")";
+                    }
+                    break;
+
+                case Query::TYPE_IS_NULL:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $filters[] = "{$escapedAttr} IS NULL";
+                    break;
+
+                case Query::TYPE_IS_NOT_NULL:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $filters[] = "{$escapedAttr} IS NOT NULL";
+                    break;
+
+                case Query::TYPE_STARTS_WITH:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $needle = $values[0] ?? null;
+                    if (!is_string($needle)) {
+                        throw new Exception("startsWith needle must be a string for attribute '{$attribute}'");
+                    }
+                    $paramName = 'param_' . $paramCounter++;
+                    $filters[] = "startsWith({$escapedAttr}, {{$paramName}:String})";
+                    $params[$paramName] = $needle;
+                    break;
+
+                case Query::TYPE_ENDS_WITH:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $needle = $values[0] ?? null;
+                    if (!is_string($needle)) {
+                        throw new Exception("endsWith needle must be a string for attribute '{$attribute}'");
+                    }
+                    $paramName = 'param_' . $paramCounter++;
+                    $filters[] = "endsWith({$escapedAttr}, {{$paramName}:String})";
+                    $params[$paramName] = $needle;
                     break;
 
                 case Query::TYPE_ORDER_DESC:
                     $this->validateAttributeName($attribute);
                     $escapedAttr = $this->escapeIdentifier($attribute);
                     $orderBy[] = "{$escapedAttr} DESC";
+                    $orderAttributes[] = ['attribute' => $attribute, 'direction' => 'DESC'];
                     break;
 
                 case Query::TYPE_ORDER_ASC:
                     $this->validateAttributeName($attribute);
                     $escapedAttr = $this->escapeIdentifier($attribute);
                     $orderBy[] = "{$escapedAttr} ASC";
+                    $orderAttributes[] = ['attribute' => $attribute, 'direction' => 'ASC'];
                     break;
 
                 case Query::TYPE_LIMIT:
@@ -1051,6 +1204,20 @@ class ClickHouse extends SQL
                     $offset = $values[0];
                     $params['offset'] = $offset;
                     break;
+
+                case Query::TYPE_CURSOR_AFTER:
+                case Query::TYPE_CURSOR_BEFORE:
+                    if ($cursor !== null) {
+                        // Keep the first cursor encountered (matches base groupByType semantics)
+                        break;
+                    }
+                    $rawCursor = $values[0] ?? null;
+                    if ($rawCursor === null) {
+                        break; // no-op cursor
+                    }
+                    $cursor = $this->normalizeCursorRow($rawCursor);
+                    $cursorDirection = $method === Query::TYPE_CURSOR_AFTER ? 'after' : 'before';
+                    break;
             }
         }
 
@@ -1061,6 +1228,7 @@ class ClickHouse extends SQL
 
         if (!empty($orderBy)) {
             $result['orderBy'] = $orderBy;
+            $result['orderAttributes'] = $orderAttributes;
         }
 
         if ($limit !== null) {
@@ -1071,7 +1239,218 @@ class ClickHouse extends SQL
             $result['offset'] = $offset;
         }
 
+        if ($cursor !== null && $cursorDirection !== null) {
+            $result['cursor'] = $cursor;
+            $result['cursorDirection'] = $cursorDirection;
+        }
+
         return $result;
+    }
+
+    /**
+     * Normalize a user-supplied cursor row into a column-keyed array.
+     *
+     * Accepts a `Log` (or any `ArrayObject`) or a plain associative array.
+     * `Log` stores its identifier under `$id` (Appwrite convention) while the
+     * underlying column is `id` — this remaps `$id` → `id` so cursor pagination
+     * can match the SQL column.
+     *
+     * @param mixed $rawCursor
+     * @return array<string, mixed>
+     * @throws Exception
+     */
+    private function normalizeCursorRow(mixed $rawCursor): array
+    {
+        if ($rawCursor instanceof \ArrayObject) {
+            /** @var array<string, mixed> $row */
+            $row = $rawCursor->getArrayCopy();
+        } elseif (is_array($rawCursor)) {
+            /** @var array<string, mixed> $rawCursor */
+            $row = $rawCursor;
+        } else {
+            throw new Exception(
+                'Invalid cursor value: expected ArrayObject (Log) or associative array, got '
+                . get_debug_type($rawCursor)
+            );
+        }
+
+        if (!array_key_exists('id', $row) && array_key_exists('$id', $row)) {
+            $row['id'] = $row['$id'];
+            unset($row['$id']);
+        }
+
+        return $row;
+    }
+
+    /**
+     * Resolve the ClickHouse parameter type for a column.
+     *
+     * Used by both filter binding and cursor keyset comparison so values are
+     * bound with the column's actual SQL type — binding a numeric column as
+     * `String` would compare values lexicographically (`"9" > "10"`) and
+     * silently produce incorrect filter results or page boundaries. Add a
+     * branch here when introducing a new non-String column type.
+     *
+     * @param string $attribute
+     * @return string ClickHouse parameter type (e.g. 'String', 'DateTime64(3)', 'UInt64')
+     */
+    private function getParamType(string $attribute): string
+    {
+        return match (true) {
+            $attribute === 'time' => 'DateTime64(3)',
+            $attribute === 'tenant' && $this->sharedTables => 'UInt64',
+            default => 'String',
+        };
+    }
+
+    /**
+     * Format a value for the given ClickHouse parameter type.
+     *
+     * Routes DateTime-typed columns through formatDateTime() and everything
+     * else through formatParamValue(). Centralising this dispatch keeps
+     * parseQueries and buildCursorWhere consistent across libraries.
+     *
+     * @param string $chType ClickHouse parameter type as returned by getParamType()
+     * @param mixed $value
+     * @return string
+     * @throws Exception
+     */
+    private function formatTypedValue(string $chType, mixed $value): string
+    {
+        if ($chType === 'DateTime64(3)') {
+            if ($value === null) {
+                throw new Exception('DateTime parameter value cannot be null');
+            }
+            /** @var \DateTime|string $value */
+            return $this->formatDateTime($value);
+        }
+
+        return $this->formatParamValue($value);
+    }
+
+    /**
+     * Resolve the effective order attributes for cursor pagination.
+     *
+     * Auto-appends `id` as a tiebreaker when not already present so keyset
+     * pagination is deterministic on non-unique columns (e.g. time).
+     *
+     * @param array<int, array{attribute: string, direction: string}> $orderAttributes
+     * @return array<int, array{attribute: string, direction: string}>
+     */
+    private function resolveCursorOrder(array $orderAttributes): array
+    {
+        foreach ($orderAttributes as $entry) {
+            if ($entry['attribute'] === 'id') {
+                return $orderAttributes;
+            }
+        }
+
+        $defaultDirection = 'DESC';
+        if (!empty($orderAttributes)) {
+            $last = $orderAttributes[count($orderAttributes) - 1];
+            $defaultDirection = $last['direction'];
+        }
+
+        $orderAttributes[] = ['attribute' => 'id', 'direction' => $defaultDirection];
+
+        return $orderAttributes;
+    }
+
+    /**
+     * Build keyset-pagination WHERE fragments for cursor support.
+     *
+     * Produces a tuple-compare clause across the order attributes:
+     *   (a > A) OR (a = A AND b > B) OR ...
+     *
+     * For cursor `before`, the comparison directions are flipped relative to
+     * the requested ORDER BY (the caller is responsible for also flipping the
+     * actual ORDER BY at SQL build time so the page comes back from the right
+     * side, then reversing the rows post-fetch).
+     *
+     * @param array<int, array{attribute: string, direction: string}> $orderAttributes
+     * @param array<string, mixed> $cursor
+     * @param string $cursorDirection 'after' or 'before'
+     * @param array<string, mixed> $params Existing params (mutated by adding cursor binds)
+     * @return array{clause: string, params: array<string, mixed>}
+     * @throws Exception
+     */
+    private function buildCursorWhere(array $orderAttributes, array $cursor, string $cursorDirection, array $params): array
+    {
+        $tuples = [];
+        foreach ($orderAttributes as $i => $entry) {
+            $attr = $entry['attribute'];
+            $direction = $entry['direction'];
+
+            if (!array_key_exists($attr, $cursor)) {
+                throw new Exception("Cursor is missing required attribute '{$attr}'");
+            }
+
+            if ($cursorDirection === 'before') {
+                $direction = $direction === 'DESC' ? 'ASC' : 'DESC';
+            }
+
+            $conditions = [];
+
+            for ($j = 0; $j < $i; $j++) {
+                $prev = $orderAttributes[$j];
+                $prevAttr = $prev['attribute'];
+                if (!array_key_exists($prevAttr, $cursor)) {
+                    throw new Exception("Cursor is missing required attribute '{$prevAttr}'");
+                }
+                $prevValue = $cursor[$prevAttr];
+                if ($prevValue === null) {
+                    throw new Exception("Cursor value for '{$prevAttr}' cannot be null");
+                }
+                $prevEscaped = $this->escapeIdentifier($prevAttr);
+                $prevType = $this->getParamType($prevAttr);
+                $paramName = "cursor_eq_{$i}_{$j}";
+
+                $conditions[] = "{$prevEscaped} = {{$paramName}:{$prevType}}";
+                $params[$paramName] = $this->formatTypedValue($prevType, $prevValue);
+            }
+
+            $value = $cursor[$attr];
+            if ($value === null) {
+                throw new Exception("Cursor value for '{$attr}' cannot be null");
+            }
+            $escaped = $this->escapeIdentifier($attr);
+            $chType = $this->getParamType($attr);
+            $operator = $direction === 'DESC' ? '<' : '>';
+            $paramName = "cursor_cmp_{$i}";
+
+            $conditions[] = "{$escaped} {$operator} {{$paramName}:{$chType}}";
+            $params[$paramName] = $this->formatTypedValue($chType, $value);
+
+            $tuples[] = '(' . implode(' AND ', $conditions) . ')';
+        }
+
+        return [
+            'clause' => '(' . implode(' OR ', $tuples) . ')',
+            'params' => $params,
+        ];
+    }
+
+    /**
+     * Build the ORDER BY SQL fragment list, optionally flipping all directions.
+     *
+     * Used when cursor direction is `before` — we run the query in reverse to
+     * grab the previous-page rows, then `array_reverse` the result.
+     *
+     * @param array<int, array{attribute: string, direction: string}> $orderAttributes
+     * @param bool $flip Whether to flip ASC↔DESC
+     * @return array<string>
+     */
+    private function buildOrderBySql(array $orderAttributes, bool $flip = false): array
+    {
+        $sql = [];
+        foreach ($orderAttributes as $entry) {
+            $direction = $entry['direction'];
+            if ($flip) {
+                $direction = $direction === 'DESC' ? 'ASC' : 'DESC';
+            }
+            $sql[] = $this->escapeIdentifier($entry['attribute']) . ' ' . $direction;
+        }
+        return $sql;
     }
 
     /**
@@ -1376,6 +1755,7 @@ class ClickHouse extends SQL
         string $userId,
         ?\DateTime $after = null,
         ?\DateTime $before = null,
+        ?int $max = null,
     ): int {
         $queries = [
             Query::equal('userId', $userId),
@@ -1389,7 +1769,7 @@ class ClickHouse extends SQL
             $queries[] = Query::lessThan('time', $before);
         }
 
-        return count($this->find($queries));
+        return $this->count($queries, $max);
     }
 
     /**
@@ -1433,6 +1813,7 @@ class ClickHouse extends SQL
         string $resource,
         ?\DateTime $after = null,
         ?\DateTime $before = null,
+        ?int $max = null,
     ): int {
         $queries = [
             Query::equal('resource', $resource),
@@ -1446,7 +1827,7 @@ class ClickHouse extends SQL
             $queries[] = Query::lessThan('time', $before);
         }
 
-        return count($this->find($queries));
+        return $this->count($queries, $max);
     }
 
     /**
@@ -1465,7 +1846,7 @@ class ClickHouse extends SQL
     ): array {
         $queries = [
             Query::equal('userId', $userId),
-            Query::in('event', $events),
+            Query::contains('event', $events),
         ];
 
         if ($after !== null && $before !== null) {
@@ -1493,10 +1874,11 @@ class ClickHouse extends SQL
         array $events,
         ?\DateTime $after = null,
         ?\DateTime $before = null,
+        ?int $max = null,
     ): int {
         $queries = [
             Query::equal('userId', $userId),
-            Query::in('event', $events),
+            Query::contains('event', $events),
         ];
 
         if ($after !== null && $before !== null) {
@@ -1507,7 +1889,7 @@ class ClickHouse extends SQL
             $queries[] = Query::lessThan('time', $before);
         }
 
-        return count($this->find($queries));
+        return $this->count($queries, $max);
     }
 
     /**
@@ -1526,7 +1908,7 @@ class ClickHouse extends SQL
     ): array {
         $queries = [
             Query::equal('resource', $resource),
-            Query::in('event', $events),
+            Query::contains('event', $events),
         ];
 
         if ($after !== null && $before !== null) {
@@ -1554,10 +1936,11 @@ class ClickHouse extends SQL
         array $events,
         ?\DateTime $after = null,
         ?\DateTime $before = null,
+        ?int $max = null,
     ): int {
         $queries = [
             Query::equal('resource', $resource),
-            Query::in('event', $events),
+            Query::contains('event', $events),
         ];
 
         if ($after !== null && $before !== null) {
@@ -1568,7 +1951,7 @@ class ClickHouse extends SQL
             $queries[] = Query::lessThan('time', $before);
         }
 
-        return count($this->find($queries));
+        return $this->count($queries, $max);
     }
 
     /**

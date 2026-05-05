@@ -194,15 +194,17 @@ class Database extends SQL
         string $userId,
         ?\DateTime $after = null,
         ?\DateTime $before = null,
+        ?int $max = null,
     ): int {
         $timeQueries = $this->buildTimeQueries($after, $before);
-        return $this->db->getAuthorization()->skip(function () use ($userId, $timeQueries) {
+        return $this->db->getAuthorization()->skip(function () use ($userId, $timeQueries, $max) {
             return $this->db->count(
                 collection: $this->getCollectionName(),
                 queries: [
                     Query::equal('userId', [$userId]),
                     ...$timeQueries,
-                ]
+                ],
+                max: $max,
             );
         });
     }
@@ -252,15 +254,17 @@ class Database extends SQL
         string $resource,
         ?\DateTime $after = null,
         ?\DateTime $before = null,
+        ?int $max = null,
     ): int {
         $timeQueries = $this->buildTimeQueries($after, $before);
-        return $this->db->getAuthorization()->skip(function () use ($resource, $timeQueries) {
+        return $this->db->getAuthorization()->skip(function () use ($resource, $timeQueries, $max) {
             return $this->db->count(
                 collection: $this->getCollectionName(),
                 queries: [
                     Query::equal('resource', [$resource]),
                     ...$timeQueries,
-                ]
+                ],
+                max: $max,
             );
         });
     }
@@ -315,16 +319,18 @@ class Database extends SQL
         array $events,
         ?\DateTime $after = null,
         ?\DateTime $before = null,
+        ?int $max = null,
     ): int {
         $timeQueries = $this->buildTimeQueries($after, $before);
-        return $this->db->getAuthorization()->skip(function () use ($userId, $events, $timeQueries) {
+        return $this->db->getAuthorization()->skip(function () use ($userId, $events, $timeQueries, $max) {
             return $this->db->count(
                 collection: $this->getCollectionName(),
                 queries: [
                     Query::equal('userId', [$userId]),
                     Query::equal('event', $events),
                     ...$timeQueries,
-                ]
+                ],
+                max: $max,
             );
         });
     }
@@ -379,16 +385,18 @@ class Database extends SQL
         array $events,
         ?\DateTime $after = null,
         ?\DateTime $before = null,
+        ?int $max = null,
     ): int {
         $timeQueries = $this->buildTimeQueries($after, $before);
-        return $this->db->getAuthorization()->skip(function () use ($resource, $events, $timeQueries) {
+        return $this->db->getAuthorization()->skip(function () use ($resource, $events, $timeQueries, $max) {
             return $this->db->count(
                 collection: $this->getCollectionName(),
                 queries: [
                     Query::equal('resource', [$resource]),
                     Query::equal('event', $events),
                     ...$timeQueries,
-                ]
+                ],
+                max: $max,
             );
         });
     }
@@ -493,13 +501,14 @@ class Database extends SQL
      * Count logs using custom queries.
      *
      * Translates Audit Query objects to Database Query objects.
-     * Ignores limit and offset queries as they don't apply to count.
+     * Ignores limit, offset, and cursor queries as they don't apply to count.
      *
      * @param array<\Utopia\Audit\Query> $queries
+     * @param int|null $max Optional upper bound (inclusive) for the count
      * @return int
      * @throws AuthorizationException|\Exception
      */
-    public function count(array $queries = []): int
+    public function count(array $queries = [], ?int $max = null): int
     {
         $dbQueries = [];
 
@@ -508,9 +517,14 @@ class Database extends SQL
                 throw new \Exception('Invalid query type. Expected Utopia\\Audit\\Query');
             }
 
-            // Skip limit and offset for count queries
+            // Skip limit, offset, and cursor queries — they don't apply to count
             $method = $query->getMethod();
-            if ($method === \Utopia\Audit\Query::TYPE_LIMIT || $method === \Utopia\Audit\Query::TYPE_OFFSET) {
+            if (
+                $method === \Utopia\Audit\Query::TYPE_LIMIT
+                || $method === \Utopia\Audit\Query::TYPE_OFFSET
+                || $method === \Utopia\Audit\Query::TYPE_CURSOR_AFTER
+                || $method === \Utopia\Audit\Query::TYPE_CURSOR_BEFORE
+            ) {
                 continue;
             }
 
@@ -520,10 +534,11 @@ class Database extends SQL
             $dbQueries[] = Query::parseQuery($queryArray);
         }
 
-        return $this->db->getAuthorization()->skip(function () use ($dbQueries) {
+        return $this->db->getAuthorization()->skip(function () use ($dbQueries, $max) {
             return $this->db->count(
                 collection: $this->getCollectionName(),
                 queries: $dbQueries,
+                max: $max,
             );
         });
     }
