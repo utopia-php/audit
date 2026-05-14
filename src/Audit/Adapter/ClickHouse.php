@@ -42,7 +42,11 @@ class ClickHouse extends SQL
         Query::TYPE_CONTAINS,
         Query::TYPE_NOT_CONTAINS,
         Query::TYPE_STARTS_WITH,
+        Query::TYPE_NOT_STARTS_WITH,
         Query::TYPE_ENDS_WITH,
+        Query::TYPE_NOT_ENDS_WITH,
+        Query::TYPE_REGEX,
+        Query::TYPE_SELECT,
     ];
 
     private string $host;
@@ -866,8 +870,15 @@ class ClickHouse extends SQL
         // Parse queries
         $parsed = $this->parseQueries($queries);
 
-        // Build SELECT clause
-        $selectColumns = $this->getSelectColumns();
+        // Random ordering and cursor pagination are incompatible: cursor needs
+        // a stable order to anchor the next page on, rand() has none.
+        if (!empty($parsed['randomOrder']) && isset($parsed['cursor'])) {
+            throw new Exception('Cursor pagination cannot be combined with orderRandom');
+        }
+
+        // Build SELECT clause — respect Query::select if provided, otherwise
+        // fall back to the full column list.
+        $selectColumns = $this->buildProjection($parsed['select'] ?? null);
 
         $filters = $parsed['filters'];
         $params = $parsed['params'];
@@ -892,11 +903,14 @@ class ClickHouse extends SQL
             $whereClause = ' WHERE ' . implode(' AND ', $conditions);
         }
 
-        // Build ORDER BY clause — when cursor is in play, rebuild from
+        // Build ORDER BY clause. Random takes priority over column-based
+        // ordering, and otherwise: when cursor is in play, rebuild from
         // orderAttributes (always non-empty after resolveCursorOrder, which
         // appends an id tiebreaker), flipping directions for `cursorBefore`.
         $orderClause = '';
-        if (isset($parsed['cursor'])) {
+        if (!empty($parsed['randomOrder'])) {
+            $orderClause = ' ORDER BY rand()';
+        } elseif (isset($parsed['cursor'])) {
             $orderSql = $this->buildOrderBySql($orderAttributes, flip: $cursorDirection === 'before');
             $orderClause = ' ORDER BY ' . implode(', ', $orderSql);
         } elseif (!empty($parsed['orderBy'])) {
@@ -921,6 +935,38 @@ class ClickHouse extends SQL
         }
 
         return $rows;
+    }
+
+    /**
+     * Build the SELECT projection list. When `$select` is null, returns the
+     * full column list from `getSelectColumns()`; otherwise validates and
+     * escapes each requested column.
+     *
+     * `id` is always projected so `parseJsonResults` can map it back to the
+     * `$id` field on the `Log` model. Callers requesting a slim projection
+     * don't have to remember to include it.
+     *
+     * @param  list<string>|null  $select
+     * @throws Exception
+     */
+    private function buildProjection(?array $select): string
+    {
+        if ($select === null) {
+            return $this->getSelectColumns();
+        }
+
+        $columns = [];
+        $seen = [];
+        foreach (array_merge(['id'], $select) as $column) {
+            if (isset($seen[$column])) {
+                continue;
+            }
+            $this->validateAttributeName($column);
+            $columns[] = $this->escapeIdentifier($column);
+            $seen[$column] = true;
+        }
+
+        return implode(', ', $columns);
     }
 
     /**
@@ -985,7 +1031,7 @@ class ClickHouse extends SQL
      * Parse Query objects into SQL components.
      *
      * @param array<Query> $queries
-     * @return array{filters: array<string>, params: array<string, mixed>, orderBy?: array<string>, orderAttributes?: array<int, array{attribute: string, direction: string}>, limit?: int, offset?: int, cursor?: array<string, mixed>, cursorDirection?: string}
+     * @return array{filters: array<string>, params: array<string, mixed>, orderBy?: array<string>, orderAttributes?: array<int, array{attribute: string, direction: string}>, randomOrder?: bool, limit?: int, offset?: int, cursor?: array<string, mixed>, cursorDirection?: string, select?: list<string>}
      * @throws Exception
      */
     private function parseQueries(array $queries): array
@@ -998,6 +1044,8 @@ class ClickHouse extends SQL
         $offset = null;
         $cursor = null;
         $cursorDirection = null;
+        $select = null;
+        $randomOrder = false;
         $paramCounter = 0;
 
         foreach ($queries as $query) {
@@ -1163,6 +1211,18 @@ class ClickHouse extends SQL
                     $params[$paramName] = $needle;
                     break;
 
+                case Query::TYPE_NOT_STARTS_WITH:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $needle = $values[0] ?? null;
+                    if (!is_string($needle)) {
+                        throw new Exception("notStartsWith needle must be a string for attribute '{$attribute}'");
+                    }
+                    $paramName = 'param_' . $paramCounter++;
+                    $filters[] = "NOT startsWith({$escapedAttr}, {{$paramName}:String})";
+                    $params[$paramName] = $needle;
+                    break;
+
                 case Query::TYPE_ENDS_WITH:
                     $this->validateAttributeName($attribute);
                     $escapedAttr = $this->escapeIdentifier($attribute);
@@ -1173,6 +1233,55 @@ class ClickHouse extends SQL
                     $paramName = 'param_' . $paramCounter++;
                     $filters[] = "endsWith({$escapedAttr}, {{$paramName}:String})";
                     $params[$paramName] = $needle;
+                    break;
+
+                case Query::TYPE_NOT_ENDS_WITH:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $needle = $values[0] ?? null;
+                    if (!is_string($needle)) {
+                        throw new Exception("notEndsWith needle must be a string for attribute '{$attribute}'");
+                    }
+                    $paramName = 'param_' . $paramCounter++;
+                    $filters[] = "NOT endsWith({$escapedAttr}, {{$paramName}:String})";
+                    $params[$paramName] = $needle;
+                    break;
+
+                case Query::TYPE_REGEX:
+                    $this->validateAttributeName($attribute);
+                    $escapedAttr = $this->escapeIdentifier($attribute);
+                    $pattern = $values[0] ?? null;
+                    if (!is_string($pattern)) {
+                        throw new Exception("regex pattern must be a string for attribute '{$attribute}'");
+                    }
+                    $paramName = 'param_' . $paramCounter++;
+                    // ClickHouse's `match(haystack, pattern)` is the re2-style
+                    // regex predicate. Pattern is bound as a parameter, never
+                    // interpolated, so it can't escape into the SQL.
+                    $filters[] = "match({$escapedAttr}, {{$paramName}:String})";
+                    $params[$paramName] = $pattern;
+                    break;
+
+                case Query::TYPE_SELECT:
+                    if (empty($values)) {
+                        // VALUE_REQUIRED_METHODS already rejects empty values
+                        // earlier, but the explicit check keeps this branch safe
+                        // if the guard is ever bypassed.
+                        break;
+                    }
+                    // Multiple Query::select(...) calls combine into a single
+                    // projection. Duplicates are removed; column names are
+                    // validated and escaped at SQL build time in find().
+                    $select ??= [];
+                    foreach ($values as $column) {
+                        if (!is_string($column) || $column === '') {
+                            throw new Exception('select columns must be non-empty strings');
+                        }
+                        $this->validateAttributeName($column);
+                        if (!in_array($column, $select, true)) {
+                            $select[] = $column;
+                        }
+                    }
                     break;
 
                 case Query::TYPE_ORDER_DESC:
@@ -1187,6 +1296,13 @@ class ClickHouse extends SQL
                     $escapedAttr = $this->escapeIdentifier($attribute);
                     $orderBy[] = "{$escapedAttr} ASC";
                     $orderAttributes[] = ['attribute' => $attribute, 'direction' => 'ASC'];
+                    break;
+
+                case Query::TYPE_ORDER_RANDOM:
+                    // ClickHouse's rand() is the per-row PRNG used for random
+                    // sampling. Single emission across the result set — repeated
+                    // Query::orderRandom() calls collapse into one ORDER BY rand().
+                    $randomOrder = true;
                     break;
 
                 case Query::TYPE_LIMIT:
@@ -1231,6 +1347,10 @@ class ClickHouse extends SQL
             $result['orderAttributes'] = $orderAttributes;
         }
 
+        if ($randomOrder) {
+            $result['randomOrder'] = true;
+        }
+
         if ($limit !== null) {
             $result['limit'] = $limit;
         }
@@ -1242,6 +1362,10 @@ class ClickHouse extends SQL
         if ($cursor !== null && $cursorDirection !== null) {
             $result['cursor'] = $cursor;
             $result['cursorDirection'] = $cursorDirection;
+        }
+
+        if ($select !== null) {
+            $result['select'] = $select;
         }
 
         return $result;

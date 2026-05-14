@@ -773,4 +773,98 @@ class ClickHouseTest extends TestCase
             new Query(Query::TYPE_EQUAL, 'event', []),
         ]);
     }
+
+    public function testSelectProjectsRequestedColumns(): void
+    {
+        $logs = $this->audit->find([
+            Query::select(['event', 'resource']),
+            Query::equal('userId', 'userId'),
+            Query::limit(1),
+        ]);
+
+        $this->assertGreaterThanOrEqual(1, count($logs));
+
+        $row = $logs[0]->getArrayCopy();
+        // `id` is always projected so the Log model still has its identifier
+        $this->assertArrayHasKey('$id', $row);
+        // Requested columns present
+        $this->assertArrayHasKey('event', $row);
+        $this->assertArrayHasKey('resource', $row);
+        // Unrequested columns are absent
+        $this->assertArrayNotHasKey('userAgent', $row);
+        $this->assertArrayNotHasKey('ip', $row);
+        $this->assertArrayNotHasKey('data', $row);
+    }
+
+    public function testSelectRejectsUnknownColumn(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Invalid attribute name: bogus_column');
+
+        $this->audit->find([
+            Query::select(['bogus_column']),
+        ]);
+    }
+
+    public function testSelectRejectsEmptyValues(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Select queries require at least one value.');
+
+        $this->audit->find([
+            Query::select([]),
+        ]);
+    }
+
+    public function testNotStartsWithFilter(): void
+    {
+        $logs = $this->audit->find([
+            Query::notStartsWith('resource', 'database/'),
+        ]);
+        // From fixture: only 'user/null' doesn't start with 'database/'
+        $this->assertCount(1, $logs);
+        $this->assertEquals('user/null', $logs[0]->getResource());
+    }
+
+    public function testNotEndsWithFilter(): void
+    {
+        $logs = $this->audit->find([
+            Query::notEndsWith('resource', '/null'),
+        ]);
+        // From fixture: 3 logs are on database/document/{1,2,2}
+        $this->assertCount(3, $logs);
+        foreach ($logs as $log) {
+            $this->assertStringStartsNotWith('user/', $log->getResource());
+        }
+    }
+
+    public function testRegexFilter(): void
+    {
+        $logs = $this->audit->find([
+            Query::regex('resource', '^database/document/\\d+$'),
+        ]);
+        // From fixture: 3 database/document/{1,2,2} rows match
+        $this->assertCount(3, $logs);
+    }
+
+    public function testOrderRandomReturnsRows(): void
+    {
+        $logs = $this->audit->find([
+            Query::orderRandom(),
+            Query::limit(2),
+        ]);
+        // Hard to assert randomness; just confirm the query executes and limits.
+        $this->assertCount(2, $logs);
+    }
+
+    public function testOrderRandomRejectedWithCursor(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Cursor pagination cannot be combined with orderRandom');
+
+        $this->audit->find([
+            Query::orderRandom(),
+            Query::cursorAfter(['id' => 'whatever']),
+        ]);
+    }
 }
