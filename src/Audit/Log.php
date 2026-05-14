@@ -140,10 +140,13 @@ class Log extends ArrayObject
             return $tenant;
         }
 
+        // Strings are returned as-is. The ClickHouse parser converts tenant
+        // values to int when the integer scheme is configured, so a string
+        // here means the host application is using a string-typed tenant
+        // (uuid7, slug, etc.) — coercing numeric-looking strings like
+        // "00123" would silently corrupt them.
         if (is_string($tenant)) {
-            // Numeric tenant IDs (e.g. legacy UInt64 rows stored as "123")
-            // round-trip back to int. Non-numeric strings stay as-is.
-            return is_numeric($tenant) ? (int) $tenant : $tenant;
+            return $tenant;
         }
 
         return null;

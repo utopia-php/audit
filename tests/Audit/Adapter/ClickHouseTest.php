@@ -778,15 +778,18 @@ class ClickHouseTest extends TestCase
         ]);
     }
 
-    public function testIdAttributeTypeDefaultsToString(): void
+    public function testIdAttributeTypeDefaultsToInteger(): void
     {
+        // Default is VAR_INTEGER to preserve the pre-existing schema on
+        // existing deployments — callers using string tenant IDs must opt
+        // in via setIdAttributeType().
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
             password: 'clickhouse'
         );
 
-        $this->assertEquals(\Utopia\Database\Database::VAR_UUID7, $adapter->getIdAttributeType());
+        $this->assertEquals(\Utopia\Database\Database::VAR_INTEGER, $adapter->getIdAttributeType());
     }
 
     public function testIdAttributeTypeSetter(): void
@@ -808,7 +811,8 @@ class ClickHouseTest extends TestCase
         $chPort = (int) (getenv('CLICKHOUSE_PORT') ?: 8123);
         $required = $this->getRequiredAttributes();
 
-        // Default scheme (uuid7) → tenant column is Nullable(String)
+        // String scheme (uuid7) → tenant column is Nullable(String). Must
+        // opt in explicitly — default is VAR_INTEGER for BC.
         $stringAdapter = new ClickHouse(
             host: $chHost,
             username: 'default',
@@ -816,6 +820,7 @@ class ClickHouseTest extends TestCase
             port: $chPort
         );
         $stringAdapter->setNamespace('tenant_string_test');
+        $stringAdapter->setIdAttributeType(\Utopia\Database\Database::VAR_UUID7);
         $stringAdapter->setSharedTables(true);
         $stringAdapter->setTenant('uuid-tenant-1');
         $stringAdapter->setup();
@@ -824,9 +829,10 @@ class ClickHouseTest extends TestCase
         $stringAudit->log('u1', 'create', 'doc/1', 'agent', '127.0.0.1', 'US', $required);
         $logs = $stringAudit->find([Query::equal('userId', 'u1')]);
         $this->assertGreaterThanOrEqual(1, count($logs));
-        $this->assertEquals('uuid-tenant-1', $logs[0]->getTenant());
+        $this->assertSame('uuid-tenant-1', $logs[0]->getTenant());
 
-        // Integer scheme → tenant column is Nullable(UInt64), tenant is int
+        // Integer scheme (default) → tenant column is Nullable(UInt64),
+        // tenant is int.
         $intAdapter = new ClickHouse(
             host: $chHost,
             username: 'default',
@@ -834,7 +840,6 @@ class ClickHouseTest extends TestCase
             port: $chPort
         );
         $intAdapter->setNamespace('tenant_int_test');
-        $intAdapter->setIdAttributeType(\Utopia\Database\Database::VAR_INTEGER);
         $intAdapter->setSharedTables(true);
         $intAdapter->setTenant(42);
         $intAdapter->setup();
@@ -843,7 +848,38 @@ class ClickHouseTest extends TestCase
         $intAudit->log('u1', 'create', 'doc/1', 'agent', '127.0.0.1', 'US', $required);
         $intLogs = $intAudit->find([Query::equal('userId', 'u1')]);
         $this->assertGreaterThanOrEqual(1, count($intLogs));
-        // getTenant() returns int for numeric values regardless of column type
         $this->assertSame(42, $intLogs[0]->getTenant());
+    }
+
+    public function testNumericStringTenantPreservedInStringMode(): void
+    {
+        // Regression test: in uuid7 mode, a tenant ID that looks numeric
+        // (e.g. "42" or "00123") must round-trip back as a string, not
+        // silently cast to int by the parser or by Log::getTenant().
+        $chHost = getenv('CLICKHOUSE_HOST') ?: 'clickhouse';
+        $chPort = (int) (getenv('CLICKHOUSE_PORT') ?: 8123);
+
+        $adapter = new ClickHouse(
+            host: $chHost,
+            username: 'default',
+            password: 'clickhouse',
+            port: $chPort
+        );
+        $adapter->setNamespace('tenant_numstr_test');
+        $adapter->setIdAttributeType(\Utopia\Database\Database::VAR_UUID7);
+        $adapter->setSharedTables(true);
+        $adapter->setTenant('00123');
+        $adapter->setup();
+
+        $audit = new Audit($adapter);
+        $audit->log('u1', 'create', 'doc/1', 'agent', '127.0.0.1', 'US', $this->getRequiredAttributes());
+
+        $logs = $audit->find([Query::equal('userId', 'u1')]);
+        $this->assertGreaterThanOrEqual(1, count($logs));
+
+        // Strict equality — must stay a string, not int(123)
+        $tenant = $logs[0]->getTenant();
+        $this->assertIsString($tenant);
+        $this->assertSame('00123', $tenant);
     }
 }

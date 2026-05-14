@@ -75,10 +75,16 @@ class ClickHouse extends SQL
      *
      * Determines the ClickHouse column type for the `tenant` column when
      * `setSharedTables(true)` is enabled:
-     * - `integer` → `Nullable(UInt64)`
-     * - anything else (default) → `Nullable(String)`
+     * - `integer` (default) → `Nullable(UInt64)`
+     * - anything else → `Nullable(String)`
+     *
+     * Defaults to `VAR_INTEGER` to preserve the previous schema on existing
+     * deployments: `reconcileTenantColumnType()` would otherwise trigger an
+     * irreversible `ALTER TABLE ... MODIFY COLUMN` from UInt64 to String on
+     * first `setup()` after upgrade. Callers using string IDs must opt in
+     * explicitly via {@see setIdAttributeType()}.
      */
-    protected string $idAttributeType = Database::VAR_UUID7;
+    protected string $idAttributeType = Database::VAR_INTEGER;
 
     /**
      * @param string $host ClickHouse host
@@ -1718,10 +1724,14 @@ class ClickHouse extends SQL
                         $document[$columnName] = $value ?? [];
                     }
                 } elseif ($columnName === 'tenant') {
-                    // Parse tenant as int, string, or null
+                    // Parse tenant according to the configured scheme:
+                    // - integer scheme → cast numeric values to int
+                    // - string scheme (uuid7 etc.) → keep verbatim so that
+                    //   numeric-looking IDs like "00123" or "42" round-trip
+                    //   without lossy coercion to int
                     if ($value === null || $value === '') {
                         $document[$columnName] = null;
-                    } elseif (is_numeric($value)) {
+                    } elseif ($this->idAttributeType === Database::VAR_INTEGER && is_numeric($value)) {
                         $document[$columnName] = (int) $value;
                     } elseif (is_scalar($value)) {
                         $document[$columnName] = (string) $value;
