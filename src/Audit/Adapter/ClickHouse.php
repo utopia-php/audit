@@ -1410,6 +1410,19 @@ class ClickHouse extends SQL
      */
     private function normalizeCursorRow(mixed $rawCursor): array
     {
+        // Most callers (Appwrite endpoints, SDK clients) pass the log ID
+        // string — matching the `Query::cursorAfter($id)` convention used
+        // across the rest of the Appwrite ecosystem. Resolve the full row
+        // by looking it up; cursor pagination needs the order-column
+        // values (e.g. `time`), not just the identifier.
+        if (is_string($rawCursor)) {
+            $log = $this->getById($rawCursor);
+            if ($log === null) {
+                throw new Exception("Cursor not found: log with id '{$rawCursor}' does not exist");
+            }
+            $rawCursor = $log;
+        }
+
         if ($rawCursor instanceof \ArrayObject) {
             /** @var array<string, mixed> $row */
             $row = $rawCursor->getArrayCopy();
@@ -1418,7 +1431,7 @@ class ClickHouse extends SQL
             $row = $rawCursor;
         } else {
             throw new Exception(
-                'Invalid cursor value: expected ArrayObject (Log) or associative array, got '
+                'Invalid cursor value: expected log id (string), Log, or associative array, got '
                 . get_debug_type($rawCursor)
             );
         }
