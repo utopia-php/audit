@@ -72,6 +72,8 @@ class ClickHouse extends SQL
 
     protected bool $sharedTables = false;
 
+    protected bool $asyncCleanup = false;
+
     /**
      * @param string $host ClickHouse host
      * @param string $username ClickHouse username (default: 'default')
@@ -298,6 +300,31 @@ class ClickHouse extends SQL
     public function isSharedTables(): bool
     {
         return $this->sharedTables;
+    }
+
+    /**
+     * Set whether cleanup() should return after scheduling the DELETE mutation
+     * rather than waiting for it to complete. When enabled, the DELETE is sent
+     * with `SETTINGS lightweight_deletes_sync = 0` and the HTTP call returns
+     * as soon as the mutation is queued.
+     *
+     * @param bool $asyncCleanup
+     * @return self
+     */
+    public function setAsyncCleanup(bool $asyncCleanup): self
+    {
+        $this->asyncCleanup = $asyncCleanup;
+        return $this;
+    }
+
+    /**
+     * Get whether cleanup() runs asynchronously.
+     *
+     * @return bool
+     */
+    public function isAsyncCleanup(): bool
+    {
+        return $this->asyncCleanup;
     }
 
     /**
@@ -2106,8 +2133,6 @@ class ClickHouse extends SQL
     /**
      * Delete logs older than the specified datetime.
      *
-     * ClickHouse uses ALTER TABLE DELETE with synchronous mutations.
-     *
      * @throws Exception
      */
     public function cleanup(\DateTime $datetime): bool
@@ -2116,14 +2141,13 @@ class ClickHouse extends SQL
         $tenantFilter = $this->getTenantFilter();
         $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
-        // Convert DateTime to string format expected by ClickHouse
         $datetimeString = $datetime->format('Y-m-d H:i:s.v');
 
-        // Use DELETE statement for synchronous deletion (ClickHouse 23.3+)
-        // Falls back to ALTER TABLE DELETE with mutations_sync for older versions
+        $settings = $this->asyncCleanup ? ' SETTINGS lightweight_deletes_sync = 0' : '';
+
         $sql = "
             DELETE FROM {$escapedTable}
-            WHERE time < {datetime:String}{$tenantFilter}
+            WHERE time < {datetime:String}{$tenantFilter}{$settings}
         ";
 
         $this->query($sql, ['datetime' => $datetimeString]);
