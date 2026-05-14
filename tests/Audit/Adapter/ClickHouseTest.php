@@ -629,35 +629,17 @@ class ClickHouseTest extends TestCase
         $this->assertEquals($all[1]->getId(), $page[0]->getId());
     }
 
-    public function testCursorAcceptsStringId(): void
+    public function testCursorStringValueRejected(): void
     {
-        // Matches the Appwrite SDK convention: pass the last item's $id
-        // from the previous page as the cursor value.
-        $all = $this->audit->find([
-            Query::orderAsc('id'),
-            Query::limit(50),
-        ]);
-
-        $this->assertGreaterThanOrEqual(2, count($all));
-
-        $page = $this->audit->find([
-            Query::orderAsc('id'),
-            Query::limit(50),
-            Query::cursorAfter($all[0]->getId()),
-        ]);
-
-        $this->assertEquals(count($all) - 1, count($page));
-        $this->assertEquals($all[1]->getId(), $page[0]->getId());
-    }
-
-    public function testCursorStringIdNotFoundThrows(): void
-    {
+        // String cursors must be resolved to a Log by the caller — the
+        // adapter doesn't do the lookup. Matches the
+        // `utopia-php/database::Query::cursorAfter(Document)` contract.
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage("Cursor not found: log with id 'nope-does-not-exist' does not exist");
+        $this->expectExceptionMessage('Invalid cursor value: expected Log or associative array');
 
         $this->audit->find([
             Query::orderAsc('id'),
-            Query::cursorAfter('nope-does-not-exist'),
+            Query::cursorAfter('some-log-id'),
         ]);
     }
 

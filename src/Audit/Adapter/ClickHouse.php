@@ -1410,19 +1410,11 @@ class ClickHouse extends SQL
      */
     private function normalizeCursorRow(mixed $rawCursor): array
     {
-        // Most callers (Appwrite endpoints, SDK clients) pass the log ID
-        // string — matching the `Query::cursorAfter($id)` convention used
-        // across the rest of the Appwrite ecosystem. Resolve the full row
-        // by looking it up; cursor pagination needs the order-column
-        // values (e.g. `time`), not just the identifier.
-        if (is_string($rawCursor)) {
-            $log = $this->getById($rawCursor);
-            if ($log === null) {
-                throw new Exception("Cursor not found: log with id '{$rawCursor}' does not exist");
-            }
-            $rawCursor = $log;
-        }
-
+        // Cursor value must already carry the order-column values needed for
+        // keyset pagination. Callers that only have the previous page's id
+        // (e.g. HTTP endpoints receiving `cursorAfter: "<id>"` from a client)
+        // are expected to resolve it via `getById()` before passing in — same
+        // contract as `utopia-php/database::Query::cursorAfter(Document)`.
         if ($rawCursor instanceof \ArrayObject) {
             /** @var array<string, mixed> $row */
             $row = $rawCursor->getArrayCopy();
@@ -1431,8 +1423,9 @@ class ClickHouse extends SQL
             $row = $rawCursor;
         } else {
             throw new Exception(
-                'Invalid cursor value: expected log id (string), Log, or associative array, got '
+                'Invalid cursor value: expected Log or associative array carrying the order-column values, got '
                 . get_debug_type($rawCursor)
+                . '. Resolve the cursor row via getById() before passing it to cursorAfter/cursorBefore.'
             );
         }
 
