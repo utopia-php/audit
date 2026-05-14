@@ -126,9 +126,9 @@ class Log extends ArrayObject
     /**
      * Get the tenant ID (for multi-tenant setups).
      *
-     * @return int|null
+     * @return int|string|null
      */
-    public function getTenant(): ?int
+    public function getTenant(): int|string|null
     {
         $tenant = $this->getAttribute('tenant');
 
@@ -140,8 +140,13 @@ class Log extends ArrayObject
             return $tenant;
         }
 
-        if (is_numeric($tenant)) {
-            return (int) $tenant;
+        // Strings are returned as-is. The ClickHouse parser converts tenant
+        // values to int when the integer scheme is configured, so a string
+        // here means the host application is using a string-typed tenant
+        // (uuid7, slug, etc.) — coercing numeric-looking strings like
+        // "00123" would silently corrupt them.
+        if (is_string($tenant)) {
+            return $tenant;
         }
 
         return null;

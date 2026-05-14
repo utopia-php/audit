@@ -64,9 +64,27 @@ class ClickHouse extends SQL
 
     protected string $namespace = '';
 
-    protected ?int $tenant = null;
+    protected int|string|null $tenant = null;
 
     protected bool $sharedTables = false;
+
+    /**
+     * Tenant identifier scheme used by the host application. Mirrors the
+     * `getIdAttributeType()` contract on `utopia-php/database` adapters
+     * (`Database::VAR_INTEGER` or `Database::VAR_UUID7`).
+     *
+     * Determines the ClickHouse column type for the `tenant` column when
+     * `setSharedTables(true)` is enabled:
+     * - `integer` (default) → `Nullable(UInt64)`
+     * - anything else → `Nullable(String)`
+     *
+     * Defaults to `VAR_INTEGER` to preserve the previous schema on existing
+     * deployments: `reconcileTenantColumnType()` would otherwise trigger an
+     * irreversible `ALTER TABLE ... MODIFY COLUMN` from UInt64 to String on
+     * first `setup()` after upgrade. Callers using string IDs must opt in
+     * explicitly via {@see setIdAttributeType()}.
+     */
+    protected string $idAttributeType = Database::VAR_INTEGER;
 
     /**
      * @param string $host ClickHouse host
@@ -254,10 +272,10 @@ class ClickHouse extends SQL
      * Set the tenant ID for multi-tenant support.
      * Tenant is used to isolate audit logs by tenant.
      *
-     * @param int|null $tenant
+     * @param int|string|null $tenant
      * @return self
      */
-    public function setTenant(?int $tenant): self
+    public function setTenant(int|string|null $tenant): self
     {
         $this->tenant = $tenant;
         return $this;
@@ -266,9 +284,9 @@ class ClickHouse extends SQL
     /**
      * Get the tenant ID.
      *
-     * @return int|null
+     * @return int|string|null
      */
-    public function getTenant(): ?int
+    public function getTenant(): int|string|null
     {
         return $this->tenant;
     }
@@ -294,6 +312,49 @@ class ClickHouse extends SQL
     public function isSharedTables(): bool
     {
         return $this->sharedTables;
+    }
+
+    /**
+     * Set the tenant identifier scheme. Pass `Database::VAR_INTEGER` for legacy
+     * integer-based tenant IDs (column will be `Nullable(UInt64)`), or
+     * `Database::VAR_UUID7` / any other value for string-based IDs
+     * (column will be `Nullable(String)`).
+     *
+     * Mirrors `getIdAttributeType()` on `utopia-php/database` adapters so the
+     * audit table tenant column matches the host application's tenant scheme.
+     *
+     * Must be called before {@see setup()} for the schema to reflect the
+     * chosen type. After setup, {@see setup()} will reconcile any mismatched
+     * existing column type via `ALTER TABLE ... MODIFY COLUMN`.
+     *
+     * @param string $type
+     * @return self
+     */
+    public function setIdAttributeType(string $type): self
+    {
+        $this->idAttributeType = $type;
+        return $this;
+    }
+
+    /**
+     * Get the tenant identifier scheme.
+     *
+     * @return string
+     */
+    public function getIdAttributeType(): string
+    {
+        return $this->idAttributeType;
+    }
+
+    /**
+     * Resolve the ClickHouse SQL type for the tenant column based on the
+     * configured ID attribute type.
+     */
+    private function getTenantColumnType(): string
+    {
+        return $this->idAttributeType === Database::VAR_INTEGER
+            ? 'Nullable(UInt64)'
+            : 'Nullable(String)';
     }
 
     /**
@@ -677,7 +738,7 @@ class ClickHouse extends SQL
 
         // Add tenant column only if tables are shared across tenants
         if ($this->sharedTables) {
-            $columns[] = 'tenant Nullable(UInt64)';  // Supports 11-digit MySQL auto-increment IDs
+            $columns[] = 'tenant ' . $this->getTenantColumnType();
         }
 
         // Build indexes from base adapter schema
@@ -691,6 +752,10 @@ class ClickHouse extends SQL
             $escapedAttributes = array_map(fn (string $attr) => $this->escapeIdentifier($attr), $attributes);
             $attributeList = implode(', ', $escapedAttributes);
             $indexes[] = "INDEX {$indexName} ({$attributeList}) TYPE bloom_filter GRANULARITY 1";
+        }
+
+        if ($this->sharedTables) {
+            $indexes[] = 'INDEX _key_tenant tenant TYPE bloom_filter GRANULARITY 1';
         }
 
         $tableName = $this->getTableName();
@@ -709,6 +774,59 @@ class ClickHouse extends SQL
         ";
 
         $this->query($createTableSql);
+
+        // Reconcile the tenant column type with the configured ID attribute
+        // scheme. Tables created on an older version of this adapter (which
+        // hardcoded `Nullable(UInt64)`) need to be migrated to `Nullable(String)`
+        // once the host switches to a string-based tenant ID scheme.
+        if ($this->sharedTables) {
+            $this->reconcileTenantColumnType($escapedDatabaseAndTable);
+        }
+    }
+
+    /**
+     * Compare the actual `tenant` column type against the configured scheme
+     * and emit an `ALTER TABLE ... MODIFY COLUMN` if they differ. A no-op
+     * when the schema is already correct or when the table was just freshly
+     * created with the right type.
+     *
+     * @param string $escapedDatabaseAndTable Fully qualified, identifier-quoted table name
+     * @throws Exception
+     */
+    private function reconcileTenantColumnType(string $escapedDatabaseAndTable): void
+    {
+        $expected = $this->getTenantColumnType();
+
+        $describeSql = "
+            SELECT type
+            FROM system.columns
+            WHERE database = {database:String}
+              AND table = {table:String}
+              AND name = 'tenant'
+            FORMAT TabSeparated
+        ";
+
+        $tableName = $this->getTableName();
+        $result = $this->query($describeSql, [
+            'database' => $this->database,
+            'table' => $tableName,
+        ]);
+        $actual = trim($result);
+
+        // Column missing on an existing table (e.g. sharedTables turned on
+        // post-create) is handled by ALTER TABLE ADD COLUMN.
+        if ($actual === '') {
+            $alterSql = "ALTER TABLE {$escapedDatabaseAndTable} ADD COLUMN IF NOT EXISTS tenant {$expected}";
+            $this->query($alterSql);
+            return;
+        }
+
+        if ($actual === $expected) {
+            return;
+        }
+
+        $alterSql = "ALTER TABLE {$escapedDatabaseAndTable} MODIFY COLUMN tenant {$expected}";
+        $this->query($alterSql);
     }
 
     /**
@@ -845,7 +963,7 @@ class ClickHouse extends SQL
             FORMAT JSON
         ";
 
-        $result = $this->query($sql, ['id' => $id]);
+        $result = $this->query($sql, array_merge(['id' => $id], $this->getTenantParams()));
         $logs = $this->parseJsonResults($result);
 
         return $logs[0] ?? null;
@@ -913,7 +1031,7 @@ class ClickHouse extends SQL
             FORMAT JSON
         ";
 
-        $result = $this->query($sql, $params);
+        $result = $this->query($sql, array_merge($params, $this->getTenantParams()));
         $rows = $this->parseJsonResults($result);
 
         if ($cursorDirection === 'before') {
@@ -975,7 +1093,7 @@ class ClickHouse extends SQL
             ";
         }
 
-        $result = $this->query($sql, $params);
+        $result = $this->query($sql, array_merge($params, $this->getTenantParams()));
         $trimmed = trim($result);
 
         return $trimmed !== '' ? (int) $trimmed : 0;
@@ -1296,11 +1414,17 @@ class ClickHouse extends SQL
      */
     private function getParamType(string $attribute): string
     {
-        return match (true) {
-            $attribute === 'time' => 'DateTime64(3)',
-            $attribute === 'tenant' && $this->sharedTables => 'UInt64',
-            default => 'String',
-        };
+        if ($attribute === 'time') {
+            return 'DateTime64(3)';
+        }
+
+        if ($attribute === 'tenant' && $this->sharedTables) {
+            // Match the column type chosen at setup() — UInt64 only for
+            // integer-based tenant schemes, String otherwise.
+            return $this->idAttributeType === Database::VAR_INTEGER ? 'UInt64' : 'String';
+        }
+
+        return 'String';
     }
 
     /**
@@ -1600,11 +1724,17 @@ class ClickHouse extends SQL
                         $document[$columnName] = $value ?? [];
                     }
                 } elseif ($columnName === 'tenant') {
-                    // Parse tenant as integer or null
+                    // Parse tenant according to the configured scheme:
+                    // - integer scheme → cast numeric values to int
+                    // - string scheme (uuid7 etc.) → keep verbatim so that
+                    //   numeric-looking IDs like "00123" or "42" round-trip
+                    //   without lossy coercion to int
                     if ($value === null || $value === '') {
                         $document[$columnName] = null;
-                    } elseif (is_numeric($value)) {
+                    } elseif ($this->idAttributeType === Database::VAR_INTEGER && is_numeric($value)) {
                         $document[$columnName] = (int) $value;
+                    } elseif (is_scalar($value)) {
+                        $document[$columnName] = (string) $value;
                     } else {
                         $document[$columnName] = null;
                     }
@@ -1682,7 +1812,30 @@ class ClickHouse extends SQL
         }
 
         $escapedTenant = $this->escapeIdentifier('tenant');
-        return " AND {$escapedTenant} = {$this->tenant}";
+        $type = $this->getParamType('tenant');
+
+        return " AND {$escapedTenant} = {_tenant:{$type}}";
+    }
+
+    /**
+     * Get query parameters for tenant filtering.
+     *
+     * @return array<string, mixed>
+     */
+    private function getTenantParams(): array
+    {
+        if (!$this->sharedTables || $this->tenant === null) {
+            return [];
+        }
+
+        // Integer scheme binds to a UInt64 placeholder so ClickHouse can
+        // coerce/validate the value as a number. String scheme passes the
+        // value verbatim.
+        if ($this->idAttributeType === Database::VAR_INTEGER) {
+            return ['_tenant' => (int) $this->tenant];
+        }
+
+        return ['_tenant' => (string) $this->tenant];
     }
 
     /**
@@ -1977,7 +2130,7 @@ class ClickHouse extends SQL
             WHERE time < {datetime:String}{$tenantFilter}
         ";
 
-        $this->query($sql, ['datetime' => $datetimeString]);
+        $this->query($sql, array_merge(['datetime' => $datetimeString], $this->getTenantParams()));
 
         return true;
     }
