@@ -36,9 +36,9 @@ class QueryTest extends TestCase
         $this->assertEquals('time', $query->getAttribute());
         $this->assertEquals(['2023-01-01', '2024-01-01'], $query->getValues());
 
-        // Test in
-        $query = Query::in('event', ['create', 'update', 'delete']);
-        $this->assertEquals(Query::TYPE_IN, $query->getMethod());
+        // Test contains
+        $query = Query::contains('event', ['create', 'update', 'delete']);
+        $this->assertEquals(Query::TYPE_CONTAINS, $query->getMethod());
         $this->assertEquals('event', $query->getAttribute());
         $this->assertEquals(['create', 'update', 'delete'], $query->getValues());
 

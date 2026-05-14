@@ -100,6 +100,7 @@ abstract class Adapter
         string $userId,
         ?\DateTime $after = null,
         ?\DateTime $before = null,
+        ?int $max = null,
     ): int;
 
     /**
@@ -131,6 +132,7 @@ abstract class Adapter
         string $resource,
         ?\DateTime $after = null,
         ?\DateTime $before = null,
+        ?int $max = null,
     ): int;
 
     /**
@@ -166,6 +168,7 @@ abstract class Adapter
         array $events,
         ?\DateTime $after = null,
         ?\DateTime $before = null,
+        ?int $max = null,
     ): int;
 
     /**
@@ -201,6 +204,7 @@ abstract class Adapter
         array $events,
         ?\DateTime $after = null,
         ?\DateTime $before = null,
+        ?int $max = null,
     ): int;
 
     /**
@@ -226,10 +230,15 @@ abstract class Adapter
     /**
      * Count logs using custom queries.
      *
+     * When $max is non-null the count is bounded at the database level so
+     * very large tables can short-circuit once the cap is reached. Pass
+     * `null` for an unbounded total.
+     *
      * @param array<\Utopia\Audit\Query> $queries
+     * @param int|null $max Optional upper bound (inclusive) for the count
      * @return int
      *
      * @throws \Exception
      */
-    abstract public function count(array $queries = []): int;
+    abstract public function count(array $queries = [], ?int $max = null): int;
 }

@@ -141,7 +141,9 @@ class Log extends ArrayObject
         }
 
         if (is_string($tenant)) {
-            return $tenant;
+            // Numeric tenant IDs (e.g. legacy UInt64 rows stored as "123")
+            // round-trip back to int. Non-numeric strings stay as-is.
+            return is_numeric($tenant) ? (int) $tenant : $tenant;
         }
 
         return null;
