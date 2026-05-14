@@ -943,8 +943,10 @@ class ClickHouse extends SQL
      * escapes each requested column.
      *
      * `id` is always projected so `parseJsonResults` can map it back to the
-     * `$id` field on the `Log` model. Callers requesting a slim projection
-     * don't have to remember to include it.
+     * `$id` field on the `Log` model. When `sharedTables` is enabled, the
+     * `tenant` column is also always projected — it's metadata callers expect
+     * on every row and the full-projection path already includes it. Callers
+     * requesting a slim projection don't have to remember either.
      *
      * @param  list<string>|null  $select
      * @throws Exception
@@ -955,9 +957,14 @@ class ClickHouse extends SQL
             return $this->getSelectColumns();
         }
 
+        $forced = ['id'];
+        if ($this->sharedTables) {
+            $forced[] = 'tenant';
+        }
+
         $columns = [];
         $seen = [];
-        foreach (array_merge(['id'], $select) as $column) {
+        foreach (array_merge($forced, $select) as $column) {
             if (isset($seen[$column])) {
                 continue;
             }

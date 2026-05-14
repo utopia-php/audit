@@ -796,6 +796,39 @@ class ClickHouseTest extends TestCase
         $this->assertArrayNotHasKey('data', $row);
     }
 
+    public function testSelectAutoIncludesTenantWhenShared(): void
+    {
+        $host = getenv('CLICKHOUSE_HOST') ?: 'clickhouse';
+        $port = (int) (getenv('CLICKHOUSE_PORT') ?: 8123);
+
+        $adapter = new ClickHouse(
+            host: $host,
+            username: 'default',
+            password: 'clickhouse',
+            port: $port,
+        );
+        $adapter->setNamespace('select_tenant_test');
+        $adapter->setSharedTables(true);
+        $adapter->setTenant(7);
+        $adapter->setup();
+
+        $audit = new Audit($adapter);
+        $audit->log('u1', 'create', 'doc/1', 'agent', '127.0.0.1', 'US', $this->getRequiredAttributes());
+
+        $logs = $audit->find([
+            Query::select(['event']),
+            Query::limit(1),
+        ]);
+
+        $this->assertCount(1, $logs);
+        $row = $logs[0]->getArrayCopy();
+        $this->assertArrayHasKey('$id', $row);
+        $this->assertArrayHasKey('event', $row);
+        // tenant is always projected when sharedTables is on, even if the
+        // caller didn't list it
+        $this->assertArrayHasKey('tenant', $row);
+    }
+
     public function testSelectRejectsUnknownColumn(): void
     {
         $this->expectException(\Exception::class);
