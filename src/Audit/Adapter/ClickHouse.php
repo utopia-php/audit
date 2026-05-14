@@ -870,10 +870,16 @@ class ClickHouse extends SQL
         // Parse queries
         $parsed = $this->parseQueries($queries);
 
-        // Random ordering and cursor pagination are incompatible: cursor needs
-        // a stable order to anchor the next page on, rand() has none.
+        // Random ordering can't combine with anything that asks for a
+        // specific row order: cursor pagination needs a stable anchor, and
+        // mixing column-based ORDER BY with rand() would silently drop the
+        // column order. Reject loudly in both cases so the caller fixes the
+        // query rather than getting unexpected results.
         if (!empty($parsed['randomOrder']) && isset($parsed['cursor'])) {
             throw new Exception('Cursor pagination cannot be combined with orderRandom');
+        }
+        if (!empty($parsed['randomOrder']) && !empty($parsed['orderBy'])) {
+            throw new Exception('orderRandom cannot be combined with orderAsc/orderDesc');
         }
 
         // Build SELECT clause — respect Query::select if provided, otherwise
@@ -903,10 +909,11 @@ class ClickHouse extends SQL
             $whereClause = ' WHERE ' . implode(' AND ', $conditions);
         }
 
-        // Build ORDER BY clause. Random takes priority over column-based
-        // ordering, and otherwise: when cursor is in play, rebuild from
-        // orderAttributes (always non-empty after resolveCursorOrder, which
-        // appends an id tiebreaker), flipping directions for `cursorBefore`.
+        // Build ORDER BY clause. orderRandom is mutually exclusive with
+        // cursor and column ordering (rejected at the top of find()); when
+        // cursor is in play, rebuild from orderAttributes (always non-empty
+        // after resolveCursorOrder, which appends an id tiebreaker),
+        // flipping directions for `cursorBefore`.
         $orderClause = '';
         if (!empty($parsed['randomOrder'])) {
             $orderClause = ' ORDER BY rand()';
@@ -957,6 +964,10 @@ class ClickHouse extends SQL
             return $this->getSelectColumns();
         }
 
+        // Forced columns are injected here, so they're validated defensively.
+        // User-supplied columns in $select are already validated inside the
+        // TYPE_SELECT branch of parseQueries() — no need to walk
+        // getAttributes() a second time per column.
         $forced = ['id'];
         if ($this->sharedTables) {
             $forced[] = 'tenant';
@@ -964,11 +975,18 @@ class ClickHouse extends SQL
 
         $columns = [];
         $seen = [];
-        foreach (array_merge($forced, $select) as $column) {
+        foreach ($forced as $column) {
             if (isset($seen[$column])) {
                 continue;
             }
             $this->validateAttributeName($column);
+            $columns[] = $this->escapeIdentifier($column);
+            $seen[$column] = true;
+        }
+        foreach ($select as $column) {
+            if (isset($seen[$column])) {
+                continue;
+            }
             $columns[] = $this->escapeIdentifier($column);
             $seen[$column] = true;
         }

@@ -900,4 +900,15 @@ class ClickHouseTest extends TestCase
             Query::cursorAfter(['id' => 'whatever']),
         ]);
     }
+
+    public function testOrderRandomRejectedWithColumnOrder(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('orderRandom cannot be combined with orderAsc/orderDesc');
+
+        $this->audit->find([
+            Query::orderRandom(),
+            Query::orderDesc('time'),
+        ]);
+    }
 }
