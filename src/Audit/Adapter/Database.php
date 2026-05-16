@@ -518,7 +518,11 @@ class Database extends SQL
             }
 
             // Skip limit, offset, and cursor queries — they don't apply to count
+            /** @var mixed $method */
             $method = $query->getMethod();
+            if ($method instanceof \BackedEnum) {
+                $method = $method->value;
+            }
             if (
                 $method === \Utopia\Audit\Query::TYPE_LIMIT
                 || $method === \Utopia\Audit\Query::TYPE_OFFSET

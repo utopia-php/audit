@@ -1107,7 +1107,11 @@ class ClickHouse extends SQL
                 throw new \InvalidArgumentException("Invalid query item: expected instance of Query, got {$type}");
             }
 
+            /** @var mixed $method */
             $method = $query->getMethod();
+            if ($method instanceof \BackedEnum) {
+                $method = $method->value;
+            }
             $attribute = $query->getAttribute();
             /** @var string $attribute */
             $values = $query->getValues();

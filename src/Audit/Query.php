@@ -15,6 +15,56 @@ use Utopia\Query\Query as BaseQuery;
  */
 class Query extends BaseQuery
 {
+    public const TYPE_BETWEEN = 'between';
+
+    public const TYPE_CONTAINS = 'contains';
+
+    public const TYPE_CURSOR_AFTER = 'cursorAfter';
+
+    public const TYPE_CURSOR_BEFORE = 'cursorBefore';
+
+    public const TYPE_ENDS_WITH = 'endsWith';
+
+    public const TYPE_EQUAL = 'equal';
+
+    public const TYPE_GREATER = 'greaterThan';
+
+    public const TYPE_GREATER_EQUAL = 'greaterThanEqual';
+
+    public const TYPE_IS_NOT_NULL = 'isNotNull';
+
+    public const TYPE_IS_NULL = 'isNull';
+
+    public const TYPE_LESSER = 'lessThan';
+
+    public const TYPE_LESSER_EQUAL = 'lessThanEqual';
+
+    public const TYPE_LIMIT = 'limit';
+
+    public const TYPE_NOT_BETWEEN = 'notBetween';
+
+    public const TYPE_NOT_CONTAINS = 'notContains';
+
+    public const TYPE_NOT_ENDS_WITH = 'notEndsWith';
+
+    public const TYPE_NOT_EQUAL = 'notEqual';
+
+    public const TYPE_NOT_STARTS_WITH = 'notStartsWith';
+
+    public const TYPE_OFFSET = 'offset';
+
+    public const TYPE_ORDER_ASC = 'orderAsc';
+
+    public const TYPE_ORDER_DESC = 'orderDesc';
+
+    public const TYPE_ORDER_RANDOM = 'orderRandom';
+
+    public const TYPE_REGEX = 'regex';
+
+    public const TYPE_SELECT = 'select';
+
+    public const TYPE_STARTS_WITH = 'startsWith';
+
     /**
      * Filter by equal condition.
      *
