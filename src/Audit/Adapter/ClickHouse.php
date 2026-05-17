@@ -7,6 +7,7 @@ use Utopia\Audit\Log;
 use Utopia\Audit\Query;
 use Utopia\Database\Database;
 use Utopia\Fetch\Client;
+use Utopia\Query\Builder\ClickHouse as ClickHouseBuilder;
 use Utopia\Query\Schema\ClickHouse as ClickHouseSchema;
 use Utopia\Query\Schema\ClickHouse\Engine as ClickHouseEngine;
 use Utopia\Query\Schema\ClickHouse\IndexAlgorithm;
@@ -1642,7 +1643,7 @@ class ClickHouse extends SQL
         }
 
         $tableName = $this->getTableName();
-        $escapedDatabaseAndTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $qualifiedTable = $this->database . '.' . $tableName;
 
         // Get all attribute column names
         $schemaColumns = $this->getColumnNames();
@@ -1726,9 +1727,25 @@ class ClickHouse extends SQL
             $rows[] = $row;
         }
 
-        $insertSql = "INSERT INTO {$escapedDatabaseAndTable} FORMAT JSONEachRow";
+        $columns = ['id', 'time'];
+        foreach ($schemaColumns as $columnName) {
+            if ($columnName === 'time') {
+                continue;
+            }
+            $columns[] = $columnName;
+        }
+        if ($this->sharedTables) {
+            $columns[] = 'tenant';
+        }
+
+        $insertSql = (new ClickHouseBuilder())
+            ->into($qualifiedTable)
+            ->insertFormat('JSONEachRow', $columns)
+            ->insert()
+            ->query;
 
         $this->query($insertSql, [], $rows);
+
         return true;
     }
 
