@@ -2388,12 +2388,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/query.git",
-                "reference": "605376809ecd61051cbd1235c14606a0b9d59a1c"
+                "reference": "c77f2280f4e899236d737dd0ea8f54398fd20710"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/query/zipball/605376809ecd61051cbd1235c14606a0b9d59a1c",
-                "reference": "605376809ecd61051cbd1235c14606a0b9d59a1c",
+                "url": "https://api.github.com/repos/utopia-php/query/zipball/c77f2280f4e899236d737dd0ea8f54398fd20710",
+                "reference": "c77f2280f4e899236d737dd0ea8f54398fd20710",
                 "shasum": ""
             },
             "require": {
@@ -2429,7 +2429,7 @@
                 "issues": "https://github.com/utopia-php/query/issues",
                 "source": "https://github.com/utopia-php/query/tree/feat/clickhouse-insert-delete-settings-mv"
             },
-            "time": "2026-05-17T07:12:35+00:00"
+            "time": "2026-05-17T09:28:32+00:00"
         },
         {
             "name": "utopia-php/telemetry",
