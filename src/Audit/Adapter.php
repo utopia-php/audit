@@ -43,7 +43,6 @@ abstract class Adapter
      *     resource: string,
      *     userAgent: string,
      *     ip: string,
-     *     location?: string,
      *     data?: array<string, mixed>
      * } $log
      * @return Log The created log entry
@@ -61,7 +60,6 @@ abstract class Adapter
      *     resource: string,
      *     userAgent: string,
      *     ip: string,
-     *     location?: string,
      *     time: \DateTime|string|null,
      *     data?: array<string, mixed>
      * }> $logs

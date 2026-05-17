@@ -91,17 +91,6 @@ class Log extends ArrayObject
     }
 
     /**
-     * Get the location information.
-     *
-     * @return string|null
-     */
-    public function getLocation(): ?string
-    {
-        $location = $this->getAttribute('location');
-        return is_string($location) ? $location : null;
-    }
-
-    /**
      * Get the timestamp.
      *
      * @return string
