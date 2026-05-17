@@ -518,7 +518,7 @@ class Database extends SQL
             }
 
             // Skip limit, offset, and cursor queries — they don't apply to count
-            $method = $query->getMethod();
+            $method = $query->getMethod()->value;
             if (
                 $method === \Utopia\Audit\Query::TYPE_LIMIT
                 || $method === \Utopia\Audit\Query::TYPE_OFFSET
