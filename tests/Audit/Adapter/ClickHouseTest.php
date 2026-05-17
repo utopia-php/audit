@@ -590,6 +590,64 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('', $parsedOdd['resourceParent']);
     }
 
+    /**
+     * Country is a write-time ISO 3166-1 alpha-2 code resolved by the caller
+     * (e.g. cloud's audit worker via geodb). Verify it round-trips through the
+     * ClickHouse adapter via both Audit::log() and the batch path.
+     */
+    public function testCountryRoundTrip(): void
+    {
+        $userId = 'countryUser';
+        $userAgent = 'CountryTestAgent/1.0';
+        $ip = '8.8.8.8';
+
+        $data = ['key' => 'value'];
+        $dataWithAttributes = array_merge($data, $this->getRequiredAttributes(), [
+            'country' => 'us',
+        ]);
+
+        $log = $this->audit->log($userId, 'create', 'user/' . $userId, $userAgent, $ip, $dataWithAttributes);
+
+        $this->assertEquals('us', $log->getAttribute('country'));
+
+        $retrieved = $this->audit->getLogById($log->getId());
+
+        $this->assertNotNull($retrieved);
+        $this->assertEquals('us', $retrieved->getAttribute('country'));
+
+        $batchEvents = [
+            [
+                'userId' => $userId,
+                'event' => 'batch-create',
+                'resource' => 'user/' . $userId . '-batch',
+                'userAgent' => $userAgent,
+                'ip' => $ip,
+                'data' => ['key' => 'batch'],
+                'time' => \Utopia\Database\DateTime::formatTz(\Utopia\Database\DateTime::now()) ?? '',
+                'country' => 'gb',
+            ],
+        ];
+
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
+        $this->assertTrue($this->audit->logBatch($batchEvents));
+
+        $batchLogs = $this->audit->getLogsByResource('user/' . $userId . '-batch');
+        $this->assertCount(1, $batchLogs);
+        $this->assertEquals('gb', $batchLogs[0]->getAttribute('country'));
+
+        $missingCountry = $this->audit->log(
+            $userId,
+            'create',
+            'user/' . $userId . '-no-country',
+            $userAgent,
+            $ip,
+            array_merge($data, $this->getRequiredAttributes()),
+        );
+
+        $missingCountryValue = $missingCountry->getAttribute('country');
+        $this->assertTrue($missingCountryValue === null || $missingCountryValue === '');
+    }
+
     public function testCursorAfterPaginatesLogs(): void
     {
         $page1 = $this->audit->find([
