@@ -2054,7 +2054,7 @@ class ClickHouse extends SQL
         }
 
         if ($this->asyncCleanup) {
-            $builder->settings(['mutations_sync' => '0']);
+            $builder->settings(['lightweight_deletes_sync' => '0']);
         }
 
         $sql = $builder->delete()->query;
