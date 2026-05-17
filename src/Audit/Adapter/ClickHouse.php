@@ -529,6 +529,13 @@ class ClickHouse extends SQL
                 'lengths' => [],
                 'orders' => [],
             ],
+            [
+                '$id' => '_key_resource_type',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['resourceType'],
+                'lengths' => [],
+                'orders' => [],
+            ],
         ];
     }
 
@@ -1077,6 +1084,178 @@ class ClickHouse extends SQL
         $trimmed = trim($result);
 
         return $trimmed !== '' ? (int) $trimmed : 0;
+    }
+
+    /**
+     * Allowed groupBy columns for findGrouped().
+     *
+     * @var list<string>
+     */
+    private const FIND_GROUPED_ATTRIBUTES = ['event', 'userType', 'resourceType'];
+
+    /**
+     * Allowed interval values for findGrouped() mapped to ClickHouse date units.
+     *
+     * @var array<string, string>
+     */
+    private const FIND_GROUPED_INTERVALS = [
+        'hour' => 'hour',
+        'day' => 'day',
+        'week' => 'week',
+        'month' => 'month',
+    ];
+
+    private const FIND_GROUPED_DEFAULT_LIMIT = 25;
+
+    private const FIND_GROUPED_MAX_LIMIT = 100;
+
+    /**
+     * Find logs aggregated into (groupValue, bucket, count) rows.
+     *
+     * Top-N groups are selected by `SUM(count)` desc (ties by groupValue asc),
+     * then paginated via the supplied `Query::limit()` / `Query::offset()`.
+     * Buckets are aligned to UTC via `toStartOfInterval(time, INTERVAL 1 <unit>, 'UTC')`
+     * and zero-filled across the time range implied by the filter set.
+     *
+     * @param array<Query> $queries
+     * @param string $groupBy
+     * @param string $interval
+     * @return array<int, array{value: string, bucket: string, count: int}>
+     * @throws Exception
+     */
+    public function findGrouped(array $queries, string $groupBy, string $interval): array
+    {
+        if (!in_array($groupBy, self::FIND_GROUPED_ATTRIBUTES, true)) {
+            $allowed = implode(', ', self::FIND_GROUPED_ATTRIBUTES);
+            throw new Exception("Invalid groupBy '{$groupBy}'. Allowed: {$allowed}");
+        }
+
+        if (!array_key_exists($interval, self::FIND_GROUPED_INTERVALS)) {
+            $allowed = implode(', ', array_keys(self::FIND_GROUPED_INTERVALS));
+            throw new Exception("Invalid interval '{$interval}'. Allowed: {$allowed}");
+        }
+
+        $unit = self::FIND_GROUPED_INTERVALS[$interval];
+
+        $this->validateAttributeName($groupBy);
+        $escapedGroup = $this->escapeIdentifier($groupBy);
+        $escapedTime = $this->escapeIdentifier('time');
+
+        $tableName = $this->getTableName();
+        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+
+        $parsed = $this->parseQueries($queries);
+
+        $filters = $parsed['filters'];
+        $tenantFilter = $this->getTenantFilter();
+        if ($tenantFilter !== '') {
+            $filters[] = ltrim($tenantFilter, ' AND');
+        }
+
+        $whereClause = empty($filters) ? '' : ' WHERE ' . implode(' AND ', $filters);
+
+        $params = $parsed['params'];
+        unset($params['limit'], $params['offset']);
+
+        $limit = self::FIND_GROUPED_DEFAULT_LIMIT;
+        if (isset($parsed['limit'])) {
+            $limit = $parsed['limit'];
+            if ($limit > self::FIND_GROUPED_MAX_LIMIT) {
+                $limit = self::FIND_GROUPED_MAX_LIMIT;
+            }
+            if ($limit < 1) {
+                $limit = 1;
+            }
+        }
+
+        $offset = 0;
+        if (isset($parsed['offset'])) {
+            $offset = max(0, $parsed['offset']);
+        }
+
+        $params['group_limit'] = $limit;
+        $params['group_offset'] = $offset;
+
+        $sql = "
+            WITH
+                top_groups AS (
+                    SELECT value FROM (
+                        SELECT {$escapedGroup} AS value, COUNT(*) AS sum_count
+                        FROM {$escapedTable}{$whereClause}
+                        GROUP BY value
+                        ORDER BY sum_count DESC, value ASC
+                        LIMIT {group_limit:UInt64} OFFSET {group_offset:UInt64}
+                    )
+                ),
+                bounds AS (
+                    SELECT
+                        toStartOfInterval(MIN({$escapedTime}), INTERVAL 1 {$unit}, 'UTC') AS bucket_from,
+                        toStartOfInterval(MAX({$escapedTime}), INTERVAL 1 {$unit}, 'UTC') AS bucket_to
+                    FROM {$escapedTable}{$whereClause}
+                ),
+                buckets AS (
+                    SELECT arrayJoin(
+                        arrayMap(
+                            i -> date_add({$unit}, i, bucket_from),
+                            range(0, toUInt64(dateDiff('{$unit}', bucket_from, bucket_to) + 1))
+                        )
+                    ) AS bucket
+                    FROM bounds
+                    WHERE bucket_from IS NOT NULL AND bucket_to IS NOT NULL
+                ),
+                agg AS (
+                    SELECT
+                        {$escapedGroup} AS value,
+                        toStartOfInterval({$escapedTime}, INTERVAL 1 {$unit}, 'UTC') AS bucket,
+                        COUNT(*) AS count
+                    FROM {$escapedTable}{$whereClause}
+                    GROUP BY value, bucket
+                )
+            SELECT
+                g.value AS value,
+                formatDateTime(b.bucket, '%Y-%m-%dT%H:%i:%S.000+00:00') AS bucket,
+                toUInt64(coalesce(a.count, 0)) AS count
+            FROM top_groups g
+            CROSS JOIN buckets b
+            LEFT JOIN agg a ON a.value = g.value AND a.bucket = b.bucket
+            WHERE g.value IN (SELECT value FROM top_groups)
+            ORDER BY value ASC, bucket ASC
+            FORMAT JSON
+        ";
+
+        $result = $this->query($sql, $params);
+        $decoded = json_decode($result, true);
+
+        if (!is_array($decoded) || !isset($decoded['data']) || !is_array($decoded['data'])) {
+            return [];
+        }
+
+        $rows = [];
+        /** @var array<int, array<string, mixed>> $data */
+        $data = $decoded['data'];
+        foreach ($data as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $value = $row['value'] ?? '';
+            $bucket = $row['bucket'] ?? '';
+            $count = $row['count'] ?? 0;
+
+            if (!is_string($value)) {
+                $value = is_scalar($value) ? (string) $value : '';
+            }
+            if (!is_string($bucket)) {
+                $bucket = is_scalar($bucket) ? (string) $bucket : '';
+            }
+
+            $rows[] = [
+                'value' => $value,
+                'bucket' => $bucket,
+                'count' => is_numeric($count) ? (int) $count : 0,
+            ];
+        }
+
+        return $rows;
     }
 
     /**

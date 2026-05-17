@@ -39,4 +39,12 @@ class DatabaseTest extends TestCase
             $this->audit->setup();
         }
     }
+
+    public function testFindGroupedNotSupported(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('findGrouped is not supported by the Database adapter');
+
+        $this->audit->findGrouped([], 'event', 'hour');
+    }
 }
