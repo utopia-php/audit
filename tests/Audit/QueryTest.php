@@ -14,55 +14,55 @@ class QueryTest extends TestCase
     {
         // Test equal
         $query = Query::equal('userId', '123');
-        $this->assertEquals(Query::TYPE_EQUAL, $query->getMethod());
+        $this->assertEquals(Query::TYPE_EQUAL, $query->getMethod()->value);
         $this->assertEquals('userId', $query->getAttribute());
         $this->assertEquals(['123'], $query->getValues());
 
         // Test lessThan
         $query = Query::lessThan('time', '2024-01-01');
-        $this->assertEquals(Query::TYPE_LESSER, $query->getMethod());
+        $this->assertEquals(Query::TYPE_LESSER, $query->getMethod()->value);
         $this->assertEquals('time', $query->getAttribute());
         $this->assertEquals(['2024-01-01'], $query->getValues());
 
         // Test greaterThan
         $query = Query::greaterThan('time', '2023-01-01');
-        $this->assertEquals(Query::TYPE_GREATER, $query->getMethod());
+        $this->assertEquals(Query::TYPE_GREATER, $query->getMethod()->value);
         $this->assertEquals('time', $query->getAttribute());
         $this->assertEquals(['2023-01-01'], $query->getValues());
 
         // Test between
         $query = Query::between('time', '2023-01-01', '2024-01-01');
-        $this->assertEquals(Query::TYPE_BETWEEN, $query->getMethod());
+        $this->assertEquals(Query::TYPE_BETWEEN, $query->getMethod()->value);
         $this->assertEquals('time', $query->getAttribute());
         $this->assertEquals(['2023-01-01', '2024-01-01'], $query->getValues());
 
         // Test contains
         $query = Query::contains('event', ['create', 'update', 'delete']);
-        $this->assertEquals(Query::TYPE_CONTAINS, $query->getMethod());
+        $this->assertEquals(Query::TYPE_CONTAINS, $query->getMethod()->value);
         $this->assertEquals('event', $query->getAttribute());
         $this->assertEquals(['create', 'update', 'delete'], $query->getValues());
 
         // Test orderDesc
         $query = Query::orderDesc('time');
-        $this->assertEquals(Query::TYPE_ORDER_DESC, $query->getMethod());
+        $this->assertEquals(Query::TYPE_ORDER_DESC, $query->getMethod()->value);
         $this->assertEquals('time', $query->getAttribute());
         $this->assertEquals([], $query->getValues());
 
         // Test orderAsc
         $query = Query::orderAsc('userId');
-        $this->assertEquals(Query::TYPE_ORDER_ASC, $query->getMethod());
+        $this->assertEquals(Query::TYPE_ORDER_ASC, $query->getMethod()->value);
         $this->assertEquals('userId', $query->getAttribute());
         $this->assertEquals([], $query->getValues());
 
         // Test limit
         $query = Query::limit(10);
-        $this->assertEquals(Query::TYPE_LIMIT, $query->getMethod());
+        $this->assertEquals(Query::TYPE_LIMIT, $query->getMethod()->value);
         $this->assertEquals('', $query->getAttribute());
         $this->assertEquals([10], $query->getValues());
 
         // Test offset
         $query = Query::offset(5);
-        $this->assertEquals(Query::TYPE_OFFSET, $query->getMethod());
+        $this->assertEquals(Query::TYPE_OFFSET, $query->getMethod()->value);
         $this->assertEquals('', $query->getAttribute());
         $this->assertEquals([5], $query->getValues());
     }
@@ -75,7 +75,7 @@ class QueryTest extends TestCase
         // Test parsing equal query
         $json = '{"method":"equal","attribute":"userId","values":["123"]}';
         $query = Query::parse($json);
-        $this->assertEquals(Query::TYPE_EQUAL, $query->getMethod());
+        $this->assertEquals(Query::TYPE_EQUAL, $query->getMethod()->value);
         $this->assertEquals('userId', $query->getAttribute());
         $this->assertEquals(['123'], $query->getValues());
 
@@ -85,7 +85,7 @@ class QueryTest extends TestCase
         $this->assertJson($json);
 
         $parsed = Query::parse($json);
-        $this->assertEquals(Query::TYPE_EQUAL, $parsed->getMethod());
+        $this->assertEquals(Query::TYPE_EQUAL, $parsed->getMethod()->value);
         $this->assertEquals('event', $parsed->getAttribute());
         $this->assertEquals(['create'], $parsed->getValues());
 
@@ -117,9 +117,9 @@ class QueryTest extends TestCase
         $this->assertInstanceOf(Query::class, $parsed[1]);
         $this->assertInstanceOf(Query::class, $parsed[2]);
 
-        $this->assertEquals(Query::TYPE_EQUAL, $parsed[0]->getMethod());
-        $this->assertEquals(Query::TYPE_GREATER, $parsed[1]->getMethod());
-        $this->assertEquals(Query::TYPE_LIMIT, $parsed[2]->getMethod());
+        $this->assertEquals(Query::TYPE_EQUAL, $parsed[0]->getMethod()->value);
+        $this->assertEquals(Query::TYPE_GREATER, $parsed[1]->getMethod()->value);
+        $this->assertEquals(Query::TYPE_LIMIT, $parsed[2]->getMethod()->value);
     }
 
     /**
@@ -218,7 +218,7 @@ class QueryTest extends TestCase
         $this->assertJson($json);
 
         $parsed = Query::parse($json);
-        $this->assertEquals(Query::TYPE_BETWEEN, $parsed->getMethod());
+        $this->assertEquals(Query::TYPE_BETWEEN, $parsed->getMethod()->value);
         $this->assertEquals('time', $parsed->getAttribute());
         $this->assertEquals(['2023-01-01', '2024-12-31'], $parsed->getValues());
     }
