@@ -120,6 +120,7 @@ class Log extends ArrayObject
     public function getData(): array
     {
         $data = $this->getAttribute('data', []);
+        /** @var array<string, mixed> */
         return is_array($data) ? $data : [];
     }
 

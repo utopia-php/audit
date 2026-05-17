@@ -478,6 +478,7 @@ class Database extends SQL
         $dbQueries = [];
 
         foreach ($queries as $query) {
+            /** @phpstan-ignore-next-line instanceof.alwaysTrue - runtime validation despite type hint */
             if (!($query instanceof \Utopia\Audit\Query)) {
                 throw new \Exception('Invalid query type. Expected Utopia\\Audit\\Query');
             }
@@ -513,6 +514,7 @@ class Database extends SQL
         $dbQueries = [];
 
         foreach ($queries as $query) {
+            /** @phpstan-ignore-next-line instanceof.alwaysTrue - runtime validation despite type hint */
             if (!($query instanceof \Utopia\Audit\Query)) {
                 throw new \Exception('Invalid query type. Expected Utopia\\Audit\\Query');
             }
