@@ -874,17 +874,20 @@ class ClickHouse extends SQL
     public function getById(string $id): ?Log
     {
         $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $qualifiedTable = $this->database . '.' . $tableName;
         $escapedId = $this->escapeIdentifier('id');
 
-        $sql = "
-            SELECT " . $this->getSelectColumns() . "
-            FROM {$escapedTable}
-            WHERE {$escapedId} = {id:String}{$tenantFilter}
-            LIMIT 1
-            FORMAT JSON
-        ";
+        $builder = (new ClickHouseBuilder())
+            ->from($qualifiedTable)
+            ->selectRaw($this->getSelectColumns())
+            ->whereRaw($escapedId . ' = {id:String}');
+
+        $tenantFilter = $this->getTenantFilter();
+        if ($tenantFilter !== '') {
+            $builder->whereRaw(ltrim($tenantFilter, ' AND'));
+        }
+
+        $sql = $builder->build()->query . ' LIMIT 1 FORMAT JSON';
 
         $result = $this->query($sql, ['id' => $id]);
         $logs = $this->parseJsonResults($result);
@@ -902,7 +905,7 @@ class ClickHouse extends SQL
     public function find(array $queries = []): array
     {
         $tableName = $this->getTableName();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $qualifiedTable = $this->database . '.' . $tableName;
 
         // Parse queries
         $parsed = $this->parseQueries($queries);
@@ -935,41 +938,45 @@ class ClickHouse extends SQL
             $params = $cursorWhere['params'];
         }
 
-        // Build WHERE clause
-        $whereClause = '';
         $tenantFilter = $this->getTenantFilter();
-        if (!empty($filters) || $tenantFilter) {
-            $conditions = $filters;
-            if ($tenantFilter) {
-                $conditions[] = ltrim($tenantFilter, ' AND');
-            }
-            $whereClause = ' WHERE ' . implode(' AND ', $conditions);
+        if ($tenantFilter !== '') {
+            $filters[] = ltrim($tenantFilter, ' AND');
         }
 
-        // Build ORDER BY clause. orderRandom is mutually exclusive with
-        // cursor and column ordering (rejected at the top of find()); when
-        // cursor is in play, rebuild from orderAttributes (always non-empty
-        // after resolveCursorOrder, which appends an id tiebreaker),
-        // flipping directions for `cursorBefore`.
-        $orderClause = '';
+        $builder = (new ClickHouseBuilder())
+            ->from($qualifiedTable)
+            ->selectRaw($selectColumns);
+
+        foreach ($filters as $filter) {
+            $builder->whereRaw($filter);
+        }
+
+        // ORDER BY. orderRandom is mutually exclusive with cursor and column
+        // ordering (rejected at the top of find()); when cursor is in play,
+        // rebuild from orderAttributes (always non-empty after
+        // resolveCursorOrder, which appends an id tiebreaker), flipping
+        // directions for `cursorBefore`.
         if (!empty($parsed['randomOrder'])) {
-            $orderClause = ' ORDER BY rand()';
+            $builder->orderByRaw('rand()');
         } elseif (isset($parsed['cursor'])) {
-            $orderSql = $this->buildOrderBySql($orderAttributes, flip: $cursorDirection === 'before');
-            $orderClause = ' ORDER BY ' . implode(', ', $orderSql);
+            foreach ($this->buildOrderBySql($orderAttributes, flip: $cursorDirection === 'before') as $orderFragment) {
+                $builder->orderByRaw($orderFragment);
+            }
         } elseif (!empty($parsed['orderBy'])) {
-            $orderClause = ' ORDER BY ' . implode(', ', $parsed['orderBy']);
+            foreach ($parsed['orderBy'] as $orderFragment) {
+                $builder->orderByRaw($orderFragment);
+            }
         }
 
-        // Build LIMIT and OFFSET
-        $limitClause = isset($parsed['limit']) ? ' LIMIT {limit:UInt64}' : '';
-        $offsetClause = isset($parsed['offset']) ? ' OFFSET {offset:UInt64}' : '';
+        $sql = $builder->build()->query;
 
-        $sql = "
-            SELECT {$selectColumns}
-            FROM {$escapedTable}{$whereClause}{$orderClause}{$limitClause}{$offsetClause}
-            FORMAT JSON
-        ";
+        if (isset($parsed['limit'])) {
+            $sql .= ' LIMIT {limit:UInt64}';
+        }
+        if (isset($parsed['offset'])) {
+            $sql .= ' OFFSET {offset:UInt64}';
+        }
+        $sql .= ' FORMAT JSON';
 
         $result = $this->query($sql, $params);
         $rows = $this->parseJsonResults($result);
@@ -1046,21 +1053,26 @@ class ClickHouse extends SQL
     public function count(array $queries = [], ?int $max = null): int
     {
         $tableName = $this->getTableName();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $qualifiedTable = $this->database . '.' . $tableName;
 
         // Parse queries - we only need filters and params, not ordering/limit/offset/cursor
         $parsed = $this->parseQueries($queries);
 
-        // Build WHERE clause
-        $whereClause = '';
+        $filters = $parsed['filters'];
         $tenantFilter = $this->getTenantFilter();
-        if (!empty($parsed['filters']) || $tenantFilter) {
-            $conditions = $parsed['filters'];
-            if ($tenantFilter) {
-                $conditions[] = ltrim($tenantFilter, ' AND');
-            }
-            $whereClause = ' WHERE ' . implode(' AND ', $conditions);
+        if ($tenantFilter !== '') {
+            $filters[] = ltrim($tenantFilter, ' AND');
         }
+
+        $inner = (new ClickHouseBuilder())
+            ->from($qualifiedTable)
+            ->selectRaw($max !== null ? '1' : 'COUNT(*) AS count');
+
+        foreach ($filters as $filter) {
+            $inner->whereRaw($filter);
+        }
+
+        $innerSql = $inner->build()->query;
 
         // Remove limit and offset from params as they don't apply to count
         $params = $parsed['params'];
@@ -1068,19 +1080,9 @@ class ClickHouse extends SQL
 
         if ($max !== null) {
             $params['max'] = $max;
-            $sql = "
-                SELECT COUNT(*) as count
-                FROM (
-                    SELECT 1 FROM {$escapedTable}{$whereClause} LIMIT {max:UInt64}
-                ) sub
-                FORMAT TabSeparated
-            ";
+            $sql = 'SELECT COUNT(*) AS count FROM (' . $innerSql . ' LIMIT {max:UInt64}) sub FORMAT TabSeparated';
         } else {
-            $sql = "
-                SELECT COUNT(*) as count
-                FROM {$escapedTable}{$whereClause}
-                FORMAT TabSeparated
-            ";
+            $sql = $innerSql . ' FORMAT TabSeparated';
         }
 
         $result = $this->query($sql, $params);
