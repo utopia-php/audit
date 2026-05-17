@@ -4,6 +4,7 @@ namespace Utopia\Tests\Audit\Adapter;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Builder\ClickHouse as ClickHouseBuilder;
+use Utopia\Query\Query;
 use Utopia\Query\Schema\ClickHouse as ClickHouseSchema;
 use Utopia\Query\Schema\ClickHouse\Engine as ClickHouseEngine;
 use Utopia\Query\Schema\ClickHouse\IndexAlgorithm;
@@ -17,6 +18,32 @@ use Utopia\Query\Schema\ColumnType;
  */
 class ClickHouseSqlSnapshotTest extends TestCase
 {
+    /**
+     * @return array<string, string>
+     */
+    private function auditTypeMap(): array
+    {
+        return [
+            'id' => 'String',
+            'userId' => 'String',
+            'event' => 'String',
+            'resource' => 'String',
+            'userAgent' => 'String',
+            'ip' => 'String',
+            'location' => 'String',
+            'time' => 'DateTime64(3)',
+            'data' => 'String',
+            'tenant' => 'UInt64',
+        ];
+    }
+
+    private function newAuditBuilder(): ClickHouseBuilder
+    {
+        return (new ClickHouseBuilder())
+            ->useNamedBindings()
+            ->withParamTypes($this->auditTypeMap());
+    }
+
     public function testSetupCreateTableSnapshot(): void
     {
         $schema = new ClickHouseSchema();
@@ -84,12 +111,12 @@ class ClickHouseSqlSnapshotTest extends TestCase
         $sql = (new ClickHouseBuilder())
             ->into('default.audits')
             ->whereRaw('`time` < {datetime:DateTime64(3)}')
-            ->settings(['mutations_sync' => '0'])
+            ->settings(['lightweight_deletes_sync' => '0'])
             ->delete()
             ->query;
 
         $this->assertEquals(
-            'ALTER TABLE `default`.`audits` DELETE WHERE `time` < {datetime:DateTime64(3)} SETTINGS mutations_sync=0',
+            'DELETE FROM `default`.`audits` WHERE `time` < {datetime:DateTime64(3)} SETTINGS lightweight_deletes_sync=0',
             $sql,
         );
     }
@@ -103,29 +130,93 @@ class ClickHouseSqlSnapshotTest extends TestCase
             ->query;
 
         $this->assertEquals(
-            'ALTER TABLE `default`.`audits` DELETE WHERE `time` < {datetime:DateTime64(3)}',
+            'DELETE FROM `default`.`audits` WHERE `time` < {datetime:DateTime64(3)}',
             $sql,
         );
     }
 
-    public function testFindSelectWithCursorAndOrderRaw(): void
+    public function testFindEmitsTypedNamedBindings(): void
     {
-        $builder = (new ClickHouseBuilder())
+        $statement = $this->newAuditBuilder()
             ->from('default.audits')
             ->selectRaw('`id`, `event`, `time`')
-            ->whereRaw('`userId` = {param_0:String}')
-            ->whereRaw('(`time` < {cursor_cmp_0:DateTime64(3)}) OR (`time` = {cursor_eq_1_0:DateTime64(3)} AND `id` < {cursor_cmp_1:String})')
-            ->orderByRaw('`time` DESC')
-            ->orderByRaw('`id` DESC');
+            ->filter([
+                Query::equal('userId', ['u1']),
+                Query::between('time', '2025-01-01 00:00:00.000', '2025-12-31 00:00:00.000'),
+            ])
+            ->sortDesc('time')
+            ->limit(25)
+            ->build();
 
-        $sql = $builder->build()->query . ' LIMIT {limit:UInt64} FORMAT JSON';
+        $expectedSql = 'SELECT `id`, `event`, `time` FROM `default`.`audits` '
+            . 'WHERE `userId` IN ({param0:String}) '
+            . 'AND `time` BETWEEN {param1:DateTime64(3)} AND {param2:DateTime64(3)} '
+            . 'ORDER BY `time` DESC '
+            . 'LIMIT {param3:Int64}';
 
-        $expected = 'SELECT `id`, `event`, `time` FROM `default`.`audits` '
-            . 'WHERE `userId` = {param_0:String} AND '
-            . '(`time` < {cursor_cmp_0:DateTime64(3)}) OR (`time` = {cursor_eq_1_0:DateTime64(3)} AND `id` < {cursor_cmp_1:String}) '
+        $this->assertEquals($expectedSql, $statement->query);
+        $this->assertSame(
+            [
+                'param0' => 'u1',
+                'param1' => '2025-01-01 00:00:00.000',
+                'param2' => '2025-12-31 00:00:00.000',
+                'param3' => 25,
+            ],
+            $statement->namedBindings,
+        );
+    }
+
+    public function testFindCursorRawFragmentMergesWithTypedBindings(): void
+    {
+        $cursorClause = '((`time` < {cursor_cmp_0:DateTime64(3)}) '
+            . 'OR (`time` = {cursor_eq_1_0:DateTime64(3)} AND `id` < {cursor_cmp_1:String}))';
+
+        $statement = $this->newAuditBuilder()
+            ->from('default.audits')
+            ->selectRaw('`id`, `event`, `time`')
+            ->filter([Query::equal('userId', ['u1'])])
+            ->whereRaw($cursorClause)
+            ->sortDesc('time')
+            ->sortDesc('id')
+            ->limit(25)
+            ->build();
+
+        $expectedSql = 'SELECT `id`, `event`, `time` FROM `default`.`audits` '
+            . 'WHERE `userId` IN ({param0:String}) '
+            . 'AND ' . $cursorClause . ' '
             . 'ORDER BY `time` DESC, `id` DESC '
-            . 'LIMIT {limit:UInt64} FORMAT JSON';
+            . 'LIMIT {param1:Int64}';
 
-        $this->assertEquals($expected, $sql);
+        $this->assertEquals($expectedSql, $statement->query);
+        $this->assertSame(
+            [
+                'param0' => 'u1',
+                'param1' => 25,
+            ],
+            $statement->namedBindings,
+        );
+    }
+
+    public function testCountWithMaxWrapsInnerSelect(): void
+    {
+        $inner = $this->newAuditBuilder()
+            ->from('default.audits')
+            ->selectRaw('1')
+            ->filter([Query::equal('userId', ['u1'])])
+            ->limit(5000)
+            ->build();
+
+        $sql = 'SELECT COUNT(*) AS count FROM (' . $inner->query . ') sub FORMAT TabSeparated';
+
+        $this->assertEquals(
+            'SELECT COUNT(*) AS count FROM ('
+            . 'SELECT 1 FROM `default`.`audits` WHERE `userId` IN ({param0:String}) LIMIT {param1:Int64}'
+            . ') sub FORMAT TabSeparated',
+            $sql,
+        );
+        $this->assertSame(
+            ['param0' => 'u1', 'param1' => 5000],
+            $inner->namedBindings,
+        );
     }
 }
