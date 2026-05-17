@@ -555,6 +555,54 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Build the column → ClickHouse type map registered on `Builder\ClickHouse`
+     * so positional `?` bindings are emitted as typed `{paramN:Type}` placeholders.
+     *
+     * Derived from `getAttributes()` so the map stays in sync with the schema —
+     * DateTime attributes get `DateTime64(3)`, everything else gets `String`.
+     * `id` is added explicitly because it lives outside `getAttributes()`, and
+     * `tenant` is added only when shared-tables mode is on. `limit`, `offset`
+     * and `max` are pseudo-columns used by the count/find SQL wrappers.
+     *
+     * @return array<string, string>
+     */
+    private function getColumnTypeMap(): array
+    {
+        $map = ['id' => 'String'];
+
+        foreach ($this->getAttributes() as $attribute) {
+            /** @var string $id */
+            $id = $attribute['$id'];
+            $map[$id] = ($attribute['type'] ?? null) === Database::VAR_DATETIME
+                ? 'DateTime64(3)'
+                : 'String';
+        }
+
+        if ($this->sharedTables) {
+            $map['tenant'] = 'UInt64';
+        }
+
+        $map['limit'] = 'UInt64';
+        $map['offset'] = 'UInt64';
+        $map['max'] = 'UInt64';
+
+        return $map;
+    }
+
+    /**
+     * Build a `Builder\ClickHouse` instance with the adapter's column type map
+     * pre-registered. Every adapter call site that produces SQL goes through
+     * here so positional `?` bindings can be rewritten to typed `{paramN:Type}`
+     * placeholders at `Statement` time.
+     */
+    private function newBuilder(): ClickHouseBuilder
+    {
+        return (new ClickHouseBuilder())
+            ->useNamedBindings()
+            ->withParamTypes($this->getColumnTypeMap());
+    }
+
+    /**
      * Execute a ClickHouse query via HTTP interface using Fetch Client.
      *
      * This unified method supports two modes of operation:
@@ -877,7 +925,7 @@ class ClickHouse extends SQL
         $qualifiedTable = $this->database . '.' . $tableName;
         $escapedId = $this->escapeIdentifier('id');
 
-        $builder = (new ClickHouseBuilder())
+        $builder = $this->newBuilder()
             ->from($qualifiedTable)
             ->selectRaw($this->getSelectColumns())
             ->whereRaw($escapedId . ' = {id:String}');
@@ -943,7 +991,7 @@ class ClickHouse extends SQL
             $filters[] = ltrim($tenantFilter, ' AND');
         }
 
-        $builder = (new ClickHouseBuilder())
+        $builder = $this->newBuilder()
             ->from($qualifiedTable)
             ->selectRaw($selectColumns);
 
@@ -1064,7 +1112,7 @@ class ClickHouse extends SQL
             $filters[] = ltrim($tenantFilter, ' AND');
         }
 
-        $inner = (new ClickHouseBuilder())
+        $inner = $this->newBuilder()
             ->from($qualifiedTable)
             ->selectRaw($max !== null ? '1' : 'COUNT(*) AS count');
 
@@ -1740,7 +1788,7 @@ class ClickHouse extends SQL
             $columns[] = 'tenant';
         }
 
-        $insertSql = (new ClickHouseBuilder())
+        $insertSql = $this->newBuilder()
             ->into($qualifiedTable)
             ->insertFormat('JSONEachRow', $columns)
             ->insert()
@@ -2157,7 +2205,7 @@ class ClickHouse extends SQL
         $escapedTimeColumn = $this->escapeIdentifier('time');
         $datetimeString = $datetime->format('Y-m-d H:i:s.v');
 
-        $builder = (new ClickHouseBuilder())
+        $builder = $this->newBuilder()
             ->into($qualifiedTable)
             ->whereRaw($escapedTimeColumn . ' < {datetime:DateTime64(3)}');
 
