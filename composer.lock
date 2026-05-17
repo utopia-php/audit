@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "52e238097ee4b3c66f172cf8c9b3e86c",
+    "content-hash": "4c74d9eb46185e0e6db7ea5d8bf5a3c5",
     "packages": [
         {
             "name": "brick/math",
@@ -2384,24 +2384,27 @@
         },
         {
             "name": "utopia-php/query",
-            "version": "0.1.1",
+            "version": "dev-feat/clickhouse-insert-delete-settings-mv",
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/query.git",
-                "reference": "964a10ed3185490505f4c0062f2eb7b89287fb27"
+                "reference": "605376809ecd61051cbd1235c14606a0b9d59a1c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/query/zipball/964a10ed3185490505f4c0062f2eb7b89287fb27",
-                "reference": "964a10ed3185490505f4c0062f2eb7b89287fb27",
+                "url": "https://api.github.com/repos/utopia-php/query/zipball/605376809ecd61051cbd1235c14606a0b9d59a1c",
+                "reference": "605376809ecd61051cbd1235c14606a0b9d59a1c",
                 "shasum": ""
             },
             "require": {
                 "php": ">=8.4"
             },
             "require-dev": {
+                "brianium/paratest": "*",
                 "laravel/pint": "*",
+                "mongodb/mongodb": "^2.0",
                 "phpstan/phpstan": "*",
+                "phpunit/phpcov": "*",
                 "phpunit/phpunit": "^12.0"
             },
             "type": "library",
@@ -2424,9 +2427,9 @@
             ],
             "support": {
                 "issues": "https://github.com/utopia-php/query/issues",
-                "source": "https://github.com/utopia-php/query/tree/0.1.1"
+                "source": "https://github.com/utopia-php/query/tree/feat/clickhouse-insert-delete-settings-mv"
             },
-            "time": "2026-03-03T09:05:14+00:00"
+            "time": "2026-05-17T07:12:35+00:00"
         },
         {
             "name": "utopia-php/telemetry",
@@ -4442,9 +4445,18 @@
             "time": "2025-11-17T20:03:58+00:00"
         }
     ],
-    "aliases": [],
+    "aliases": [
+        {
+            "package": "utopia-php/query",
+            "version": "dev-feat/clickhouse-insert-delete-settings-mv",
+            "alias": "0.3.2",
+            "alias_normalized": "0.3.2.0"
+        }
+    ],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "utopia-php/query": 20
+    },
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
