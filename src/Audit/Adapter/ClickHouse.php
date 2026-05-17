@@ -7,6 +7,10 @@ use Utopia\Audit\Log;
 use Utopia\Audit\Query;
 use Utopia\Database\Database;
 use Utopia\Fetch\Client;
+use Utopia\Query\Schema\ClickHouse as ClickHouseSchema;
+use Utopia\Query\Schema\ClickHouse\Engine as ClickHouseEngine;
+use Utopia\Query\Schema\ClickHouse\IndexAlgorithm;
+use Utopia\Query\Schema\ColumnType;
 use Utopia\Validator\Hostname;
 
 /**
@@ -683,63 +687,68 @@ class ClickHouse extends SQL
      */
     public function setup(): void
     {
-        // Create database if not exists
         $escapedDatabase = $this->escapeIdentifier($this->database);
-        $createDbSql = "CREATE DATABASE IF NOT EXISTS {$escapedDatabase}";
-        $this->query($createDbSql);
+        $this->query("CREATE DATABASE IF NOT EXISTS {$escapedDatabase}");
 
-        // Build column definitions from base adapter schema
-        // Override time column to be NOT NULL since it's used in partition key
-        $columns = [
-            'id String',
-        ];
+        $schema = new ClickHouseSchema();
+        $tableName = $this->getTableName();
+        $qualifiedTable = $this->database . '.' . $tableName;
+        $table = $schema->table($qualifiedTable);
+        $table->string('id')->primary();
 
         foreach ($this->getAttributes() as $attribute) {
             /** @var string $id */
             $id = $attribute['$id'];
 
-            // Special handling for time column - must be NOT NULL for partition key
             if ($id === 'time') {
-                $columns[] = 'time DateTime64(3)';
-            } else {
-                $columns[] = $this->getColumnDefinition($id);
+                $table->datetime('time', precision: 3);
+
+                continue;
+            }
+
+            $type = $this->mapAttributeType($attribute);
+            $column = $table->addColumn($id, $type);
+            if (empty($attribute['required'])) {
+                $column->nullable();
             }
         }
 
-        // Add tenant column only if tables are shared across tenants
         if ($this->sharedTables) {
-            $columns[] = 'tenant Nullable(UInt64)';  // Supports 11-digit MySQL auto-increment IDs
+            $table->bigInteger('tenant')->unsigned()->nullable();
         }
 
-        // Build indexes from base adapter schema
-        $indexes = [];
         foreach ($this->getIndexes() as $index) {
             /** @var string $indexName */
             $indexName = $index['$id'];
             /** @var array<string> $attributes */
             $attributes = $index['attributes'];
-            // Escape each attribute name to prevent SQL injection
-            $escapedAttributes = array_map(fn (string $attr) => $this->escapeIdentifier($attr), $attributes);
-            $attributeList = implode(', ', $escapedAttributes);
-            $indexes[] = "INDEX {$indexName} ({$attributeList}) TYPE bloom_filter GRANULARITY 1";
+            $table->index(
+                columns: $attributes,
+                name: $indexName,
+                algorithm: IndexAlgorithm::BloomFilter,
+                granularity: 1,
+            );
         }
 
-        $tableName = $this->getTableName();
-        $escapedDatabaseAndTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
+        $table->engine(ClickHouseEngine::MergeTree);
+        $table->orderBy(['time', 'id']);
+        $table->partitionBy('toYYYYMM(time)');
+        $table->settings(['index_granularity' => '8192']);
 
-        // Create table with MergeTree engine for optimal performance
-        $createTableSql = "
-            CREATE TABLE IF NOT EXISTS {$escapedDatabaseAndTable} (
-                " . implode(",\n                ", $columns) . ",
-                " . implode(",\n                ", $indexes) . "
-            )
-            ENGINE = MergeTree()
-            ORDER BY (time, id)
-            PARTITION BY toYYYYMM(time)
-            SETTINGS index_granularity = 8192
-        ";
-
+        $createTableSql = $table->createIfNotExists()->query;
         $this->query($createTableSql);
+    }
+
+    /**
+     * Map an audit attribute descriptor to its `Schema\ColumnType`.
+     *
+     * @param  array<string, mixed>  $attribute
+     */
+    private function mapAttributeType(array $attribute): ColumnType
+    {
+        return ($attribute['type'] ?? null) === Database::VAR_DATETIME
+            ? ColumnType::Datetime
+            : ColumnType::String;
     }
 
     /**
@@ -1101,6 +1110,7 @@ class ClickHouse extends SQL
         $paramCounter = 0;
 
         foreach ($queries as $query) {
+            /** @phpstan-ignore-next-line instanceof.alwaysTrue - runtime validation despite type hint */
             if (!$query instanceof Query) {
                 /** @phpstan-ignore-next-line ternary.alwaysTrue - runtime validation despite type hint */
                 $type = is_object($query) ? get_class($query) : gettype($query);
@@ -1219,9 +1229,7 @@ class ClickHouse extends SQL
                         $inParams[] = "{{$paramName}:{$chType}}";
                         $params[$paramName] = $this->formatTypedValue($chType, $value);
                     }
-                    if (!empty($inParams)) {
-                        $filters[] = "{$escapedAttr} IN (" . implode(', ', $inParams) . ")";
-                    }
+                    $filters[] = "{$escapedAttr} IN (" . implode(', ', $inParams) . ")";
                     break;
 
                 case Query::TYPE_NOT_CONTAINS:
@@ -1234,9 +1242,7 @@ class ClickHouse extends SQL
                         $inParams[] = "{{$paramName}:{$chType}}";
                         $params[$paramName] = $this->formatTypedValue($chType, $value);
                     }
-                    if (!empty($inParams)) {
-                        $filters[] = "{$escapedAttr} NOT IN (" . implode(', ', $inParams) . ")";
-                    }
+                    $filters[] = "{$escapedAttr} NOT IN (" . implode(', ', $inParams) . ")";
                     break;
 
                 case Query::TYPE_IS_NULL:
@@ -1315,12 +1321,6 @@ class ClickHouse extends SQL
                     break;
 
                 case Query::TYPE_SELECT:
-                    if (empty($values)) {
-                        // VALUE_REQUIRED_METHODS already rejects empty values
-                        // earlier, but the explicit check keeps this branch safe
-                        // if the guard is ever bypassed.
-                        break;
-                    }
                     // Multiple Query::select(...) calls combine into a single
                     // projection. Duplicates are removed; column names are
                     // validated and escaped at SQL build time in find().
@@ -1761,10 +1761,6 @@ class ClickHouse extends SQL
         $documents = [];
 
         foreach ($data as $row) {
-            if (!is_array($row)) {
-                continue;
-            }
-
             $document = [];
 
             foreach ($row as $columnName => $value) {
