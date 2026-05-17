@@ -2151,17 +2151,24 @@ class ClickHouse extends SQL
     public function cleanup(\DateTime $datetime): bool
     {
         $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
-
+        $qualifiedTable = $this->database . '.' . $tableName;
+        $escapedTimeColumn = $this->escapeIdentifier('time');
         $datetimeString = $datetime->format('Y-m-d H:i:s.v');
 
-        $settings = $this->asyncCleanup ? ' SETTINGS lightweight_deletes_sync = 0' : '';
+        $builder = (new ClickHouseBuilder())
+            ->into($qualifiedTable)
+            ->whereRaw($escapedTimeColumn . ' < {datetime:DateTime64(3)}');
 
-        $sql = "
-            DELETE FROM {$escapedTable}
-            WHERE time < {datetime:String}{$tenantFilter}{$settings}
-        ";
+        $tenantFilter = $this->getTenantFilter();
+        if ($tenantFilter !== '') {
+            $builder->whereRaw(ltrim($tenantFilter, ' AND'));
+        }
+
+        if ($this->asyncCleanup) {
+            $builder->settings(['mutations_sync' => '0']);
+        }
+
+        $sql = $builder->delete()->query;
 
         $this->query($sql, ['datetime' => $datetimeString]);
 
