@@ -61,6 +61,7 @@ class ClickHouseTest extends TestCase
             'teamId' => 'team-1',
             'teamInternalId' => 'team-int-1',
             'hostname' => 'example.org',
+            'country' => 'us',
         ];
     }
 
@@ -418,7 +419,6 @@ class ClickHouseTest extends TestCase
                 'resource' => 'doc/"quotes"',
                 'userAgent' => "User'Agent\"With'Quotes",
                 'ip' => '192.168.1.1',
-                'location' => 'UK',
                 'data' => ['special' => "data with 'quotes'"],
                 'time' => \Utopia\Database\DateTime::formatTz(\Utopia\Database\DateTime::now()) ?? ''
             ]
@@ -519,7 +519,6 @@ class ClickHouseTest extends TestCase
         $actorId = 'parseActor';
         $userAgent = 'UnitTestAgent/1.0';
         $ip = '127.0.0.1';
-        $location = 'US';
 
         $resource = 'database/6978484940ff05762e1a/table/697848498066e3d2ef64';
 
@@ -532,7 +531,7 @@ class ClickHouseTest extends TestCase
         unset($required['resourceType'], $required['resourceId'], $required['resourceParent']);
         $dataWithAttributes = array_merge($data, $required);
 
-        $log = $this->audit->log($actorId, 'create', $resource, $userAgent, $ip, $location, $dataWithAttributes);
+        $log = $this->audit->log($actorId, 'create', $resource, $userAgent, $ip, $dataWithAttributes);
 
         $this->assertInstanceOf(\Utopia\Audit\Log::class, $log);
 
@@ -566,6 +565,30 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('697848498066e3d2ef64', $parsed['resourceId']);
         $this->assertEquals('table', $parsed['resourceType']);
         $this->assertEquals('database/6978484940ff05762e1a', $parsed['resourceParent']);
+
+        $sixPart = 'database/693586330029ae2f0d3f/collection/watch_history/document/6a06d9a7001c3cd05d20';
+        /** @var array{resourceId: string, resourceType: string, resourceParent: string} $parsedSix */
+        $parsedSix = $method->invoke($adapter, $sixPart);
+
+        $this->assertEquals('6a06d9a7001c3cd05d20', $parsedSix['resourceId']);
+        $this->assertEquals('document', $parsedSix['resourceType']);
+        $this->assertEquals('database/693586330029ae2f0d3f/collection/watch_history', $parsedSix['resourceParent']);
+
+        $twoPart = 'user/abc123';
+        /** @var array{resourceId: string, resourceType: string, resourceParent: string} $parsedTwo */
+        $parsedTwo = $method->invoke($adapter, $twoPart);
+
+        $this->assertEquals('abc123', $parsedTwo['resourceId']);
+        $this->assertEquals('user', $parsedTwo['resourceType']);
+        $this->assertEquals('', $parsedTwo['resourceParent']);
+
+        $oddPart = 'foo/bar/baz';
+        /** @var array{resourceId: string, resourceType: string, resourceParent: string} $parsedOdd */
+        $parsedOdd = $method->invoke($adapter, $oddPart);
+
+        $this->assertEquals('foo/bar/baz', $parsedOdd['resourceId']);
+        $this->assertEquals('', $parsedOdd['resourceType']);
+        $this->assertEquals('', $parsedOdd['resourceParent']);
     }
 
     public function testCursorAfterPaginatesLogs(): void
@@ -813,7 +836,7 @@ class ClickHouseTest extends TestCase
         $adapter->setup();
 
         $audit = new Audit($adapter);
-        $audit->log('u1', 'create', 'doc/1', 'agent', '127.0.0.1', 'US', $this->getRequiredAttributes());
+        $audit->log('u1', 'create', 'doc/1', 'agent', '127.0.0.1', $this->getRequiredAttributes());
 
         $logs = $audit->find([
             Query::select(['event']),
