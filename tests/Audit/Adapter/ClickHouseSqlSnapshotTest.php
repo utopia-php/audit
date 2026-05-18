@@ -166,6 +166,32 @@ class ClickHouseSqlSnapshotTest extends TestCase
         );
     }
 
+    public function testNotContainsMultiValueEmitsTypedNotIn(): void
+    {
+        $statement = $this->newAuditBuilder()
+            ->from('default.audits')
+            ->selectRaw('`id`, `event`, `time`')
+            ->filter([
+                Query::notEqual('event', ['users.delete', 'projects.delete']),
+            ])
+            ->limit(25)
+            ->build();
+
+        $expectedSql = 'SELECT `id`, `event`, `time` FROM `default`.`audits` '
+            . 'WHERE `event` NOT IN ({param0:String}, {param1:String}) '
+            . 'LIMIT {param2:Int64}';
+
+        $this->assertEquals($expectedSql, $statement->query);
+        $this->assertSame(
+            [
+                'param0' => 'users.delete',
+                'param1' => 'projects.delete',
+                'param2' => 25,
+            ],
+            $statement->namedBindings,
+        );
+    }
+
     public function testFindCursorRawFragmentMergesWithTypedBindings(): void
     {
         $cursorClause = '((`time` < {cursor_cmp_0:DateTime64(3)}) '
