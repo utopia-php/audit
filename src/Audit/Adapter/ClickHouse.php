@@ -1662,13 +1662,18 @@ class ClickHouse extends SQL
             return [];
         }
 
-        /** @var array<int, array<string, mixed>> $data */
+        /** @var array<int, mixed> $data */
         $data = $decoded['data'];
         $documents = [];
 
         foreach ($data as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
             $document = [];
 
+            /** @var array<string, mixed> $row */
             foreach ($row as $columnName => $value) {
                 if ($columnName === 'data') {
                     // Decode JSON data column
