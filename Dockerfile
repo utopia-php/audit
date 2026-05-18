@@ -8,7 +8,7 @@ COPY composer.json /src/
 RUN composer install --ignore-platform-reqs --optimize-autoloader \
     --no-plugins --no-scripts --prefer-dist
 
-FROM php:8.4-cli-alpine AS final
+FROM php:8.4.18-cli-alpine3.22 AS final
 
 LABEL maintainer="team@appwrite.io"
 
