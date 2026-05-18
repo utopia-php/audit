@@ -53,7 +53,7 @@ class ClickHouseTest extends TestCase
     protected function getRequiredAttributes(): array
     {
         return [
-            'userType' => 'member',
+            'actorType' => 'member',
             'resourceType' => 'document',
             'resourceId' => 'res-1',
             'projectId' => 'proj-1',
@@ -61,6 +61,7 @@ class ClickHouseTest extends TestCase
             'teamId' => 'team-1',
             'teamInternalId' => 'team-int-1',
             'hostname' => 'example.org',
+            'country' => 'us',
         ];
     }
 
@@ -413,12 +414,11 @@ class ClickHouseTest extends TestCase
         // Test batch with special characters in data
         $batchEvents = [
             [
-                'userId' => 'user`with`backticks',
+                'actorId' => 'actor`with`backticks',
                 'event' => 'create',
                 'resource' => 'doc/"quotes"',
                 'userAgent' => "User'Agent\"With'Quotes",
                 'ip' => '192.168.1.1',
-                'location' => 'UK',
                 'data' => ['special' => "data with 'quotes'"],
                 'time' => \Utopia\Database\DateTime::formatTz(\Utopia\Database\DateTime::now()) ?? ''
             ]
@@ -429,7 +429,7 @@ class ClickHouseTest extends TestCase
         $this->assertTrue($result);
 
         // Verify retrieval
-        $logs = $this->audit->getLogsByUser('user`with`backticks');
+        $logs = $this->audit->getLogsByUser('actor`with`backticks');
         $this->assertGreaterThan(0, count($logs));
     }
 
@@ -449,9 +449,9 @@ class ClickHouseTest extends TestCase
 
         // Verify all expected attributes exist
         $expectedAttributes = [
-            'userType',
-            'userId',
-            'userInternalId',
+            'actorType',
+            'actorId',
+            'actorInternalId',
             'resourceParent',
             'resourceType',
             'resourceId',
@@ -491,11 +491,11 @@ class ClickHouseTest extends TestCase
 
         // Verify all ClickHouse-specific indexes exist
         $expectedClickHouseIndexes = [
-            '_key_user_internal_and_event',
+            '_key_actor_internal_and_event',
             '_key_project_internal_id',
             '_key_team_internal_id',
-            '_key_user_internal_id',
-            '_key_user_type',
+            '_key_actor_internal_id',
+            '_key_actor_type',
             '_key_country',
             '_key_hostname'
         ];
@@ -505,7 +505,7 @@ class ClickHouseTest extends TestCase
         }
 
         // Verify parent indexes are also included (with parent naming convention)
-        $parentExpectedIndexes = ['idx_event', 'idx_userId_event', 'idx_resource_event', 'idx_time_desc'];
+        $parentExpectedIndexes = ['idx_event', 'idx_actorId_event', 'idx_resource_event', 'idx_time_desc'];
         foreach ($parentExpectedIndexes as $expected) {
             $this->assertContains($expected, $indexIds, "Parent index '{$expected}' not found in ClickHouse adapter");
         }
@@ -516,10 +516,9 @@ class ClickHouseTest extends TestCase
      */
     public function testParseResourceComplexPath(): void
     {
-        $userId = 'parseUser';
+        $actorId = 'parseActor';
         $userAgent = 'UnitTestAgent/1.0';
         $ip = '127.0.0.1';
-        $location = 'US';
 
         $resource = 'database/6978484940ff05762e1a/table/697848498066e3d2ef64';
 
@@ -532,7 +531,7 @@ class ClickHouseTest extends TestCase
         unset($required['resourceType'], $required['resourceId'], $required['resourceParent']);
         $dataWithAttributes = array_merge($data, $required);
 
-        $log = $this->audit->log($userId, 'create', $resource, $userAgent, $ip, $location, $dataWithAttributes);
+        $log = $this->audit->log($actorId, 'create', $resource, $userAgent, $ip, $dataWithAttributes);
 
         $this->assertInstanceOf(\Utopia\Audit\Log::class, $log);
 
@@ -566,6 +565,30 @@ class ClickHouseTest extends TestCase
         $this->assertEquals('697848498066e3d2ef64', $parsed['resourceId']);
         $this->assertEquals('table', $parsed['resourceType']);
         $this->assertEquals('database/6978484940ff05762e1a', $parsed['resourceParent']);
+
+        $sixPart = 'database/693586330029ae2f0d3f/collection/watch_history/document/6a06d9a7001c3cd05d20';
+        /** @var array{resourceId: string, resourceType: string, resourceParent: string} $parsedSix */
+        $parsedSix = $method->invoke($adapter, $sixPart);
+
+        $this->assertEquals('6a06d9a7001c3cd05d20', $parsedSix['resourceId']);
+        $this->assertEquals('document', $parsedSix['resourceType']);
+        $this->assertEquals('database/693586330029ae2f0d3f/collection/watch_history', $parsedSix['resourceParent']);
+
+        $twoPart = 'user/abc123';
+        /** @var array{resourceId: string, resourceType: string, resourceParent: string} $parsedTwo */
+        $parsedTwo = $method->invoke($adapter, $twoPart);
+
+        $this->assertEquals('abc123', $parsedTwo['resourceId']);
+        $this->assertEquals('user', $parsedTwo['resourceType']);
+        $this->assertEquals('', $parsedTwo['resourceParent']);
+
+        $oddPart = 'foo/bar/baz';
+        /** @var array{resourceId: string, resourceType: string, resourceParent: string} $parsedOdd */
+        $parsedOdd = $method->invoke($adapter, $oddPart);
+
+        $this->assertEquals('foo/bar/baz', $parsedOdd['resourceId']);
+        $this->assertEquals('', $parsedOdd['resourceType']);
+        $this->assertEquals('', $parsedOdd['resourceParent']);
     }
 
     public function testCursorAfterPaginatesLogs(): void
@@ -652,7 +675,7 @@ class ClickHouseTest extends TestCase
 
     public function testNotEqualQuery(): void
     {
-        // Fixture: 3x event=update/delete for userId, plus 1x event=insert for null user
+        // Fixture: 3x event=update/delete for actor, plus 1x event=insert for null actor
         $logs = $this->audit->find([
             Query::notEqual('event', 'update'),
         ]);
@@ -712,17 +735,17 @@ class ClickHouseTest extends TestCase
 
     public function testIsNullAndIsNotNullQueries(): void
     {
-        $nullUser = $this->audit->find([
-            Query::isNull('userId'),
+        $nullActor = $this->audit->find([
+            Query::isNull('actorId'),
         ]);
-        // Only the insert log has null userId
-        $this->assertCount(1, $nullUser);
-        $this->assertEquals('insert', $nullUser[0]->getEvent());
+        // Only the insert log has null actorId
+        $this->assertCount(1, $nullActor);
+        $this->assertEquals('insert', $nullActor[0]->getEvent());
 
-        $notNullUser = $this->audit->find([
-            Query::isNotNull('userId'),
+        $notNullActor = $this->audit->find([
+            Query::isNotNull('actorId'),
         ]);
-        $this->assertCount(3, $notNullUser);
+        $this->assertCount(3, $notNullActor);
     }
 
     public function testStartsWithAndEndsWithQueries(): void
@@ -778,7 +801,7 @@ class ClickHouseTest extends TestCase
     {
         $logs = $this->audit->find([
             Query::select(['event', 'resource']),
-            Query::equal('userId', 'userId'),
+            Query::equal('actorId', 'userId'),
             Query::limit(1),
         ]);
 
@@ -813,7 +836,7 @@ class ClickHouseTest extends TestCase
         $adapter->setup();
 
         $audit = new Audit($adapter);
-        $audit->log('u1', 'create', 'doc/1', 'agent', '127.0.0.1', 'US', $this->getRequiredAttributes());
+        $audit->log('u1', 'create', 'doc/1', 'agent', '127.0.0.1', $this->getRequiredAttributes());
 
         $logs = $audit->find([
             Query::select(['event']),

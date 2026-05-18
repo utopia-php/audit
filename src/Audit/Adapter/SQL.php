@@ -89,15 +89,6 @@ abstract class SQL extends Adapter
                 'filters' => [],
             ],
             [
-                '$id' => 'location',
-                'type' => Database::VAR_STRING,
-                'size' => 45,
-                'required' => false,
-                'signed' => true,
-                'array' => false,
-                'filters' => [],
-            ],
-            [
                 '$id' => 'time',
                 'type' => Database::VAR_DATETIME,
                 'format' => '',
@@ -222,30 +213,31 @@ abstract class SQL extends Adapter
     /**
      * Parses the resource string from the payload and extracts its ID, type, and parent.
      *
+     * Supports any even number of segments shaped as alternating `<type>/<id>`,
+     * e.g. `database/<id>`, `database/<id>/collection/<id>`,
+     * `database/<id>/collection/<id>/document/<id>`. The last segment is the
+     * resource id, the second-to-last is the resource type, and any preceding
+     * segments form the resource parent path.
+     *
      * @param string $resource
      * @return array{ resourceId: string, resourceType: string, resourceParent: string }
      */
     protected function parseResource(string $resource): array
     {
         $parts = explode('/', $resource);
+        $count = count($parts);
 
+        $resourceId = $resource;
         $resourceType = '';
         $resourceParent = '';
 
-        // resource/resourceId/subResource/subResourceId
-        if (count($parts) === 4) {
-            $resourceId = $parts[3];
-            $resourceType = $parts[2];
+        if ($count >= 2 && $count % 2 === 0) {
+            $resourceId = $parts[$count - 1];
+            $resourceType = $parts[$count - 2];
 
-            // resource/resourceId
-            $resourceParent = "{$parts[0]}/{$parts[1]}";
-        } // resource/resourceId
-        elseif (count($parts) === 2) {
-            $resourceId = $parts[1];
-            $resourceType = $parts[0];
-        } else {
-            // default fallback
-            $resourceId = $resource;
+            if ($count > 2) {
+                $resourceParent = implode('/', array_slice($parts, 0, $count - 2));
+            }
         }
 
         return [
