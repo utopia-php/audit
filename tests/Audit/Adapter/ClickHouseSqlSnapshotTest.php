@@ -25,12 +25,13 @@ class ClickHouseSqlSnapshotTest extends TestCase
     {
         return [
             'id' => 'String',
-            'userId' => 'String',
+            'actorId' => 'String',
+            'actorType' => 'String',
+            'actorInternalId' => 'String',
             'event' => 'String',
             'resource' => 'String',
             'userAgent' => 'String',
             'ip' => 'String',
-            'location' => 'String',
             'time' => 'DateTime64(3)',
             'data' => 'String',
             'tenant' => 'UInt64',
@@ -49,12 +50,13 @@ class ClickHouseSqlSnapshotTest extends TestCase
         $schema = new ClickHouseSchema();
         $table = $schema->table('default.audits');
         $table->string('id')->primary();
-        $table->string('userId')->nullable();
+        $table->string('actorId')->nullable();
+        $table->string('actorType');
+        $table->string('actorInternalId')->nullable();
         $table->string('event');
         $table->string('resource')->nullable();
         $table->string('userAgent');
         $table->string('ip');
-        $table->string('location')->nullable();
         $table->datetime('time', precision: 3);
         $table->addColumn('data', ColumnType::String)->nullable();
 
@@ -65,8 +67,14 @@ class ClickHouseSqlSnapshotTest extends TestCase
             granularity: 1,
         );
         $table->index(
-            columns: ['userId', 'event'],
-            name: 'idx_userId_event',
+            columns: ['actorId', 'event'],
+            name: 'idx_actorId_event',
+            algorithm: IndexAlgorithm::BloomFilter,
+            granularity: 1,
+        );
+        $table->index(
+            columns: ['actorType'],
+            name: '_key_actor_type',
             algorithm: IndexAlgorithm::BloomFilter,
             granularity: 1,
         );
@@ -80,11 +88,16 @@ class ClickHouseSqlSnapshotTest extends TestCase
 
         $this->assertStringContainsString('CREATE TABLE IF NOT EXISTS `default`.`audits`', $sql);
         $this->assertStringContainsString('`id` String', $sql);
-        $this->assertStringContainsString('`userId` Nullable(String)', $sql);
+        $this->assertStringContainsString('`actorId` Nullable(String)', $sql);
+        $this->assertStringContainsString('`actorType` String', $sql);
+        $this->assertStringContainsString('`actorInternalId` Nullable(String)', $sql);
         $this->assertStringContainsString('`event` String', $sql);
         $this->assertStringContainsString('`time` DateTime64(3)', $sql);
+        $this->assertStringNotContainsString('`location`', $sql);
+        $this->assertStringNotContainsString('`userId`', $sql);
         $this->assertStringContainsString('INDEX `idx_event` `event` TYPE bloom_filter GRANULARITY 1', $sql);
-        $this->assertStringContainsString('INDEX `idx_userId_event` (`userId`, `event`) TYPE bloom_filter GRANULARITY 1', $sql);
+        $this->assertStringContainsString('INDEX `idx_actorId_event` (`actorId`, `event`) TYPE bloom_filter GRANULARITY 1', $sql);
+        $this->assertStringContainsString('INDEX `_key_actor_type` `actorType` TYPE bloom_filter GRANULARITY 1', $sql);
         $this->assertStringContainsString('ENGINE = MergeTree()', $sql);
         $this->assertStringContainsString('PARTITION BY toYYYYMM(time)', $sql);
         $this->assertStringContainsString('ORDER BY (`time`, `id`)', $sql);
@@ -93,7 +106,7 @@ class ClickHouseSqlSnapshotTest extends TestCase
 
     public function testInsertFormatJsonEachRowSnapshot(): void
     {
-        $columns = ['id', 'time', 'userId', 'event', 'data'];
+        $columns = ['id', 'time', 'actorId', 'actorType', 'event', 'data'];
         $sql = (new ClickHouseBuilder())
             ->into('default.audits')
             ->insertFormat('JSONEachRow', $columns)
@@ -101,7 +114,7 @@ class ClickHouseSqlSnapshotTest extends TestCase
             ->query;
 
         $this->assertEquals(
-            'INSERT INTO `default`.`audits` (`id`, `time`, `userId`, `event`, `data`) FORMAT JSONEachRow',
+            'INSERT INTO `default`.`audits` (`id`, `time`, `actorId`, `actorType`, `event`, `data`) FORMAT JSONEachRow',
             $sql,
         );
     }
@@ -141,7 +154,7 @@ class ClickHouseSqlSnapshotTest extends TestCase
             ->from('default.audits')
             ->selectRaw('`id`, `event`, `time`')
             ->filter([
-                Query::equal('userId', ['u1']),
+                Query::equal('actorId', ['u1']),
                 Query::between('time', '2025-01-01 00:00:00.000', '2025-12-31 00:00:00.000'),
             ])
             ->sortDesc('time')
@@ -149,7 +162,7 @@ class ClickHouseSqlSnapshotTest extends TestCase
             ->build();
 
         $expectedSql = 'SELECT `id`, `event`, `time` FROM `default`.`audits` '
-            . 'WHERE `userId` IN ({param0:String}) '
+            . 'WHERE `actorId` IN ({param0:String}) '
             . 'AND `time` BETWEEN {param1:DateTime64(3)} AND {param2:DateTime64(3)} '
             . 'ORDER BY `time` DESC '
             . 'LIMIT {param3:Int64}';
@@ -200,7 +213,7 @@ class ClickHouseSqlSnapshotTest extends TestCase
         $statement = $this->newAuditBuilder()
             ->from('default.audits')
             ->selectRaw('`id`, `event`, `time`')
-            ->filter([Query::equal('userId', ['u1'])])
+            ->filter([Query::equal('actorId', ['u1'])])
             ->whereRaw($cursorClause)
             ->sortDesc('time')
             ->sortDesc('id')
@@ -208,7 +221,7 @@ class ClickHouseSqlSnapshotTest extends TestCase
             ->build();
 
         $expectedSql = 'SELECT `id`, `event`, `time` FROM `default`.`audits` '
-            . 'WHERE `userId` IN ({param0:String}) '
+            . 'WHERE `actorId` IN ({param0:String}) '
             . 'AND ' . $cursorClause . ' '
             . 'ORDER BY `time` DESC, `id` DESC '
             . 'LIMIT {param1:Int64}';
@@ -228,7 +241,7 @@ class ClickHouseSqlSnapshotTest extends TestCase
         $inner = $this->newAuditBuilder()
             ->from('default.audits')
             ->selectRaw('1')
-            ->filter([Query::equal('userId', ['u1'])])
+            ->filter([Query::equal('actorId', ['u1'])])
             ->limit(5000)
             ->build();
 
@@ -236,7 +249,7 @@ class ClickHouseSqlSnapshotTest extends TestCase
 
         $this->assertEquals(
             'SELECT COUNT(*) AS count FROM ('
-            . 'SELECT 1 FROM `default`.`audits` WHERE `userId` IN ({param0:String}) LIMIT {param1:Int64}'
+            . 'SELECT 1 FROM `default`.`audits` WHERE `actorId` IN ({param0:String}) LIMIT {param1:Int64}'
             . ') sub FORMAT TabSeparated',
             $sql,
         );
