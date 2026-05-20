@@ -1685,7 +1685,7 @@ class ClickHouse extends SQL
 
         foreach ($logs as $log) {
             foreach (['userId' => 'actorId', 'userType' => 'actorType', 'userInternalId' => 'actorInternalId'] as $legacy => $current) {
-                if (\array_key_exists($legacy, $log) && !\array_key_exists($current, $log)) {
+                if (isset($log[$legacy]) && !isset($log[$current])) {
                     $log[$current] = $log[$legacy];
                 }
                 unset($log[$legacy]);
