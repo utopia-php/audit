@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ce81cb6886b4c53426c0c0f609d8c180",
+    "content-hash": "f029651a8f1ea00a7fd6d4312821ec2f",
     "packages": [
         {
             "name": "brick/math",
@@ -2384,16 +2384,16 @@
         },
         {
             "name": "utopia-php/query",
-            "version": "dev-feat/clickhouse-insert-delete-settings-mv",
+            "version": "0.3.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/query.git",
-                "reference": "c77f2280f4e899236d737dd0ea8f54398fd20710"
+                "reference": "84d31822f57adc9ee60d6d5a07fa4a5175278550"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/query/zipball/c77f2280f4e899236d737dd0ea8f54398fd20710",
-                "reference": "c77f2280f4e899236d737dd0ea8f54398fd20710",
+                "url": "https://api.github.com/repos/utopia-php/query/zipball/84d31822f57adc9ee60d6d5a07fa4a5175278550",
+                "reference": "84d31822f57adc9ee60d6d5a07fa4a5175278550",
                 "shasum": ""
             },
             "require": {
@@ -2427,9 +2427,9 @@
             ],
             "support": {
                 "issues": "https://github.com/utopia-php/query/issues",
-                "source": "https://github.com/utopia-php/query/tree/feat/clickhouse-insert-delete-settings-mv"
+                "source": "https://github.com/utopia-php/query/tree/0.3.2"
             },
-            "time": "2026-05-17T09:28:32+00:00"
+            "time": "2026-05-20T05:27:42+00:00"
         },
         {
             "name": "utopia-php/telemetry",
@@ -4445,18 +4445,9 @@
             "time": "2025-11-17T20:03:58+00:00"
         }
     ],
-    "aliases": [
-        {
-            "package": "utopia-php/query",
-            "version": "dev-feat/clickhouse-insert-delete-settings-mv",
-            "alias": "0.3.2",
-            "alias_normalized": "0.3.2.0"
-        }
-    ],
+    "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {
-        "utopia-php/query": 20
-    },
+    "stability-flags": {},
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
