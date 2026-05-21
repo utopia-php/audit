@@ -10,7 +10,8 @@
         "audit"
     ],
     "license": "MIT",
-    "minimum-stability": "stable",
+    "minimum-stability": "dev",
+    "prefer-stable": true,
     "scripts": {
         "lint": "./vendor/bin/pint --test",
         "format": "./vendor/bin/pint",
@@ -30,7 +31,7 @@
         "php": ">=8.4",
         "utopia-php/database": "5.*",
         "utopia-php/fetch": "^1.1",
-        "utopia-php/query": "^0.3.2",
+        "utopia-php/query": "dev-feat/clickhouse-nested-column-quoting as 0.3.3",
         "utopia-php/validators": "0.2.*"
     },
     "require-dev": {
