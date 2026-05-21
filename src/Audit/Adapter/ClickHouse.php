@@ -8,6 +8,7 @@ use Utopia\Audit\Query;
 use Utopia\Database\Database;
 use Utopia\Fetch\Client;
 use Utopia\Query\Builder\ClickHouse as ClickHouseBuilder;
+use Utopia\Query\Builder\ClickHouse\Format;
 use Utopia\Query\Method;
 use Utopia\Query\Query as BaseQuery;
 use Utopia\Query\Schema\ClickHouse as ClickHouseSchema;
@@ -630,21 +631,23 @@ class ClickHouse extends SQL
      *    Parameters are referenced in SQL using syntax: {paramName:Type}
      *    Example: SELECT * WHERE id = {id:String}
      *
-     * 2. **JSON body queries** (when $jsonRows is provided):
-     *    Uses JSONEachRow format for optimal INSERT performance.
-     *    SQL is sent via URL query string, JSON data as POST body.
-     *    Each row is a JSON object on a separate line.
+     * 2. **Pre-serialized body queries** (when $rawBody is provided):
+     *    Used for FORMAT-style INSERT operations (e.g. JSONEachRow).
+     *    SQL envelope is sent via URL query string and the body is sent
+     *    verbatim as the POST body. The caller (typically the typed
+     *    Builder\ClickHouse::bulkInsert() entry point) is responsible for
+     *    serializing rows into the format ClickHouse expects.
      *
      * ClickHouse handles all parameter escaping and type conversion internally,
      * making both approaches fully injection-safe.
      *
      * @param string $sql The SQL query to execute
      * @param array<string, mixed> $params Key-value pairs for query parameters (for SELECT/UPDATE/DELETE)
-     * @param array<int, array<string, mixed>>|null $jsonRows Array of rows for JSONEachRow INSERT operations
+     * @param string|null $rawBody Pre-serialized request body for FORMAT INSERT operations
      * @return string Response body
      * @throws Exception
      */
-    private function query(string $sql, array $params = [], ?array $jsonRows = null): string
+    private function query(string $sql, array $params = [], ?string $rawBody = null): string
     {
         $scheme = $this->secure ? 'https' : 'http';
 
@@ -652,21 +655,9 @@ class ClickHouse extends SQL
         $this->client->addHeader('X-ClickHouse-Database', $this->database);
 
         try {
-            if ($jsonRows !== null) {
-                // JSON body mode for INSERT operations with JSONEachRow format
+            if ($rawBody !== null) {
                 $url = "{$scheme}://{$this->host}:{$this->port}/?query=" . urlencode($sql);
-
-                // Build JSONEachRow body - each row on a separate line
-                $jsonLines = [];
-                foreach ($jsonRows as $row) {
-                    try {
-                        $encoded = json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-                    } catch (\JsonException $e) {
-                        throw new Exception('Failed to encode row to JSON: ' . $e->getMessage());
-                    }
-                    $jsonLines[] = $encoded;
-                }
-                $body = implode("\n", $jsonLines);
+                $body = $rawBody;
             } else {
                 // Parameterized query mode using multipart form data
                 $url = "{$scheme}://{$this->host}:{$this->port}/";
@@ -1676,13 +1667,11 @@ class ClickHouse extends SQL
             $columns[] = 'tenant';
         }
 
-        $insertSql = $this->newBuilder()
+        $statement = $this->newBuilder()
             ->into($qualifiedTable)
-            ->insertFormat('JSONEachRow', $columns)
-            ->insert()
-            ->query;
+            ->bulkInsert(Format::JSONEachRow, $rows, $columns);
 
-        $this->query($insertSql, [], $rows);
+        $this->query($statement->query, [], $statement->body);
 
         return true;
     }

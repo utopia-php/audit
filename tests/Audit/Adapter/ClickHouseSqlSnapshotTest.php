@@ -4,6 +4,7 @@ namespace Utopia\Tests\Audit\Adapter;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Query\Builder\ClickHouse as ClickHouseBuilder;
+use Utopia\Query\Builder\ClickHouse\Format;
 use Utopia\Query\Query;
 use Utopia\Query\Schema\ClickHouse as ClickHouseSchema;
 use Utopia\Query\Schema\ClickHouse\Engine as ClickHouseEngine;
@@ -104,18 +105,42 @@ class ClickHouseSqlSnapshotTest extends TestCase
         $this->assertStringContainsString('SETTINGS index_granularity = 8192', $sql);
     }
 
-    public function testInsertFormatJsonEachRowSnapshot(): void
+    public function testBulkInsertJsonEachRowSnapshot(): void
     {
         $columns = ['id', 'time', 'actorId', 'actorType', 'event', 'data'];
-        $sql = (new ClickHouseBuilder())
+        $rows = [
+            [
+                'id' => 'log-1',
+                'time' => '2025-01-02 03:04:05.678',
+                'actorId' => 'u1',
+                'actorType' => 'users',
+                'event' => 'users.create',
+                'data' => '{"foo":"bar"}',
+            ],
+            [
+                'id' => 'log-2',
+                'time' => '2025-01-02 03:04:06.000',
+                'actorId' => 'u2',
+                'actorType' => 'users',
+                'event' => 'users.delete',
+                'data' => '{"foo":"baz"}',
+            ],
+        ];
+
+        $statement = (new ClickHouseBuilder())
             ->into('default.audits')
-            ->insertFormat('JSONEachRow', $columns)
-            ->insert()
-            ->query;
+            ->bulkInsert(Format::JSONEachRow, $rows, $columns);
 
         $this->assertEquals(
             'INSERT INTO `default`.`audits` (`id`, `time`, `actorId`, `actorType`, `event`, `data`) FORMAT JSONEachRow',
-            $sql,
+            $statement->query,
+        );
+        $this->assertSame('JSONEachRow', $statement->format);
+        $this->assertSame($columns, $statement->columns);
+        $this->assertSame(
+            '{"id":"log-1","time":"2025-01-02 03:04:05.678","actorId":"u1","actorType":"users","event":"users.create","data":"{\"foo\":\"bar\"}"}' . "\n"
+            . '{"id":"log-2","time":"2025-01-02 03:04:06.000","actorId":"u2","actorType":"users","event":"users.delete","data":"{\"foo\":\"baz\"}"}',
+            $statement->body,
         );
     }
 
