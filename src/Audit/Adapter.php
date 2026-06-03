@@ -243,9 +243,9 @@ abstract class Adapter
     /**
      * Ping the adapter to check connectivity.
      *
-     * @return bool
+     * Returns false on any connectivity failure rather than throwing.
      *
-     * @throws \Exception
+     * @return bool True when the backing store is reachable, false otherwise.
      */
     abstract public function ping(): bool;
 }
