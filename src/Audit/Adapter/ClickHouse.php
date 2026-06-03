@@ -114,6 +114,29 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Ping ClickHouse to check connectivity.
+     *
+     * Uses ClickHouse's dedicated /ping endpoint, which bypasses the query
+     * pipeline, requires no database context, and is not recorded in query
+     * logs. Returns false on any connectivity failure rather than throwing.
+     *
+     * @return bool True when ClickHouse is reachable, false otherwise.
+     */
+    public function ping(): bool
+    {
+        $scheme = $this->secure ? 'https' : 'http';
+        $url = "{$scheme}://{$this->host}:{$this->port}/ping";
+
+        try {
+            $response = $this->client->fetch(url: $url, method: Client::METHOD_GET);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return $response->getStatusCode() === 200;
+    }
+
+    /**
      * Validate host parameter.
      *
      * @param string $host

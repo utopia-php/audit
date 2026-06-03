@@ -287,4 +287,16 @@ class Audit
     {
         return $this->adapter->count($queries, $max);
     }
+
+    /**
+     * Ping the adapter to check connectivity.
+     *
+     * Returns false on any connectivity failure rather than throwing.
+     *
+     * @return bool True when the backing store is reachable, false otherwise.
+     */
+    public function ping(): bool
+    {
+        return $this->adapter->ping();
+    }
 }
