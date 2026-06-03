@@ -35,6 +35,18 @@ class Database extends SQL
     }
 
     /**
+     * Ping the database to check connectivity.
+     *
+     * @return bool
+     *
+     * @throws \Exception
+     */
+    public function ping(): bool
+    {
+        return $this->db->ping();
+    }
+
+    /**
      * Setup database structure.
      *
      * @return void

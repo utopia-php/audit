@@ -287,4 +287,16 @@ class Audit
     {
         return $this->adapter->count($queries, $max);
     }
+
+    /**
+     * Ping the adapter to check connectivity.
+     *
+     * @return bool
+     *
+     * @throws \Exception
+     */
+    public function ping(): bool
+    {
+        return $this->adapter->ping();
+    }
 }

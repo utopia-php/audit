@@ -114,6 +114,20 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Ping ClickHouse to check connectivity.
+     *
+     * @return bool
+     *
+     * @throws Exception
+     */
+    public function ping(): bool
+    {
+        $result = $this->query('SELECT 1 FORMAT TabSeparated');
+
+        return trim($result) === '1';
+    }
+
+    /**
      * Validate host parameter.
      *
      * @param string $host

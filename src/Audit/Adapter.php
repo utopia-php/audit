@@ -239,4 +239,13 @@ abstract class Adapter
      * @throws \Exception
      */
     abstract public function count(array $queries = [], ?int $max = null): int;
+
+    /**
+     * Ping the adapter to check connectivity.
+     *
+     * @return bool
+     *
+     * @throws \Exception
+     */
+    abstract public function ping(): bool;
 }
