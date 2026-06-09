@@ -47,6 +47,39 @@ class Log extends ArrayObject
     }
 
     /**
+     * Get the actor ID associated with this log entry.
+     *
+     * @return string|null
+     */
+    public function getActorId(): ?string
+    {
+        $actorId = $this->getAttribute('actorId');
+        return is_string($actorId) ? $actorId : null;
+    }
+
+    /**
+     * Get the actor type associated with this log entry.
+     *
+     * @return string|null
+     */
+    public function getActorType(): ?string
+    {
+        $actorType = $this->getAttribute('actorType');
+        return is_string($actorType) ? $actorType : null;
+    }
+
+    /**
+     * Get the actor internal ID associated with this log entry.
+     *
+     * @return string|null
+     */
+    public function getActorInternalId(): ?string
+    {
+        $actorInternalId = $this->getAttribute('actorInternalId');
+        return is_string($actorInternalId) ? $actorInternalId : null;
+    }
+
+    /**
      * Get the event name.
      *
      * @return string
@@ -88,17 +121,6 @@ class Log extends ArrayObject
     {
         $ip = $this->getAttribute('ip', '');
         return is_string($ip) ? $ip : '';
-    }
-
-    /**
-     * Get the location information.
-     *
-     * @return string|null
-     */
-    public function getLocation(): ?string
-    {
-        $location = $this->getAttribute('location');
-        return is_string($location) ? $location : null;
     }
 
     /**

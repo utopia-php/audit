@@ -52,22 +52,20 @@ class Audit
      * @param string $resource
      * @param string $userAgent
      * @param string $ip
-     * @param string $location
      * @param array<string, mixed> $data
      * @return Log
      *
      * @throws \Exception
      */
-    public function log(?string $userId, string $event, string $resource, string $userAgent, string $ip, string $location, array $data = []): Log
+    public function log(?string $userId, string $event, string $resource, string $userAgent, string $ip, array $data = []): Log
     {
-        /** @var array{userId?: string|null, event: string, resource: string, userAgent: string, ip: string, location?: string, data?: array<string, mixed>} $log */
+        /** @var array{userId?: string|null, event: string, resource: string, userAgent: string, ip: string, data?: array<string, mixed>} $log */
         $log = [
             'userId' => $userId,
             'event' => $event,
             'resource' => $resource,
             'userAgent' => $userAgent,
             'ip' => $ip,
-            'location' => $location,
             'data' => $data,
         ];
 
@@ -77,7 +75,7 @@ class Audit
     /**
      * Add multiple event logs in batch.
      *
-     * @param array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, time: string, data?: array<string, mixed>}> $events
+     * @param array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, time: string, data?: array<string, mixed>}> $events
      * @return bool
      *
      * @throws \Exception
@@ -303,5 +301,17 @@ class Audit
     public function findGrouped(array $queries, string $groupBy, string $interval): array
     {
         return $this->adapter->findGrouped($queries, $groupBy, $interval);
+    }
+
+    /**
+     * Ping the adapter to check connectivity.
+     *
+     * Returns false on any connectivity failure rather than throwing.
+     *
+     * @return bool True when the backing store is reachable, false otherwise.
+     */
+    public function ping(): bool
+    {
+        return $this->adapter->ping();
     }
 }

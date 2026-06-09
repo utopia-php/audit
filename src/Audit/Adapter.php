@@ -43,7 +43,6 @@ abstract class Adapter
      *     resource: string,
      *     userAgent: string,
      *     ip: string,
-     *     location?: string,
      *     data?: array<string, mixed>
      * } $log
      * @return Log The created log entry
@@ -61,7 +60,6 @@ abstract class Adapter
      *     resource: string,
      *     userAgent: string,
      *     ip: string,
-     *     location?: string,
      *     time: \DateTime|string|null,
      *     data?: array<string, mixed>
      * }> $logs
@@ -271,4 +269,13 @@ abstract class Adapter
      * @throws \Exception
      */
     abstract public function findGrouped(array $queries, string $groupBy, string $interval): array;
+
+    /**
+     * Ping the adapter to check connectivity.
+     *
+     * Returns false on any connectivity failure rather than throwing.
+     *
+     * @return bool True when the backing store is reachable, false otherwise.
+     */
+    abstract public function ping(): bool;
 }

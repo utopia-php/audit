@@ -114,6 +114,29 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Ping ClickHouse to check connectivity.
+     *
+     * Uses ClickHouse's dedicated /ping endpoint, which bypasses the query
+     * pipeline, requires no database context, and is not recorded in query
+     * logs. Returns false on any connectivity failure rather than throwing.
+     *
+     * @return bool True when ClickHouse is reachable, false otherwise.
+     */
+    public function ping(): bool
+    {
+        $scheme = $this->secure ? 'https' : 'http';
+        $url = "{$scheme}://{$this->host}:{$this->port}/ping";
+
+        try {
+            $response = $this->client->fetch(url: $url, method: Client::METHOD_GET);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return $response->getStatusCode() === 200;
+    }
+
+    /**
      * Validate host parameter.
      *
      * @param string $host
@@ -337,10 +360,18 @@ class ClickHouse extends SQL
     {
         $parentAttributes = parent::getAttributes();
 
+        foreach ($parentAttributes as &$attribute) {
+            if (($attribute['$id'] ?? null) === 'userId') {
+                $attribute['$id'] = 'actorId';
+                break;
+            }
+        }
+        unset($attribute);
+
         return [
             ...$parentAttributes,
             [
-                '$id' => 'userType',
+                '$id' => 'actorType',
                 'type' => Database::VAR_STRING,
                 'size' => Database::LENGTH_KEY,
                 'required' => true,
@@ -350,7 +381,7 @@ class ClickHouse extends SQL
                 'filters' => [],
             ],
             [
-                '$id' => 'userInternalId',
+                '$id' => 'actorInternalId',
                 'type' => Database::VAR_STRING,
                 'size' => Database::LENGTH_KEY,
                 'required' => false,
@@ -477,13 +508,21 @@ class ClickHouse extends SQL
     {
         $parentIndexes = parent::getIndexes();
 
-        // New indexes to add
+        foreach ($parentIndexes as &$index) {
+            if (($index['$id'] ?? null) === 'idx_userId_event') {
+                $index['$id'] = 'idx_actorId_event';
+                $index['attributes'] = ['actorId', 'event'];
+                break;
+            }
+        }
+        unset($index);
+
         return [
             ...$parentIndexes,
             [
-                '$id' => '_key_user_internal_and_event',
+                '$id' => '_key_actor_internal_and_event',
                 'type' => Database::INDEX_KEY,
-                'attributes' => ['userInternalId', 'event'],
+                'attributes' => ['actorInternalId', 'event'],
                 'lengths' => [],
                 'orders' => [],
             ],
@@ -502,16 +541,16 @@ class ClickHouse extends SQL
                 'orders' => [],
             ],
             [
-                '$id' => '_key_user_internal_id',
+                '$id' => '_key_actor_internal_id',
                 'type' => Database::INDEX_KEY,
-                'attributes' => ['userInternalId'],
+                'attributes' => ['actorInternalId'],
                 'lengths' => [],
                 'orders' => [],
             ],
             [
-                '$id' => '_key_user_type',
+                '$id' => '_key_actor_type',
                 'type' => Database::INDEX_KEY,
-                'attributes' => ['userType'],
+                'attributes' => ['actorType'],
                 'lengths' => [],
                 'orders' => [],
             ],
@@ -777,6 +816,22 @@ class ClickHouse extends SQL
      * @return bool True if valid
      * @throws Exception If attribute name is invalid
      */
+    /**
+     * Translate legacy user* attribute names to actor* column names.
+     *
+     * @param string $attribute
+     * @return string
+     */
+    private function translateAttribute(string $attribute): string
+    {
+        return match ($attribute) {
+            'userId' => 'actorId',
+            'userType' => 'actorType',
+            'userInternalId' => 'actorInternalId',
+            default => $attribute,
+        };
+    }
+
     private function validateAttributeName(string $attributeName): bool
     {
         // Special case: 'id' is always valid
@@ -1289,6 +1344,7 @@ class ClickHouse extends SQL
             $method = $query->getMethod();
             $attribute = $query->getAttribute();
             /** @var string $attribute */
+            $attribute = $this->translateAttribute($attribute);
             $values = $query->getValues();
 
             // Reject empty values for filter methods that take values — mirrors
@@ -1830,8 +1886,23 @@ class ClickHouse extends SQL
         $rows = [];
 
         foreach ($logs as $log) {
+            foreach (['userId' => 'actorId', 'userType' => 'actorType', 'userInternalId' => 'actorInternalId'] as $legacy => $current) {
+                if (isset($log[$legacy]) && !isset($log[$current])) {
+                    $log[$current] = $log[$legacy];
+                }
+                unset($log[$legacy]);
+            }
+
             /** @var array<string, mixed> $logData */
             $logData = $log['data'] ?? [];
+
+            foreach (['userId' => 'actorId', 'userType' => 'actorType', 'userInternalId' => 'actorInternalId'] as $legacy => $current) {
+                if (\array_key_exists($legacy, $logData) && !\array_key_exists($current, $logData)) {
+                    $logData[$current] = $logData[$legacy];
+                }
+                unset($logData[$legacy]);
+            }
+            $log['data'] = $logData;
 
             // Separate data for non-schema attributes
             $nonSchemaData = $logData;
@@ -1984,6 +2055,12 @@ class ClickHouse extends SQL
                 unset($document['id']);
             }
 
+            foreach (['actorId' => 'userId', 'actorType' => 'userType', 'actorInternalId' => 'userInternalId'] as $current => $legacy) {
+                if (\array_key_exists($current, $document) && !\array_key_exists($legacy, $document)) {
+                    $document[$legacy] = $document[$current];
+                }
+            }
+
             $documents[] = new Log($document);
         }
 
@@ -2083,7 +2160,7 @@ class ClickHouse extends SQL
         bool $ascending = false,
     ): array {
         $queries = [
-            Query::equal('userId', $userId),
+            Query::equal('actorId', $userId),
         ];
 
         if ($after !== null && $before !== null) {
@@ -2113,7 +2190,7 @@ class ClickHouse extends SQL
         ?int $max = null,
     ): int {
         $queries = [
-            Query::equal('userId', $userId),
+            Query::equal('actorId', $userId),
         ];
 
         if ($after !== null && $before !== null) {
@@ -2200,7 +2277,7 @@ class ClickHouse extends SQL
         bool $ascending = false,
     ): array {
         $queries = [
-            Query::equal('userId', $userId),
+            Query::equal('actorId', $userId),
             Query::contains('event', $events),
         ];
 
@@ -2232,7 +2309,7 @@ class ClickHouse extends SQL
         ?int $max = null,
     ): int {
         $queries = [
-            Query::equal('userId', $userId),
+            Query::equal('actorId', $userId),
             Query::contains('event', $events),
         ];
 

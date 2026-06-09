@@ -51,16 +51,20 @@ trait AuditBase
         $userId = 'userId';
         $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36';
         $ip = '127.0.0.1';
-        $location = 'US';
         $data = ['key1' => 'value1', 'key2' => 'value2'];
 
         $requiredAttributes = $this->getRequiredAttributes();
         $dataWithAttributes = array_merge($data, $requiredAttributes);
 
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $dataWithAttributes));
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $dataWithAttributes));
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $dataWithAttributes));
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log(null, 'insert', 'user/null', $userAgent, $ip, $location, $dataWithAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $dataWithAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $dataWithAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $dataWithAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log(null, 'insert', 'user/null', $userAgent, $ip, $dataWithAttributes));
+    }
+
+    public function testPing(): void
+    {
+        $this->assertTrue($this->audit->ping());
     }
 
     public function testGetLogsByUser(): void
@@ -164,12 +168,11 @@ trait AuditBase
         $userId = 'testGetByIdUser';
         $userAgent = 'Mozilla/5.0 Test';
         $ip = '192.168.1.100';
-        $location = 'US';
         $data = ['test' => 'getById'];
 
         $requiredAttributes = $this->getRequiredAttributes();
         $dataWithAttributes = array_merge($data, $requiredAttributes);
-        $log = $this->audit->log($userId, 'create', 'test/resource/123', $userAgent, $ip, $location, $dataWithAttributes);
+        $log = $this->audit->log($userId, 'create', 'test/resource/123', $userAgent, $ip, $dataWithAttributes);
         $logId = $log->getId();
 
         // Retrieve the log by ID
@@ -182,7 +185,6 @@ trait AuditBase
         $this->assertEquals('test/resource/123', $retrievedLog->getAttribute('resource'));
         $this->assertEquals($userAgent, $retrievedLog->getAttribute('userAgent'));
         $this->assertEquals($ip, $retrievedLog->getAttribute('ip'));
-        $this->assertEquals($location, $retrievedLog->getAttribute('location'));
         $this->assertEquals($data, $retrievedLog->getAttribute('data'));
 
         // Test with non-existent ID
@@ -198,7 +200,6 @@ trait AuditBase
         $userId = 'batchUserId';
         $userAgent = 'Mozilla/5.0 (Test User Agent)';
         $ip = '192.168.1.1';
-        $location = 'UK';
 
         // Create timestamps 1 minute apart
         $timestamp1 = DateTime::formatTz(DateTime::addSeconds(new \DateTime(), -120)) ?? '';
@@ -212,7 +213,6 @@ trait AuditBase
                 'resource' => 'database/document/batch1',
                 'userAgent' => $userAgent,
                 'ip' => $ip,
-                'location' => $location,
                 'data' => ['key' => 'value1'],
                 'time' => $timestamp1
             ],
@@ -222,7 +222,6 @@ trait AuditBase
                 'resource' => 'database/document/batch2',
                 'userAgent' => $userAgent,
                 'ip' => $ip,
-                'location' => $location,
                 'data' => ['key' => 'value2'],
                 'time' => $timestamp2
             ],
@@ -232,7 +231,6 @@ trait AuditBase
                 'resource' => 'database/document/batch3',
                 'userAgent' => $userAgent,
                 'ip' => $ip,
-                'location' => $location,
                 'data' => ['key' => 'value3'],
                 'time' => $timestamp3
             ],
@@ -242,7 +240,6 @@ trait AuditBase
                 'resource' => 'user1/null',
                 'userAgent' => $userAgent,
                 'ip' => $ip,
-                'location' => $location,
                 'data' => ['key' => 'value4'],
                 'time' => $timestamp3
             ]
@@ -326,7 +323,6 @@ trait AuditBase
                 'resource' => 'doc/' . $i,
                 'userAgent' => 'Mozilla',
                 'ip' => '127.0.0.1',
-                'location' => 'US',
                 'data' => ['index' => $i],
                 'time' => DateTime::formatTz($baseTime) ?? ''
             ];
@@ -362,7 +358,6 @@ trait AuditBase
                 'resource' => 'doc/1',
                 'userAgent' => 'Mozilla',
                 'ip' => '127.0.0.1',
-                'location' => 'US',
                 'data' => [],
                 'time' => $old
             ],
@@ -372,7 +367,6 @@ trait AuditBase
                 'resource' => 'doc/2',
                 'userAgent' => 'Mozilla',
                 'ip' => '127.0.0.1',
-                'location' => 'US',
                 'data' => [],
                 'time' => $recent
             ]
@@ -404,17 +398,16 @@ trait AuditBase
         $userId = 'userId';
         $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36';
         $ip = '127.0.0.1';
-        $location = 'US';
         $data = ['key1' => 'value1', 'key2' => 'value2'];
 
         $requiredAttributes = $this->getRequiredAttributes();
         $dataWithAttributes = array_merge($data, $requiredAttributes);
 
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $location, $dataWithAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $dataWithAttributes));
         sleep(5);
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $location, $dataWithAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $dataWithAttributes));
         sleep(5);
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $location, $dataWithAttributes));
+        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $dataWithAttributes));
         sleep(5);
 
         // DELETE logs older than 11 seconds and check that status is true
@@ -439,7 +432,6 @@ trait AuditBase
         $userId = 'paramtestuser';
         $userAgent = 'Mozilla/5.0';
         $ip = '192.168.1.1';
-        $location = 'US';
 
         // Create 5 logs with different timestamps
         $baseTime = new \DateTime('2024-06-15 12:00:00');
@@ -455,7 +447,6 @@ trait AuditBase
                 'resource' => 'doc/' . $i,
                 'userAgent' => $userAgent,
                 'ip' => $ip,
-                'location' => $location,
                 'data' => ['sequence' => $i],
                 'time' => $timestamp
             ];
@@ -611,7 +602,6 @@ trait AuditBase
         $userId = 'userId';
         $userAgent = 'Mozilla/5.0';
         $ip = '192.168.1.1';
-        $location = 'US';
 
         // Create test logs with specific attributes
         $baseTime = new \DateTime('2024-06-15 12:00:00');
@@ -627,7 +617,6 @@ trait AuditBase
                 'resource' => 'doc/' . $i,
                 'userAgent' => $userAgent,
                 'ip' => $ip,
-                'location' => $location,
                 'data' => ['sequence' => $i],
                 'time' => $timestamp
             ];
@@ -726,7 +715,6 @@ trait AuditBase
         $userId = 'userId';
         $userAgent = 'Mozilla/5.0';
         $ip = '192.168.1.1';
-        $location = 'US';
 
         // Create test logs with specific attributes
         $baseTime = new \DateTime('2024-06-15 12:00:00');
@@ -742,7 +730,6 @@ trait AuditBase
                 'resource' => 'doc/' . $i,
                 'userAgent' => $userAgent,
                 'ip' => $ip,
-                'location' => $location,
                 'data' => ['sequence' => $i],
                 'time' => $timestamp
             ];
@@ -813,17 +800,17 @@ trait AuditBase
      * Apply adapter-specific required attributes to batch events.
      *
      * @param array<int, array<string, mixed>> $batchEvents
-     * @return array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, time: string, data?: array<string, mixed>}>
+     * @return array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, time: string, data?: array<string, mixed>}>
      */
     protected function applyRequiredAttributesToBatch(array $batchEvents): array
     {
         $requiredAttributes = $this->getRequiredAttributes();
         if ($requiredAttributes === []) {
-            /** @var array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, time: string, data?: array<string, mixed>}> */
+            /** @var array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, time: string, data?: array<string, mixed>}> */
             return $batchEvents;
         }
 
-        /** @var array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, location: string, time: string, data?: array<string, mixed>}> */
+        /** @var array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, time: string, data?: array<string, mixed>}> */
         return array_map(static fn (array $event) => array_merge($event, $requiredAttributes), $batchEvents);
     }
 
