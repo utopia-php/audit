@@ -62,6 +62,11 @@ trait AuditBase
         $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log(null, 'insert', 'user/null', $userAgent, $ip, $dataWithAttributes));
     }
 
+    public function testPing(): void
+    {
+        $this->assertTrue($this->audit->ping());
+    }
+
     public function testGetLogsByUser(): void
     {
         $logs = $this->audit->getLogsByUser('userId');
