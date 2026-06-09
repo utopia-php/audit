@@ -35,6 +35,22 @@ class Database extends SQL
     }
 
     /**
+     * Ping the database to check connectivity.
+     *
+     * Returns false on any connectivity failure rather than throwing.
+     *
+     * @return bool True when the database is reachable, false otherwise.
+     */
+    public function ping(): bool
+    {
+        try {
+            return $this->db->ping();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * Setup database structure.
      *
      * @return void

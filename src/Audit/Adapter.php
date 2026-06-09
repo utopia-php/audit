@@ -239,4 +239,13 @@ abstract class Adapter
      * @throws \Exception
      */
     abstract public function count(array $queries = [], ?int $max = null): int;
+
+    /**
+     * Ping the adapter to check connectivity.
+     *
+     * Returns false on any connectivity failure rather than throwing.
+     *
+     * @return bool True when the backing store is reachable, false otherwise.
+     */
+    abstract public function ping(): bool;
 }
