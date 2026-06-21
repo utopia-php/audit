@@ -241,6 +241,36 @@ abstract class Adapter
     abstract public function count(array $queries = [], ?int $max = null): int;
 
     /**
+     * Find logs aggregated into (groupValue, bucket, count) rows.
+     *
+     * Produces time-bucketed grouped counts for charts of the form
+     * "events per <interval>, grouped by <attribute>". The result is a flat
+     * array of associative rows ordered by groupValue asc, bucket asc;
+     * cloud-side consumers reshape into nested groups.
+     *
+     * Adapters MUST:
+     *  - reject `$groupBy` values outside {`event`, `userType`, `resourceType`}
+     *  - reject `$interval` values outside {`hour`, `day`, `week`, `month`}
+     *  - apply the same filters/tenant scoping as `find()` to `$queries`
+     *  - apply `Query::limit()` / `Query::offset()` to the group set (top-N
+     *    by `SUM(count)` desc, ties by groupValue asc), default limit 25,
+     *    hard max 100
+     *  - zero-fill every bucket between the smallest and largest bucket
+     *    implied by the time filter for every returned group, with UTC-aligned
+     *    boundaries
+     *  - return the bucket as an ISO-8601 UTC string (matching `find()`'s
+     *    formatting of `time`)
+     *
+     * @param array<\Utopia\Audit\Query> $queries Filter/limit/offset queries; callers should include a time BETWEEN filter
+     * @param string $groupBy One of `event`, `userType`, `resourceType`
+     * @param string $interval One of `hour`, `day`, `week`, `month`
+     * @return array<int, array{value: string, bucket: string, count: int}>
+     *
+     * @throws \Exception
+     */
+    abstract public function findGrouped(array $queries, string $groupBy, string $interval): array;
+
+    /**
      * Ping the adapter to check connectivity.
      *
      * Returns false on any connectivity failure rather than throwing.

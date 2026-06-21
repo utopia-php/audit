@@ -289,6 +289,21 @@ class Audit
     }
 
     /**
+     * Find logs aggregated into (groupValue, bucket, count) rows.
+     *
+     * @param array<Query> $queries Filter/limit/offset queries; callers should include a time BETWEEN filter
+     * @param string $groupBy One of `event`, `userType`, `resourceType`
+     * @param string $interval One of `hour`, `day`, `week`, `month`
+     * @return array<int, array{value: string, bucket: string, count: int}>
+     *
+     * @throws \Exception
+     */
+    public function findGrouped(array $queries, string $groupBy, string $interval): array
+    {
+        return $this->adapter->findGrouped($queries, $groupBy, $interval);
+    }
+
+    /**
      * Ping the adapter to check connectivity.
      *
      * Returns false on any connectivity failure rather than throwing.

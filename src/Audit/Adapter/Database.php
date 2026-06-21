@@ -558,4 +558,22 @@ class Database extends SQL
             );
         });
     }
+
+    /**
+     * Find logs aggregated into (groupValue, bucket, count) rows.
+     *
+     * Not implemented for the Database adapter — grouped time-bucketed
+     * aggregations are designed for analytical backends (ClickHouse). Callers
+     * relying on this method must use the ClickHouse adapter.
+     *
+     * @param array<\Utopia\Audit\Query> $queries
+     * @param string $groupBy
+     * @param string $interval
+     * @return array<int, array{value: string, bucket: string, count: int}>
+     * @throws \Exception
+     */
+    public function findGrouped(array $queries, string $groupBy, string $interval): array
+    {
+        throw new Exception('findGrouped is not supported by the Database adapter');
+    }
 }

@@ -934,4 +934,263 @@ class ClickHouseTest extends TestCase
             Query::orderDesc('time'),
         ]);
     }
+
+    public function testFindGroupedRejectsInvalidGroupBy(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage("Invalid groupBy 'userId'");
+
+        $this->audit->findGrouped([], 'userId', 'hour');
+    }
+
+    public function testFindGroupedRejectsInvalidInterval(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage("Invalid interval 'minute'");
+
+        $this->audit->findGrouped([], 'event', 'minute');
+    }
+
+    public function testFindGroupedByEventReturnsBucketedCounts(): void
+    {
+        $from = (new \DateTime())->modify('-1 hour');
+        $to = (new \DateTime())->modify('+1 hour');
+
+        $rows = $this->audit->findGrouped(
+            [
+                Query::between(
+                    'time',
+                    \Utopia\Database\DateTime::format($from),
+                    \Utopia\Database\DateTime::format($to),
+                ),
+            ],
+            'event',
+            'hour'
+        );
+
+        $this->assertNotEmpty($rows);
+
+        $events = [];
+        foreach ($rows as $row) {
+            $this->assertArrayHasKey('value', $row);
+            $this->assertArrayHasKey('bucket', $row);
+            $this->assertArrayHasKey('count', $row);
+            $this->assertIsString($row['value']);
+            $this->assertIsString($row['bucket']);
+            $this->assertIsInt($row['count']);
+            // Bucket is ISO-8601 UTC
+            $this->assertMatchesRegularExpression(
+                '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/',
+                $row['bucket']
+            );
+            $events[$row['value']] = ($events[$row['value']] ?? 0) + $row['count'];
+        }
+
+        // Fixture has 4 rows: 2 update, 1 delete, 1 insert
+        $this->assertEquals(2, $events['update'] ?? null);
+        $this->assertEquals(1, $events['delete'] ?? null);
+        $this->assertEquals(1, $events['insert'] ?? null);
+    }
+
+    public function testFindGroupedOrdersByValueAscThenBucketAsc(): void
+    {
+        $from = (new \DateTime())->modify('-1 hour');
+        $to = (new \DateTime())->modify('+1 hour');
+
+        $rows = $this->audit->findGrouped(
+            [
+                Query::between(
+                    'time',
+                    \Utopia\Database\DateTime::format($from),
+                    \Utopia\Database\DateTime::format($to),
+                ),
+            ],
+            'event',
+            'hour'
+        );
+
+        $this->assertNotEmpty($rows);
+
+        $previousValue = null;
+        $previousBucketForValue = null;
+        foreach ($rows as $row) {
+            if ($previousValue === null || $row['value'] !== $previousValue) {
+                if ($previousValue !== null) {
+                    $this->assertGreaterThan($previousValue, $row['value']);
+                }
+                $previousValue = $row['value'];
+                $previousBucketForValue = $row['bucket'];
+                continue;
+            }
+            $this->assertGreaterThanOrEqual($previousBucketForValue, $row['bucket']);
+            $previousBucketForValue = $row['bucket'];
+        }
+    }
+
+    public function testFindGroupedZeroFillsBucketRange(): void
+    {
+        $from = (new \DateTime())->modify('-3 hour');
+        $to = (new \DateTime())->modify('+1 hour');
+
+        $rows = $this->audit->findGrouped(
+            [
+                Query::between(
+                    'time',
+                    \Utopia\Database\DateTime::format($from),
+                    \Utopia\Database\DateTime::format($to),
+                ),
+            ],
+            'event',
+            'hour'
+        );
+
+        $this->assertNotEmpty($rows);
+
+        // Group counts per value
+        $bucketsPerValue = [];
+        foreach ($rows as $row) {
+            $bucketsPerValue[$row['value']] = ($bucketsPerValue[$row['value']] ?? 0) + 1;
+        }
+
+        // Fixture rows are within a single hour; bounds = [bucket_min, bucket_max]
+        // inclusive. With all 4 fixture rows in one hour, every group should have
+        // exactly one bucket (the min and max bucket are the same).
+        foreach ($bucketsPerValue as $value => $count) {
+            $this->assertGreaterThanOrEqual(1, $count, "Group '{$value}' should have at least one bucket");
+            // Each group has the same number of buckets (zero-fill is consistent)
+            $this->assertEquals(reset($bucketsPerValue), $count, 'All groups should share the same bucket count');
+        }
+    }
+
+    public function testFindGroupedRespectsLimit(): void
+    {
+        $from = (new \DateTime())->modify('-1 hour');
+        $to = (new \DateTime())->modify('+1 hour');
+
+        $rows = $this->audit->findGrouped(
+            [
+                Query::between(
+                    'time',
+                    \Utopia\Database\DateTime::format($from),
+                    \Utopia\Database\DateTime::format($to),
+                ),
+                Query::limit(1),
+            ],
+            'event',
+            'hour'
+        );
+
+        $this->assertNotEmpty($rows);
+        $values = array_unique(array_map(fn (array $r) => $r['value'], $rows));
+        $this->assertCount(1, $values);
+        // Top-N by SUM(count) desc: 'update' has 2 rows, others have 1 → wins
+        $this->assertEquals('update', $rows[0]['value']);
+    }
+
+    public function testFindGroupedClampsLimitToMax(): void
+    {
+        $from = (new \DateTime())->modify('-1 hour');
+        $to = (new \DateTime())->modify('+1 hour');
+
+        $rows = $this->audit->findGrouped(
+            [
+                Query::between(
+                    'time',
+                    \Utopia\Database\DateTime::format($from),
+                    \Utopia\Database\DateTime::format($to),
+                ),
+                Query::limit(500),
+            ],
+            'event',
+            'hour'
+        );
+
+        // Hard max is 100; fixture only has 3 distinct events so result is small
+        $this->assertNotEmpty($rows);
+        $values = array_unique(array_map(fn (array $r) => $r['value'], $rows));
+        $this->assertLessThanOrEqual(100, count($values));
+    }
+
+    public function testFindGroupedRespectsOffset(): void
+    {
+        $from = (new \DateTime())->modify('-1 hour');
+        $to = (new \DateTime())->modify('+1 hour');
+
+        $page1 = $this->audit->findGrouped(
+            [
+                Query::between(
+                    'time',
+                    \Utopia\Database\DateTime::format($from),
+                    \Utopia\Database\DateTime::format($to),
+                ),
+                Query::limit(1),
+            ],
+            'event',
+            'hour'
+        );
+        $page2 = $this->audit->findGrouped(
+            [
+                Query::between(
+                    'time',
+                    \Utopia\Database\DateTime::format($from),
+                    \Utopia\Database\DateTime::format($to),
+                ),
+                Query::limit(1),
+                Query::offset(1),
+            ],
+            'event',
+            'hour'
+        );
+
+        $this->assertNotEmpty($page1);
+        $this->assertNotEmpty($page2);
+        $this->assertNotEquals($page1[0]['value'], $page2[0]['value']);
+    }
+
+    public function testFindGroupedByUserTypeReturnsRows(): void
+    {
+        $from = (new \DateTime())->modify('-1 hour');
+        $to = (new \DateTime())->modify('+1 hour');
+
+        $rows = $this->audit->findGrouped(
+            [
+                Query::between(
+                    'time',
+                    \Utopia\Database\DateTime::format($from),
+                    \Utopia\Database\DateTime::format($to),
+                ),
+            ],
+            'userType',
+            'day'
+        );
+
+        $this->assertNotEmpty($rows);
+        // Fixture sets userType=member for every row
+        $total = 0;
+        foreach ($rows as $row) {
+            $this->assertEquals('member', $row['value']);
+            $total += $row['count'];
+        }
+        $this->assertEquals(4, $total);
+    }
+
+    public function testFindGroupedReturnsEmptyForEmptyRange(): void
+    {
+        $past1 = (new \DateTime())->modify('-3 hour');
+        $past2 = (new \DateTime())->modify('-2 hour');
+
+        $rows = $this->audit->findGrouped(
+            [
+                Query::between(
+                    'time',
+                    \Utopia\Database\DateTime::format($past1),
+                    \Utopia\Database\DateTime::format($past2),
+                ),
+            ],
+            'event',
+            'hour'
+        );
+
+        $this->assertEquals([], $rows);
+    }
 }
