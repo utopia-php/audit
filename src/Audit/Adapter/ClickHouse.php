@@ -24,6 +24,16 @@ class ClickHouse extends SQL
     private const DEFAULT_DATABASE = 'default';
 
     /**
+     * @var list<string>
+     */
+    private const LOW_CARDINALITY_COLUMNS = [
+        'event',
+        'actorType',
+        'resourceType',
+        'country',
+    ];
+
+    /**
      * Filter methods that must be supplied at least one value. Empty `values`
      * arrays for these methods are rejected up front so they can't silently
      * compile into a "no filter applied" WHERE clause.
@@ -766,6 +776,8 @@ class ClickHouse extends SQL
         $tableName = $this->getTableName();
         $escapedDatabaseAndTable = $this->escapeIdentifier($this->database) . '.' . $this->escapeIdentifier($tableName);
 
+        $orderByExpr = $this->sharedTables ? '(tenant, time, id)' : '(time, id)';
+
         // Create table with MergeTree engine for optimal performance
         $createTableSql = "
             CREATE TABLE IF NOT EXISTS {$escapedDatabaseAndTable} (
@@ -773,9 +785,9 @@ class ClickHouse extends SQL
                 " . implode(",\n                ", $indexes) . "
             )
             ENGINE = MergeTree()
-            ORDER BY (time, id)
+            ORDER BY {$orderByExpr}
             PARTITION BY toYYYYMM(time)
-            SETTINGS index_granularity = 8192
+            SETTINGS index_granularity = 8192" . ($this->sharedTables ? ', allow_nullable_key = 1' : '') . "
         ";
 
         $this->query($createTableSql);
@@ -1962,9 +1974,19 @@ class ClickHouse extends SQL
             ? 'DateTime64(3)'
             : 'String';
 
-        $nullable = !$attribute['required'] ? 'Nullable(' . $type . ')' : $type;
+        $required = (bool) $attribute['required'];
 
-        return "{$id} {$nullable}";
+        if ($type === 'String' && \in_array($id, self::LOW_CARDINALITY_COLUMNS, true)) {
+            $columnType = $required
+                ? 'LowCardinality(String)'
+                : 'LowCardinality(Nullable(String))';
+
+            return "{$id} {$columnType}";
+        }
+
+        $columnType = !$required ? 'Nullable(' . $type . ')' : $type;
+
+        return "{$id} {$columnType}";
     }
 
     /**
