@@ -377,6 +377,74 @@ class ClickHouseTest extends TestCase
     }
 
     /**
+     * Test setRetention stores the value and getRetention returns it
+     */
+    public function testSetRetention(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $this->assertNull($adapter->getRetention());
+
+        $result = $adapter->setRetention(30);
+        $this->assertInstanceOf(ClickHouse::class, $result);
+        $this->assertEquals(30, $adapter->getRetention());
+    }
+
+    /**
+     * Test setRetention accepts null to disable retention
+     */
+    public function testSetRetentionAcceptsNull(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $adapter->setRetention(30);
+        $adapter->setRetention(null);
+        $this->assertNull($adapter->getRetention());
+    }
+
+    /**
+     * Test setRetention rejects zero days
+     */
+    public function testSetRetentionRejectsZero(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Retention must be a positive number of days');
+
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $adapter->setRetention(0);
+    }
+
+    /**
+     * Test setRetention rejects negative days
+     */
+    public function testSetRetentionRejectsNegative(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Retention must be a positive number of days');
+
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $adapter->setRetention(-1);
+    }
+
+    /**
      * Test shared tables configuration
      */
     public function testSharedTablesConfiguration(): void
