@@ -32,6 +32,16 @@ class ClickHouse extends SQL
     private const DEFAULT_DATABASE = 'default';
 
     /**
+     * @var list<string>
+     */
+    private const LOW_CARDINALITY_COLUMNS = [
+        'event',
+        'actorType',
+        'resourceType',
+        'country',
+    ];
+
+    /**
      * Filter methods that must be supplied at least one value. Empty `values`
      * arrays for these methods are rejected up front so they can't silently
      * compile into a "no filter applied" WHERE clause.
@@ -789,6 +799,9 @@ class ClickHouse extends SQL
 
             $type = $this->mapAttributeType($attribute);
             $column = $table->addColumn($id, $type);
+            if (!empty($attribute['required']) && \in_array($id, self::LOW_CARDINALITY_COLUMNS, true)) {
+                $column->lowCardinality();
+            }
             if (empty($attribute['required'])) {
                 $column->nullable();
             }
@@ -812,9 +825,14 @@ class ClickHouse extends SQL
         }
 
         $table->engine(ClickHouseEngine::MergeTree);
-        $table->orderBy(['time', 'id']);
+        $table->orderBy($this->sharedTables ? ['tenant', 'time', 'id'] : ['time', 'id']);
         $table->partitionBy('toYYYYMM(time)');
-        $table->settings(['index_granularity' => '8192']);
+
+        $settings = ['index_granularity' => '8192'];
+        if ($this->sharedTables) {
+            $settings['allow_nullable_key'] = '1';
+        }
+        $table->settings($settings);
 
         $createTableSql = $table->createIfNotExists()->query;
         $this->query($createTableSql);
@@ -1859,9 +1877,19 @@ class ClickHouse extends SQL
             ? 'DateTime64(3)'
             : 'String';
 
-        $nullable = !$attribute['required'] ? 'Nullable(' . $type . ')' : $type;
+        $required = (bool) $attribute['required'];
 
-        return "{$id} {$nullable}";
+        if ($type === 'String' && \in_array($id, self::LOW_CARDINALITY_COLUMNS, true)) {
+            $columnType = $required
+                ? 'LowCardinality(String)'
+                : 'LowCardinality(Nullable(String))';
+
+            return "{$id} {$columnType}";
+        }
+
+        $columnType = !$required ? 'Nullable(' . $type . ')' : $type;
+
+        return "{$id} {$columnType}";
     }
 
     /**

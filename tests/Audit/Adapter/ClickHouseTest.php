@@ -25,7 +25,7 @@ class ClickHouseTest extends TestCase
         $username = getenv('CLICKHOUSE_USER') ?: 'default';
         $password = getenv('CLICKHOUSE_PASSWORD') ?: 'clickhouse';
         $port = (int) (getenv('CLICKHOUSE_PORT') ?: 8123);
-        $secure = (bool) (getenv('CLICKHOUSE_SECURE') ?: false);
+        $secure = filter_var(getenv('CLICKHOUSE_SECURE') ?: false, FILTER_VALIDATE_BOOLEAN);
 
         $clickHouse = new ClickHouse(
             host: $host,
@@ -933,5 +933,70 @@ class ClickHouseTest extends TestCase
             Query::orderRandom(),
             Query::orderDesc('time'),
         ]);
+    }
+
+    public function testSharedTableSortKeyLeadsWithTenant(): void
+    {
+        $host = getenv('CLICKHOUSE_HOST') ?: 'clickhouse';
+        $username = getenv('CLICKHOUSE_USER') ?: 'default';
+        $password = getenv('CLICKHOUSE_PASSWORD') ?: 'clickhouse';
+        $port = (int) (getenv('CLICKHOUSE_PORT') ?: 8123);
+        $secure = filter_var(getenv('CLICKHOUSE_SECURE') ?: false, FILTER_VALIDATE_BOOLEAN);
+        $database = getenv('CLICKHOUSE_DATABASE') ?: 'default';
+
+        $namespace = 'projtest_' . uniqid();
+
+        $adapter = new ClickHouse(
+            host: $host,
+            username: $username,
+            password: $password,
+            port: $port,
+            secure: $secure
+        );
+        $adapter->setDatabase($database);
+        $adapter->setNamespace($namespace);
+        $adapter->setSharedTables(true);
+        $adapter->setTenant(1);
+
+        $table = $namespace . '_audits';
+
+        $http = function (string $sql, array $params = []) use ($host, $port, $username, $password, $secure, $database): string {
+            $scheme = $secure ? 'https' : 'http';
+            $url = "{$scheme}://{$host}:{$port}/?database=" . rawurlencode($database)
+                . '&user=' . rawurlencode($username)
+                . '&password=' . rawurlencode($password);
+            /** @var array<string, string> $params */
+            foreach ($params as $key => $value) {
+                $url .= '&param_' . rawurlencode($key) . '=' . rawurlencode($value);
+            }
+            $ctx = stream_context_create(['http' => [
+                'method' => 'POST',
+                'header' => "Content-Type: text/plain\r\n",
+                'content' => $sql,
+                'timeout' => 15,
+                'ignore_errors' => true,
+            ]]);
+            $out = @file_get_contents($url, false, $ctx);
+
+            return $out === false ? '' : trim((string) $out);
+        };
+
+        try {
+            (new Audit($adapter))->setup();
+
+            $sortingKey = $http(
+                'SELECT sorting_key FROM system.tables WHERE database = {db:String} AND name = {tbl:String}',
+                ['db' => $database, 'tbl' => $table]
+            );
+
+            $this->assertTrue(
+                str_starts_with(trim($sortingKey), 'tenant'),
+                "Expected sorting key to lead with 'tenant', got: {$sortingKey}"
+            );
+        } finally {
+            $escDb = '`' . str_replace('`', '``', $database) . '`';
+            $escTbl = '`' . str_replace('`', '``', $table) . '`';
+            $http("DROP TABLE IF EXISTS {$escDb}.{$escTbl}");
+        }
     }
 }
