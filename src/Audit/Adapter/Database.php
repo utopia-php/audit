@@ -494,6 +494,7 @@ class Database extends SQL
         $dbQueries = [];
 
         foreach ($queries as $query) {
+            /** @phpstan-ignore-next-line instanceof.alwaysTrue - runtime validation despite type hint */
             if (!($query instanceof \Utopia\Audit\Query)) {
                 throw new \Exception('Invalid query type. Expected Utopia\\Audit\\Query');
             }
@@ -529,12 +530,13 @@ class Database extends SQL
         $dbQueries = [];
 
         foreach ($queries as $query) {
+            /** @phpstan-ignore-next-line instanceof.alwaysTrue - runtime validation despite type hint */
             if (!($query instanceof \Utopia\Audit\Query)) {
                 throw new \Exception('Invalid query type. Expected Utopia\\Audit\\Query');
             }
 
             // Skip limit, offset, and cursor queries — they don't apply to count
-            $method = $query->getMethod();
+            $method = $query->getMethod()->value;
             if (
                 $method === \Utopia\Audit\Query::TYPE_LIMIT
                 || $method === \Utopia\Audit\Query::TYPE_OFFSET

@@ -10,7 +10,8 @@
         "audit"
     ],
     "license": "MIT",
-    "minimum-stability": "stable",
+    "minimum-stability": "dev",
+    "prefer-stable": true,
     "scripts": {
         "lint": "./vendor/bin/pint --test",
         "format": "./vendor/bin/pint",
@@ -28,14 +29,15 @@
     },
     "require": {
         "php": ">=8.4",
+        "psr/http-client": "^1.0",
+        "utopia-php/client": "^0.1|^0.2",
         "utopia-php/database": "^6.0.0",
-        "utopia-php/fetch": "^1.1",
-        "utopia-php/query": "0.1.*",
+        "utopia-php/query": "0.3.*",
         "utopia-php/validators": "0.2.*"
     },
     "require-dev": {
         "phpunit/phpunit": "9.*",
-        "phpstan/phpstan": "1.*",
+        "phpstan/phpstan": "^2.0",
         "laravel/pint": "1.*"
     },
     "config": {

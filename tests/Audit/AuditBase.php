@@ -245,8 +245,6 @@ trait AuditBase
             ]
         ];
 
-        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
-
         // Test batch insertion
         $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
 
