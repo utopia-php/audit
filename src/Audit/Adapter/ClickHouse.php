@@ -3,10 +3,14 @@
 namespace Utopia\Audit\Adapter;
 
 use Exception;
+use Psr\Http\Client\ClientInterface;
 use Utopia\Audit\Log;
 use Utopia\Audit\Query;
+use Utopia\Client;
+use Utopia\Client\Adapter\Curl\Client as CurlAdapter;
 use Utopia\Database\Database;
-use Utopia\Fetch\Client;
+use Utopia\Psr7\Method as HttpMethod;
+use Utopia\Psr7\Request\Factory as RequestFactory;
 use Utopia\Query\Builder\ClickHouse as ClickHouseBuilder;
 use Utopia\Query\Builder\ClickHouse\Format;
 use Utopia\Query\Method;
@@ -82,7 +86,9 @@ class ClickHouse extends SQL
     /** @var bool Whether to use HTTPS for ClickHouse HTTP interface */
     private bool $secure = false;
 
-    private Client $client;
+    private readonly ClientInterface $client;
+
+    private readonly RequestFactory $requestFactory;
 
     protected string $namespace = '';
 
@@ -98,6 +104,8 @@ class ClickHouse extends SQL
      * @param string $password ClickHouse password (default: '')
      * @param int $port ClickHouse HTTP port (default: 8123)
      * @param bool $secure Whether to use HTTPS (default: false)
+     * @param ClientInterface|null $client PSR-18 HTTP transport. Defaults to a
+     *   cURL client with connection reuse enabled.
      * @throws Exception If validation fails
      */
     public function __construct(
@@ -105,7 +113,8 @@ class ClickHouse extends SQL
         string $username = 'default',
         string $password = '',
         int $port = self::DEFAULT_PORT,
-        bool $secure = false
+        bool $secure = false,
+        ?ClientInterface $client = null
     ) {
         $this->validateHost($host);
         $this->validatePort($port);
@@ -116,11 +125,8 @@ class ClickHouse extends SQL
         $this->password = $password;
         $this->secure = $secure;
 
-        // Initialize the HTTP client for connection reuse
-        $this->client = new Client();
-        $this->client->addHeader('X-ClickHouse-User', $this->username);
-        $this->client->addHeader('X-ClickHouse-Key', $this->password);
-        $this->client->setTimeout(30_000); // 30 seconds
+        $this->client = $client ?? new Client((new CurlAdapter())->withConnectionReuse());
+        $this->requestFactory = new RequestFactory();
     }
 
     /**
@@ -146,7 +152,7 @@ class ClickHouse extends SQL
         $url = "{$scheme}://{$this->host}:{$this->port}/ping";
 
         try {
-            $response = $this->client->fetch(url: $url, method: Client::METHOD_GET);
+            $response = $this->client->sendRequest($this->requestFactory->createRequest(HttpMethod::GET, $url));
         } catch (\Throwable) {
             return false;
         }
@@ -655,7 +661,7 @@ class ClickHouse extends SQL
     }
 
     /**
-     * Execute a ClickHouse query via HTTP interface using Fetch Client.
+     * Execute a ClickHouse query via HTTP interface.
      *
      * This unified method supports two modes of operation:
      *
@@ -684,38 +690,29 @@ class ClickHouse extends SQL
     {
         $scheme = $this->secure ? 'https' : 'http';
 
-        // Update the database header for each query (in case setDatabase was called)
-        $this->client->addHeader('X-ClickHouse-Database', $this->database);
-
         try {
             if ($rawBody !== null) {
                 $url = "{$scheme}://{$this->host}:{$this->port}/?query=" . urlencode($sql);
-                $body = $rawBody;
+                $request = $this->requestFactory->body(HttpMethod::POST, $url, $rawBody, 'application/x-ndjson', $this->buildHeaders());
             } else {
-                // Parameterized query mode using multipart form data
                 $url = "{$scheme}://{$this->host}:{$this->port}/";
 
-                // Build multipart form data body with query and parameters
-                $body = ['query' => $sql];
+                $parts = ['query' => $sql];
                 foreach ($params as $key => $value) {
-                    $body['param_' . $key] = $this->formatParamValue($value);
+                    $parts['param_' . $key] = $this->formatParamValue($value);
                 }
+
+                $request = $this->requestFactory->multipart(HttpMethod::POST, $url, $parts, $this->buildHeaders());
             }
 
-            $response = $this->client->fetch(
-                url: $url,
-                method: Client::METHOD_POST,
-                body: $body
-            );
+            $response = $this->client->sendRequest($request);
+            $responseBody = (string) $response->getBody();
 
             if ($response->getStatusCode() !== 200) {
-                $responseBody = $response->getBody();
-                $responseBody = is_string($responseBody) ? $responseBody : '';
                 throw new Exception("ClickHouse query failed with HTTP {$response->getStatusCode()}: {$responseBody}");
             }
 
-            $responseBody = $response->getBody();
-            return is_string($responseBody) ? $responseBody : '';
+            return $responseBody;
         } catch (Exception $e) {
             throw new Exception(
                 "ClickHouse query execution failed: {$e->getMessage()}",
@@ -723,6 +720,20 @@ class ClickHouse extends SQL
                 $e
             );
         }
+    }
+
+    /**
+     * Build ClickHouse authentication and database headers.
+     *
+     * @return array<string, string>
+     */
+    private function buildHeaders(): array
+    {
+        return [
+            'X-ClickHouse-User' => $this->username,
+            'X-ClickHouse-Key' => $this->password,
+            'X-ClickHouse-Database' => $this->database,
+        ];
     }
 
     /**
