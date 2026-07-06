@@ -10,7 +10,7 @@ use Utopia\Database\Exception\Authorization as AuthorizationException;
 use Utopia\Database\Exception\Duplicate as DuplicateException;
 use Utopia\Database\Exception\Timeout;
 use Utopia\Database\Query;
-use Utopia\Exception;
+use Exception;
 
 /**
  * Database Adapter for Audit
@@ -54,7 +54,7 @@ class Database extends SQL
      * Setup database structure.
      *
      * @return void
-     * @throws Exception|\Exception
+     * @throws \Exception
      */
     public function setup(): void
     {

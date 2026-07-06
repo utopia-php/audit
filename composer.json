@@ -29,7 +29,7 @@
     },
     "require": {
         "php": ">=8.4",
-        "utopia-php/database": "5.*",
+        "utopia-php/database": "^6.0.0",
         "utopia-php/fetch": "^1.1",
         "utopia-php/query": "dev-feat/clickhouse-nested-column-quoting as 0.3.3",
         "utopia-php/validators": "0.2.*"
