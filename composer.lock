@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a96b3358ce86775fa3350e75c7afeb0d",
+    "content-hash": "6065b4b4d72c773b4b686885aedb9a1e",
     "packages": [
         {
             "name": "brick/math",
@@ -2427,16 +2427,16 @@
         },
         {
             "name": "utopia-php/query",
-            "version": "dev-feat/clickhouse-nested-column-quoting",
+            "version": "0.3.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/query.git",
-                "reference": "a0eb584fab2253d20b08f96adab2a38cd9233ceb"
+                "reference": "76cd71071cd59cb45ef6b30eb11449f3832bf18f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/query/zipball/a0eb584fab2253d20b08f96adab2a38cd9233ceb",
-                "reference": "a0eb584fab2253d20b08f96adab2a38cd9233ceb",
+                "url": "https://api.github.com/repos/utopia-php/query/zipball/76cd71071cd59cb45ef6b30eb11449f3832bf18f",
+                "reference": "76cd71071cd59cb45ef6b30eb11449f3832bf18f",
                 "shasum": ""
             },
             "require": {
@@ -2470,9 +2470,9 @@
             ],
             "support": {
                 "issues": "https://github.com/utopia-php/query/issues",
-                "source": "https://github.com/utopia-php/query/tree/feat/clickhouse-nested-column-quoting"
+                "source": "https://github.com/utopia-php/query/tree/0.3.3"
             },
-            "time": "2026-05-21T06:56:39+00:00"
+            "time": "2026-07-06T04:55:56+00:00"
         },
         {
             "name": "utopia-php/span",
@@ -4525,18 +4525,9 @@
             "time": "2025-11-17T20:03:58+00:00"
         }
     ],
-    "aliases": [
-        {
-            "package": "utopia-php/query",
-            "version": "dev-feat/clickhouse-nested-column-quoting",
-            "alias": "0.3.3",
-            "alias_normalized": "0.3.3.0"
-        }
-    ],
+    "aliases": [],
     "minimum-stability": "dev",
-    "stability-flags": {
-        "utopia-php/query": 20
-    },
+    "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
