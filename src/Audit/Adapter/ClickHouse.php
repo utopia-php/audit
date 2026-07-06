@@ -810,7 +810,7 @@ class ClickHouse extends SQL
 
             $type = $this->mapAttributeType($attribute);
             $column = $table->addColumn($id, $type);
-            if (!empty($attribute['required']) && \in_array($id, self::LOW_CARDINALITY_COLUMNS, true)) {
+            if (\in_array($id, self::LOW_CARDINALITY_COLUMNS, true)) {
                 $column->lowCardinality();
             }
             if (empty($attribute['required'])) {

@@ -32,7 +32,7 @@
         "psr/http-client": "^1.0",
         "utopia-php/client": "^0.1|^0.2",
         "utopia-php/database": "^6.0.0",
-        "utopia-php/query": "dev-feat/clickhouse-nested-column-quoting as 0.3.3",
+        "utopia-php/query": "0.3.*",
         "utopia-php/validators": "0.2.*"
     },
     "require-dev": {
