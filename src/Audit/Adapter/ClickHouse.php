@@ -84,15 +84,13 @@ class ClickHouse extends SQL
 
     protected bool $asyncCleanup = false;
 
-    /** @var int|null Retention in days; when set, setup() applies a TTL on the table. Null disables TTL. */
-    private ?int $retention = null;
-
     /**
      * @param string $host ClickHouse host
      * @param string $username ClickHouse username (default: 'default')
      * @param string $password ClickHouse password (default: '')
      * @param int $port ClickHouse HTTP port (default: 8123)
      * @param bool $secure Whether to use HTTPS (default: false)
+     * @param int|null $retention Retention window in days; when set, setup() applies a TTL so rows older than the window are dropped. Null disables TTL.
      * @throws Exception If validation fails
      */
     public function __construct(
@@ -100,10 +98,15 @@ class ClickHouse extends SQL
         string $username = 'default',
         string $password = '',
         int $port = self::DEFAULT_PORT,
-        bool $secure = false
+        bool $secure = false,
+        public readonly ?int $retention = null,
     ) {
         $this->validateHost($host);
         $this->validatePort($port);
+
+        if ($retention !== null && $retention < 1) {
+            throw new Exception('Retention must be a positive number of days');
+        }
 
         $this->host = $host;
         $this->port = $port;
@@ -361,34 +364,6 @@ class ClickHouse extends SQL
     public function isAsyncCleanup(): bool
     {
         return $this->asyncCleanup;
-    }
-
-    /**
-     * Set the retention window in days. When set, setup() applies a TTL so
-     * rows older than the window are dropped by background merges. Pass null
-     * to disable (the default).
-     *
-     * @param int|null $days
-     * @return self
-     * @throws Exception If $days is not positive
-     */
-    public function setRetention(?int $days): self
-    {
-        if ($days !== null && $days < 1) {
-            throw new Exception('Retention must be a positive number of days');
-        }
-        $this->retention = $days;
-        return $this;
-    }
-
-    /**
-     * Get the retention window in days, or null when TTL is disabled.
-     *
-     * @return int|null
-     */
-    public function getRetention(): ?int
-    {
-        return $this->retention;
     }
 
     /**
