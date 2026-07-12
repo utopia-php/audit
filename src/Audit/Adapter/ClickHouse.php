@@ -31,6 +31,7 @@ class ClickHouse extends SQL
         'actorType',
         'resourceType',
         'country',
+        'sdk',
     ];
 
     /**
@@ -536,6 +537,26 @@ class ClickHouse extends SQL
                 'array' => false,
                 'filters' => [],
             ],
+            [
+                '$id' => 'sdk',
+                'type' => Database::VAR_STRING,
+                'size' => 256,
+                'required' => false,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'sdkVersion',
+                'type' => Database::VAR_STRING,
+                'size' => 255,
+                'required' => false,
+                'default' => null,
+                'signed' => true,
+                'array' => false,
+                'filters' => [],
+            ],
         ];
     }
 
@@ -606,6 +627,13 @@ class ClickHouse extends SQL
                 '$id' => '_key_hostname',
                 'type' => Database::INDEX_KEY,
                 'attributes' => ['hostname'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_sdk',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['sdk'],
                 'lengths' => [],
                 'orders' => [],
             ],

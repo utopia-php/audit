@@ -2,6 +2,29 @@
 
 All notable changes to `utopia-php/audit` are documented in this file.
 
+## 2.7.0
+
+### ClickHouse adapter — SDK columns
+
+The ClickHouse adapter now stores two additional optional columns capturing the
+SDK that produced an audit event:
+
+#### Added
+
+- `Log::getSdk()` and `Log::getSdkVersion()` getters for ClickHouse-backed log reads.
+
+#### ClickHouse schema changes
+
+- Column `sdk` `LowCardinality(Nullable(String))` — SDK name (e.g. `web`, `flutter`,
+  `console`, `cli`); low-cardinality, optional.
+- Column `sdkVersion` `Nullable(String)` — SDK version (e.g. `14.0.0`); high-cardinality,
+  optional.
+- Index `_key_sdk` — bloom-filter index on the `sdk` column.
+
+Both columns are optional (`required = false`) so `createBatch()` never throws when a
+caller omits them. Existing ClickHouse audit tables gain the columns via `setup()` or an
+`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` migration.
+
 ## 2.4.0
 
 ### ClickHouse adapter — actor terminology

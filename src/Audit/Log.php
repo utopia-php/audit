@@ -102,6 +102,28 @@ class Log extends ArrayObject
     }
 
     /**
+     * Get the SDK name associated with this log entry.
+     *
+     * @return string
+     */
+    public function getSdk(): string
+    {
+        $sdk = $this->getAttribute('sdk', '');
+        return is_string($sdk) ? $sdk : '';
+    }
+
+    /**
+     * Get the SDK version associated with this log entry.
+     *
+     * @return string
+     */
+    public function getSdkVersion(): string
+    {
+        $sdkVersion = $this->getAttribute('sdkVersion', '');
+        return is_string($sdkVersion) ? $sdkVersion : '';
+    }
+
+    /**
      * Get the user agent string.
      *
      * @return string

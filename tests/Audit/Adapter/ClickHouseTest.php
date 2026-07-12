@@ -535,7 +535,9 @@ class ClickHouseTest extends TestCase
             'projectInternalId',
             'teamId',
             'teamInternalId',
-            'hostname'
+            'hostname',
+            'sdk',
+            'sdkVersion'
         ];
 
         foreach ($expectedAttributes as $expected) {
@@ -565,7 +567,8 @@ class ClickHouseTest extends TestCase
             '_key_actor_internal_id',
             '_key_actor_type',
             '_key_country',
-            '_key_hostname'
+            '_key_hostname',
+            '_key_sdk'
         ];
 
         foreach ($expectedClickHouseIndexes as $expected) {
