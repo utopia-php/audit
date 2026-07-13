@@ -377,7 +377,28 @@ class ClickHouseTest extends TestCase
     }
 
     /**
-     * Test setRetention stores the value and getRetention returns it
+     * Test retention defaults to null and is stored when passed to the constructor
+     */
+    public function testRetention(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+        $this->assertNull($adapter->retention);
+
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            retention: 30
+        );
+        $this->assertEquals(30, $adapter->retention);
+    }
+
+    /**
+     * Test retention can be set and cleared per table via the fluent setter
      */
     public function testSetRetention(): void
     {
@@ -387,61 +408,47 @@ class ClickHouseTest extends TestCase
             password: 'clickhouse'
         );
 
-        $this->assertNull($adapter->getRetention());
+        $this->assertSame($adapter, $adapter->setRetention(30));
+        $this->assertEquals(30, $adapter->retention);
 
-        $result = $adapter->setRetention(30);
-        $this->assertInstanceOf(ClickHouse::class, $result);
-        $this->assertEquals(30, $adapter->getRetention());
-    }
-
-    /**
-     * Test setRetention accepts null to disable retention
-     */
-    public function testSetRetentionAcceptsNull(): void
-    {
-        $adapter = new ClickHouse(
-            host: 'clickhouse',
-            username: 'default',
-            password: 'clickhouse'
-        );
-
-        $adapter->setRetention(30);
         $adapter->setRetention(null);
-        $this->assertNull($adapter->getRetention());
-    }
+        $this->assertNull($adapter->retention);
 
-    /**
-     * Test setRetention rejects zero days
-     */
-    public function testSetRetentionRejectsZero(): void
-    {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Retention must be a positive number of days');
-
-        $adapter = new ClickHouse(
-            host: 'clickhouse',
-            username: 'default',
-            password: 'clickhouse'
-        );
-
         $adapter->setRetention(0);
     }
 
     /**
-     * Test setRetention rejects negative days
+     * Test retention rejects zero days
      */
-    public function testSetRetentionRejectsNegative(): void
+    public function testRetentionRejectsZero(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Retention must be a positive number of days');
 
-        $adapter = new ClickHouse(
+        new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
+            retention: 0
         );
+    }
 
-        $adapter->setRetention(-1);
+    /**
+     * Test retention rejects negative days
+     */
+    public function testRetentionRejectsNegative(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Retention must be a positive number of days');
+
+        new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+            retention: -1
+        );
     }
 
     /**
