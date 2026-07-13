@@ -31,6 +31,7 @@ class ClickHouse extends SQL
         'actorType',
         'resourceType',
         'country',
+        'sdk',
         // premium geo
         'continentCode',
         'subdivisions',
@@ -89,6 +90,9 @@ class ClickHouse extends SQL
     protected bool $sharedTables = false;
 
     protected bool $asyncCleanup = false;
+
+    /** @var int|null Retention in days; when set, setup() applies a TTL on the table. Null disables TTL. */
+    private ?int $retention = null;
 
     /**
      * @param string $host ClickHouse host
@@ -367,6 +371,34 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Set the retention window in days. When set, setup() applies a TTL so
+     * rows older than the window are dropped by background merges. Pass null
+     * to disable (the default).
+     *
+     * @param int|null $days
+     * @return self
+     * @throws Exception If $days is not positive
+     */
+    public function setRetention(?int $days): self
+    {
+        if ($days !== null && $days < 1) {
+            throw new Exception('Retention must be a positive number of days');
+        }
+        $this->retention = $days;
+        return $this;
+    }
+
+    /**
+     * Get the retention window in days, or null when TTL is disabled.
+     *
+     * @return int|null
+     */
+    public function getRetention(): ?int
+    {
+        return $this->retention;
+    }
+
+    /**
      * Override getAttributes to provide extended attributes for ClickHouse.
      * Includes existing attributes from parent and adds new missing ones.
      *
@@ -602,6 +634,28 @@ class ClickHouse extends SQL
                 'array' => false,
                 'filters' => [],
             ],
+            [
+                '$id' => 'sdk',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => false,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
+            [
+                '$id' => 'sdkVersion',
+                'type' => Database::VAR_STRING,
+                'format' => '',
+                'size' => Database::LENGTH_KEY,
+                'signed' => true,
+                'required' => false,
+                'default' => null,
+                'array' => false,
+                'filters' => [],
+            ],
         ];
     }
 
@@ -672,6 +726,13 @@ class ClickHouse extends SQL
                 '$id' => '_key_hostname',
                 'type' => Database::INDEX_KEY,
                 'attributes' => ['hostname'],
+                'lengths' => [],
+                'orders' => [],
+            ],
+            [
+                '$id' => '_key_sdk',
+                'type' => Database::INDEX_KEY,
+                'attributes' => ['sdk'],
                 'lengths' => [],
                 'orders' => [],
             ],
@@ -888,6 +949,34 @@ class ClickHouse extends SQL
         ";
 
         $this->query($createTableSql);
+
+        // Apply retention as a separate, idempotent ALTER. CREATE TABLE IF NOT
+        // EXISTS won't add a TTL to a table that already exists, and MODIFY TTL
+        // is a no-op when the TTL already matches, so setup() stays re-runnable.
+        // materialize_ttl_after_modify = 0 defers the purge to background merges
+        // rather than an immediate, I/O-heavy mutation.
+        if ($this->retention !== null) {
+            $this->query(
+                "ALTER TABLE {$escapedDatabaseAndTable} "
+                . "MODIFY TTL toDateTime(time) + INTERVAL {$this->retention} DAY "
+                . 'SETTINGS materialize_ttl_after_modify = 0'
+            );
+        } else {
+            // Disabling retention must actively strip any TTL a previous run
+            // applied; otherwise rows keep being purged despite retention being
+            // null. ClickHouse errors (code 36) when REMOVE TTL runs on a table
+            // that has no TTL, so swallow that specific case to keep setup()
+            // idempotent.
+            try {
+                $this->query(
+                    "ALTER TABLE {$escapedDatabaseAndTable} REMOVE TTL"
+                );
+            } catch (Exception $e) {
+                if (!str_contains($e->getMessage(), "doesn't have any table TTL expression")) {
+                    throw $e;
+                }
+            }
+        }
     }
 
     /**
