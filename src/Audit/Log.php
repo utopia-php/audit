@@ -104,23 +104,28 @@ class Log extends ArrayObject
     /**
      * Get the SDK name associated with this log entry.
      *
-     * @return string
+     * Optional column: returns null when the SDK was never recorded, mirroring
+     * the other nullable actor columns (getActorId/getActorInternalId).
+     *
+     * @return string|null
      */
-    public function getSdk(): string
+    public function getSdk(): ?string
     {
-        $sdk = $this->getAttribute('sdk', '');
-        return is_string($sdk) ? $sdk : '';
+        $sdk = $this->getAttribute('sdk');
+        return is_string($sdk) ? $sdk : null;
     }
 
     /**
      * Get the SDK version associated with this log entry.
      *
-     * @return string
+     * Optional column: returns null when the SDK version was never recorded.
+     *
+     * @return string|null
      */
-    public function getSdkVersion(): string
+    public function getSdkVersion(): ?string
     {
-        $sdkVersion = $this->getAttribute('sdkVersion', '');
-        return is_string($sdkVersion) ? $sdkVersion : '';
+        $sdkVersion = $this->getAttribute('sdkVersion');
+        return is_string($sdkVersion) ? $sdkVersion : null;
     }
 
     /**

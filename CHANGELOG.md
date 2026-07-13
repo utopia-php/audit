@@ -22,8 +22,10 @@ SDK that produced an audit event:
 - Index `_key_sdk` — bloom-filter index on the `sdk` column.
 
 Both columns are optional (`required = false`) so `createBatch()` never throws when a
-caller omits them. Existing ClickHouse audit tables gain the columns via `setup()` or an
-`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` migration.
+caller omits them. Newly created tables include the columns automatically via `setup()`.
+`setup()` only issues `CREATE TABLE IF NOT EXISTS`, so **existing** tables do not gain the
+columns automatically — apply them with an `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
+migration.
 
 ## 2.4.0
 
