@@ -467,11 +467,98 @@ class ClickHouseTest extends TestCase
             'projectInternalId',
             'teamId',
             'teamInternalId',
-            'hostname'
+            'hostname',
+            // premium geo
+            'city',
+            'continentCode',
+            'subdivisions',
+            'isp',
+            'autonomousSystemNumber',
+            'autonomousSystemOrganization',
+            'connectionType',
+            'connectionUsageType',
+            'connectionOrganization',
         ];
 
         foreach ($expectedAttributes as $expected) {
             $this->assertContains($expected, $attributeIds, "Attribute '{$expected}' not found in ClickHouse adapter");
+        }
+    }
+
+    /**
+     * Test that premium geo attributes are all optional String columns.
+     */
+    public function testPremiumGeoAttributesAreOptionalStrings(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $attributes = $adapter->getAttributes();
+        $byId = [];
+        foreach ($attributes as $attribute) {
+            $byId[$attribute['$id']] = $attribute;
+        }
+
+        $geoColumns = [
+            'city',
+            'continentCode',
+            'subdivisions',
+            'isp',
+            'autonomousSystemNumber',
+            'autonomousSystemOrganization',
+            'connectionType',
+            'connectionUsageType',
+            'connectionOrganization',
+        ];
+
+        foreach ($geoColumns as $column) {
+            $this->assertArrayHasKey($column, $byId, "Premium geo attribute '{$column}' not found");
+            $this->assertEquals(\Utopia\Database\Database::VAR_STRING, $byId[$column]['type'], "'{$column}' should be a string");
+            $this->assertFalse($byId[$column]['required'], "'{$column}' should be optional");
+            $this->assertFalse($byId[$column]['array'], "'{$column}' should not be an array");
+        }
+    }
+
+    /**
+     * Test that premium geo columns get the correct ClickHouse type:
+     * low-cardinality dimensions use LowCardinality(Nullable(String)), while
+     * high-cardinality ones stay plain Nullable(String).
+     */
+    public function testPremiumGeoColumnTypes(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $method = new \ReflectionMethod($adapter, 'getColumnDefinition');
+        $method->setAccessible(true);
+
+        $lowCardinality = [
+            'continentCode',
+            'subdivisions',
+            'connectionType',
+            'connectionUsageType',
+            'autonomousSystemNumber',
+        ];
+        foreach ($lowCardinality as $column) {
+            $definition = $method->invoke($adapter, $column);
+            $this->assertEquals("{$column} LowCardinality(Nullable(String))", $definition);
+        }
+
+        $highCardinality = [
+            'city',
+            'isp',
+            'autonomousSystemOrganization',
+            'connectionOrganization',
+        ];
+        foreach ($highCardinality as $column) {
+            $definition = $method->invoke($adapter, $column);
+            $this->assertEquals("{$column} Nullable(String)", $definition);
         }
     }
 
