@@ -398,6 +398,28 @@ class ClickHouseTest extends TestCase
     }
 
     /**
+     * Test retention can be set and cleared per table via the fluent setter
+     */
+    public function testSetRetention(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse'
+        );
+
+        $this->assertSame($adapter, $adapter->setRetention(30));
+        $this->assertEquals(30, $adapter->retention);
+
+        $adapter->setRetention(null);
+        $this->assertNull($adapter->retention);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Retention must be a positive number of days');
+        $adapter->setRetention(0);
+    }
+
+    /**
      * Test retention rejects zero days
      */
     public function testRetentionRejectsZero(): void

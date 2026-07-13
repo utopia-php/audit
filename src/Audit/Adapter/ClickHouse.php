@@ -99,14 +99,11 @@ class ClickHouse extends SQL
         string $password = '',
         int $port = self::DEFAULT_PORT,
         bool $secure = false,
-        public readonly ?int $retention = null,
+        public ?int $retention = null,
     ) {
         $this->validateHost($host);
         $this->validatePort($port);
-
-        if ($retention !== null && $retention < 1) {
-            throw new Exception('Retention must be a positive number of days');
-        }
+        $this->validateRetention($retention);
 
         $this->host = $host;
         $this->port = $port;
@@ -354,6 +351,34 @@ class ClickHouse extends SQL
     {
         $this->asyncCleanup = $asyncCleanup;
         return $this;
+    }
+
+    /**
+     * Set the retention window in days applied by setup() as a TTL, or null to
+     * disable it. Call before setup(); a single adapter can setup() several
+     * tables (differing namespaces), so retention is settable per table rather
+     * than fixed at construction.
+     *
+     * @param int|null $retention
+     * @return self
+     * @throws Exception If retention is not a positive number of days.
+     */
+    public function setRetention(?int $retention): self
+    {
+        $this->validateRetention($retention);
+        $this->retention = $retention;
+        return $this;
+    }
+
+    /**
+     * @param int|null $retention
+     * @throws Exception If retention is set but not a positive number of days.
+     */
+    private function validateRetention(?int $retention): void
+    {
+        if ($retention !== null && $retention < 1) {
+            throw new Exception('Retention must be a positive number of days');
+        }
     }
 
     /**
