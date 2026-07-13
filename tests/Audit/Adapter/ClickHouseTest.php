@@ -614,22 +614,67 @@ class ClickHouseTest extends TestCase
             'subdivisions',
             'connectionType',
             'connectionUsageType',
-            'autonomousSystemNumber',
         ];
         foreach ($lowCardinality as $column) {
             $definition = $method->invoke($adapter, $column);
             $this->assertEquals("{$column} LowCardinality(Nullable(String))", $definition);
         }
 
+        // autonomousSystemNumber is high-cardinality (~100k ASNs) so it is a
+        // plain Nullable(String), not LowCardinality.
         $highCardinality = [
             'city',
             'isp',
+            'autonomousSystemNumber',
             'autonomousSystemOrganization',
             'connectionOrganization',
         ];
         foreach ($highCardinality as $column) {
             $definition = $method->invoke($adapter, $column);
             $this->assertEquals("{$column} Nullable(String)", $definition);
+        }
+    }
+
+    /**
+     * Premium geo values must round-trip through a real write/read cycle:
+     * write a log carrying all 9 geo fields and read it back unchanged. This
+     * proves the columns are actually created, written and selected (not just
+     * present in the schema definition).
+     */
+    public function testPremiumGeoRoundTrip(): void
+    {
+        $actorId = 'geo-actor-' . uniqid('', true);
+        $geo = [
+            'city' => 'Mountain View',
+            'continentCode' => 'NA',
+            'subdivisions' => 'California',
+            'isp' => 'Google',
+            'autonomousSystemNumber' => '15169',
+            'autonomousSystemOrganization' => 'GOOGLE',
+            'connectionType' => 'cable',
+            'connectionUsageType' => 'residential',
+            'connectionOrganization' => 'Google LLC',
+        ];
+
+        $batchEvents = [array_merge([
+            'actorId' => $actorId,
+            'event' => 'geo.roundtrip',
+            'resource' => 'document/geo-1',
+            'userAgent' => 'RoundTrip/1.0',
+            'ip' => '8.8.8.8',
+            'data' => [],
+            'time' => \Utopia\Database\DateTime::formatTz(\Utopia\Database\DateTime::now()) ?? '',
+        ], $geo)];
+
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
+        $this->assertTrue($this->audit->logBatch($batchEvents));
+
+        $logs = $this->audit->getLogsByUser($actorId);
+        $this->assertGreaterThan(0, count($logs), 'geo round-trip log was not persisted');
+
+        $log = $logs[0];
+        foreach ($geo as $key => $expected) {
+            $this->assertSame($expected, $log->getAttribute($key), "premium geo '{$key}' did not round-trip");
         }
     }
 

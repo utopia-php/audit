@@ -32,12 +32,12 @@ class ClickHouse extends SQL
         'resourceType',
         'country',
         'sdk',
-        // premium geo
+        // premium geo (autonomousSystemNumber is intentionally NOT low-cardinality:
+        // ~100k ASNs globally can exceed ClickHouse's LowCardinality sweet spot)
         'continentCode',
         'subdivisions',
         'connectionType',
         'connectionUsageType',
-        'autonomousSystemNumber',
     ];
 
     /**
