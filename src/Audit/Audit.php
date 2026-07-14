@@ -11,22 +11,15 @@ namespace Utopia\Audit;
  */
 class Audit
 {
-    private Adapter $adapter;
-
     /**
      * Constructor.
      *
      * @param Adapter $adapter The adapter to use for storing audit logs
      */
-    public function __construct(Adapter $adapter)
-    {
-        $this->adapter = $adapter;
-    }
+    public function __construct(private readonly Adapter $adapter) {}
 
     /**
      * Get the current adapter.
-     *
-     * @return Adapter
      */
     public function getAdapter(): Adapter
     {
@@ -36,7 +29,6 @@ class Audit
     /**
      * Setup the audit log storage.
      *
-     * @return void
      * @throws \Exception
      */
     public function setup(): void
@@ -47,13 +39,7 @@ class Audit
     /**
      * Add event log.
      *
-     * @param string|null $userId
-     * @param string $event
-     * @param string $resource
-     * @param string $userAgent
-     * @param string $ip
      * @param array<string, mixed> $data
-     * @return Log
      *
      * @throws \Exception
      */
@@ -76,7 +62,6 @@ class Audit
      * Add multiple event logs in batch.
      *
      * @param array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, time: string, data?: array<string, mixed>}> $events
-     * @return bool
      *
      * @throws \Exception
      */
@@ -88,9 +73,7 @@ class Audit
     /**
      * Get a single log by its ID.
      *
-     * @param string $id
      * @return Log|null The log entry or null if not found
-     *
      * @throws \Exception
      */
     public function getLogById(string $id): ?Log
@@ -101,9 +84,7 @@ class Audit
     /**
      * Get all logs by user ID.
      *
-     * @param string $userId
      * @return array<Log>
-     *
      * @throws \Exception
      */
     public function getLogsByUser(
@@ -120,8 +101,6 @@ class Audit
     /**
      * Count logs by user ID.
      *
-     * @param string $userId
-     * @return int
      * @throws \Exception
      */
     public function countLogsByUser(
@@ -136,9 +115,7 @@ class Audit
     /**
      * Get all logs by resource.
      *
-     * @param string $resource
      * @return array<Log>
-     *
      * @throws \Exception
      */
     public function getLogsByResource(
@@ -155,8 +132,6 @@ class Audit
     /**
      * Count logs by resource.
      *
-     * @param string $resource
-     * @return int
      *
      * @throws \Exception
      */
@@ -172,10 +147,8 @@ class Audit
     /**
      * Get logs by user and events.
      *
-     * @param string $userId
      * @param array<int, string> $events
      * @return array<Log>
-     *
      * @throws \Exception
      */
     public function getLogsByUserAndEvents(
@@ -193,9 +166,7 @@ class Audit
     /**
      * Count logs by user and events.
      *
-     * @param string $userId
      * @param array<int, string> $events
-     * @return int
      *
      * @throws \Exception
      */
@@ -212,10 +183,8 @@ class Audit
     /**
      * Get logs by resource and events.
      *
-     * @param string $resource
      * @param array<int, string> $events
      * @return array<Log>
-     *
      * @throws \Exception
      */
     public function getLogsByResourceAndEvents(
@@ -233,9 +202,7 @@ class Audit
     /**
      * Count logs by resource and events.
      *
-     * @param string $resource
      * @param array<int, string> $events
-     * @return int
      *
      * @throws \Exception
      */
@@ -252,8 +219,6 @@ class Audit
     /**
      * Delete all logs older than the specified datetime
      *
-     * @param \DateTime $datetime
-     * @return bool
      *
      * @throws \Exception
      */
@@ -279,7 +244,6 @@ class Audit
      * Count logs using custom queries.
      *
      * @param array<Query> $queries Array of Audit Query objects
-     * @return int
      *
      * @throws \Exception
      */

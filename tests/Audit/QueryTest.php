@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Utopia\Tests\Audit;
 
 use PHPUnit\Framework\TestCase;
 use Utopia\Audit\Query;
 
-class QueryTest extends TestCase
+final class QueryTest extends TestCase
 {
     /**
      * Test Query class static factory methods
@@ -14,57 +16,57 @@ class QueryTest extends TestCase
     {
         // Test equal
         $query = Query::equal('userId', '123');
-        $this->assertEquals(Query::TYPE_EQUAL, $query->getMethod());
-        $this->assertEquals('userId', $query->getAttribute());
-        $this->assertEquals(['123'], $query->getValues());
+        $this->assertSame(Query::TYPE_EQUAL, $query->getMethod());
+        $this->assertSame('userId', $query->getAttribute());
+        $this->assertSame(['123'], $query->getValues());
 
         // Test lessThan
         $query = Query::lessThan('time', '2024-01-01');
-        $this->assertEquals(Query::TYPE_LESSER, $query->getMethod());
-        $this->assertEquals('time', $query->getAttribute());
-        $this->assertEquals(['2024-01-01'], $query->getValues());
+        $this->assertSame(Query::TYPE_LESSER, $query->getMethod());
+        $this->assertSame('time', $query->getAttribute());
+        $this->assertSame(['2024-01-01'], $query->getValues());
 
         // Test greaterThan
         $query = Query::greaterThan('time', '2023-01-01');
-        $this->assertEquals(Query::TYPE_GREATER, $query->getMethod());
-        $this->assertEquals('time', $query->getAttribute());
-        $this->assertEquals(['2023-01-01'], $query->getValues());
+        $this->assertSame(Query::TYPE_GREATER, $query->getMethod());
+        $this->assertSame('time', $query->getAttribute());
+        $this->assertSame(['2023-01-01'], $query->getValues());
 
         // Test between
         $query = Query::between('time', '2023-01-01', '2024-01-01');
-        $this->assertEquals(Query::TYPE_BETWEEN, $query->getMethod());
-        $this->assertEquals('time', $query->getAttribute());
-        $this->assertEquals(['2023-01-01', '2024-01-01'], $query->getValues());
+        $this->assertSame(Query::TYPE_BETWEEN, $query->getMethod());
+        $this->assertSame('time', $query->getAttribute());
+        $this->assertSame(['2023-01-01', '2024-01-01'], $query->getValues());
 
         // Test contains
         $query = Query::contains('event', ['create', 'update', 'delete']);
-        $this->assertEquals(Query::TYPE_CONTAINS, $query->getMethod());
-        $this->assertEquals('event', $query->getAttribute());
-        $this->assertEquals(['create', 'update', 'delete'], $query->getValues());
+        $this->assertSame(Query::TYPE_CONTAINS, $query->getMethod());
+        $this->assertSame('event', $query->getAttribute());
+        $this->assertSame(['create', 'update', 'delete'], $query->getValues());
 
         // Test orderDesc
         $query = Query::orderDesc('time');
-        $this->assertEquals(Query::TYPE_ORDER_DESC, $query->getMethod());
-        $this->assertEquals('time', $query->getAttribute());
-        $this->assertEquals([], $query->getValues());
+        $this->assertSame(Query::TYPE_ORDER_DESC, $query->getMethod());
+        $this->assertSame('time', $query->getAttribute());
+        $this->assertSame([], $query->getValues());
 
         // Test orderAsc
         $query = Query::orderAsc('userId');
-        $this->assertEquals(Query::TYPE_ORDER_ASC, $query->getMethod());
-        $this->assertEquals('userId', $query->getAttribute());
-        $this->assertEquals([], $query->getValues());
+        $this->assertSame(Query::TYPE_ORDER_ASC, $query->getMethod());
+        $this->assertSame('userId', $query->getAttribute());
+        $this->assertSame([], $query->getValues());
 
         // Test limit
         $query = Query::limit(10);
-        $this->assertEquals(Query::TYPE_LIMIT, $query->getMethod());
-        $this->assertEquals('', $query->getAttribute());
-        $this->assertEquals([10], $query->getValues());
+        $this->assertSame(Query::TYPE_LIMIT, $query->getMethod());
+        $this->assertSame('', $query->getAttribute());
+        $this->assertSame([10], $query->getValues());
 
         // Test offset
         $query = Query::offset(5);
-        $this->assertEquals(Query::TYPE_OFFSET, $query->getMethod());
-        $this->assertEquals('', $query->getAttribute());
-        $this->assertEquals([5], $query->getValues());
+        $this->assertSame(Query::TYPE_OFFSET, $query->getMethod());
+        $this->assertSame('', $query->getAttribute());
+        $this->assertSame([5], $query->getValues());
     }
 
     /**
@@ -75,9 +77,9 @@ class QueryTest extends TestCase
         // Test parsing equal query
         $json = '{"method":"equal","attribute":"userId","values":["123"]}';
         $query = Query::parse($json);
-        $this->assertEquals(Query::TYPE_EQUAL, $query->getMethod());
-        $this->assertEquals('userId', $query->getAttribute());
-        $this->assertEquals(['123'], $query->getValues());
+        $this->assertSame(Query::TYPE_EQUAL, $query->getMethod());
+        $this->assertSame('userId', $query->getAttribute());
+        $this->assertSame(['123'], $query->getValues());
 
         // Test toString
         $query = Query::equal('event', 'create');
@@ -85,9 +87,9 @@ class QueryTest extends TestCase
         $this->assertJson($json);
 
         $parsed = Query::parse($json);
-        $this->assertEquals(Query::TYPE_EQUAL, $parsed->getMethod());
-        $this->assertEquals('event', $parsed->getAttribute());
-        $this->assertEquals(['create'], $parsed->getValues());
+        $this->assertSame(Query::TYPE_EQUAL, $parsed->getMethod());
+        $this->assertSame('event', $parsed->getAttribute());
+        $this->assertSame(['create'], $parsed->getValues());
 
         // Test toArray
         $array = $query->toArray();
@@ -107,7 +109,7 @@ class QueryTest extends TestCase
         $queries = [
             '{"method":"equal","attribute":"userId","values":["123"]}',
             '{"method":"greaterThan","attribute":"time","values":["2023-01-01"]}',
-            '{"method":"limit","values":[10]}'
+            '{"method":"limit","values":[10]}',
         ];
 
         $parsed = Query::parseQueries($queries);
@@ -117,9 +119,9 @@ class QueryTest extends TestCase
         $this->assertInstanceOf(Query::class, $parsed[1]);
         $this->assertInstanceOf(Query::class, $parsed[2]);
 
-        $this->assertEquals(Query::TYPE_EQUAL, $parsed[0]->getMethod());
-        $this->assertEquals(Query::TYPE_GREATER, $parsed[1]->getMethod());
-        $this->assertEquals(Query::TYPE_LIMIT, $parsed[2]->getMethod());
+        $this->assertSame(Query::TYPE_EQUAL, $parsed[0]->getMethod());
+        $this->assertSame(Query::TYPE_GREATER, $parsed[1]->getMethod());
+        $this->assertSame(Query::TYPE_LIMIT, $parsed[2]->getMethod());
     }
 
     /**
@@ -145,12 +147,12 @@ class QueryTest extends TestCase
     public function testQueryWithEmptyAttribute(): void
     {
         $query = Query::limit(25);
-        $this->assertEquals('', $query->getAttribute());
-        $this->assertEquals([25], $query->getValues());
+        $this->assertSame('', $query->getAttribute());
+        $this->assertSame([25], $query->getValues());
 
         $query = Query::offset(10);
-        $this->assertEquals('', $query->getAttribute());
-        $this->assertEquals([10], $query->getValues());
+        $this->assertSame('', $query->getAttribute());
+        $this->assertSame([10], $query->getValues());
     }
 
     /**
@@ -218,8 +220,8 @@ class QueryTest extends TestCase
         $this->assertJson($json);
 
         $parsed = Query::parse($json);
-        $this->assertEquals(Query::TYPE_BETWEEN, $parsed->getMethod());
-        $this->assertEquals('time', $parsed->getAttribute());
-        $this->assertEquals(['2023-01-01', '2024-12-31'], $parsed->getValues());
+        $this->assertSame(Query::TYPE_BETWEEN, $parsed->getMethod());
+        $this->assertSame('time', $parsed->getAttribute());
+        $this->assertSame(['2023-01-01', '2024-12-31'], $parsed->getValues());
     }
 }

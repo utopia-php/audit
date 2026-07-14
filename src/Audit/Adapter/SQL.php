@@ -18,8 +18,6 @@ abstract class SQL extends Adapter
 
     /**
      * Get the collection/table name for audit logs.
-     *
-     * @return string
      */
     public function getCollectionName(): string
     {
@@ -117,7 +115,7 @@ abstract class SQL extends Adapter
      */
     public function getAttributeDocuments(): array
     {
-        return array_map(static fn (array $attribute) => new Document($attribute), $this->getAttributes());
+        return array_map(static fn(array $attribute): \Utopia\Database\Document => new Document($attribute), $this->getAttributes());
     }
 
     /**
@@ -163,13 +161,12 @@ abstract class SQL extends Adapter
      */
     public function getIndexDocuments(): array
     {
-        return array_map(static fn (array $index) => new Document($index), $this->getIndexes());
+        return array_map(static fn(array $index): \Utopia\Database\Document => new Document($index), $this->getIndexes());
     }
 
     /**
      * Get a single attribute by ID.
      *
-     * @param string $id
      * @return array<string, mixed>|null
      */
     protected function getAttribute(string $id)
@@ -219,13 +216,12 @@ abstract class SQL extends Adapter
      * resource id, the second-to-last is the resource type, and any preceding
      * segments form the resource parent path.
      *
-     * @param string $resource
      * @return array{ resourceId: string, resourceType: string, resourceParent: string }
      */
     protected function parseResource(string $resource): array
     {
         $parts = explode('/', $resource);
-        $count = count($parts);
+        $count = \count($parts);
 
         $resourceId = $resource;
         $resourceType = '';
@@ -236,7 +232,7 @@ abstract class SQL extends Adapter
             $resourceType = $parts[$count - 2];
 
             if ($count > 2) {
-                $resourceParent = implode('/', array_slice($parts, 0, $count - 2));
+                $resourceParent = implode('/', \array_slice($parts, 0, $count - 2));
             }
         }
 

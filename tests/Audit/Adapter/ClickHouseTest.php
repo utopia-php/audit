@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Utopia\Tests\Audit\Adapter;
 
 use Exception;
@@ -15,16 +17,16 @@ use Utopia\Tests\Audit\AuditBase;
  * Tests ClickHouse-specific features and configurations.
  * Generic audit functionality tests are in AuditBase trait.
  */
-class ClickHouseTest extends TestCase
+final class ClickHouseTest extends TestCase
 {
     use AuditBase;
 
     protected function initializeAudit(): void
     {
-        $host = getenv('CLICKHOUSE_HOST') ?: 'clickhouse';
+        $host = getenv('CLICKHOUSE_HOST') ?: 'localhost';
         $username = getenv('CLICKHOUSE_USER') ?: 'default';
         $password = getenv('CLICKHOUSE_PASSWORD') ?: 'clickhouse';
-        $port = (int) (getenv('CLICKHOUSE_PORT') ?: 8123);
+        $port = (int) (getenv('CLICKHOUSE_PORT') ?: 18123);
         $secure = filter_var(getenv('CLICKHOUSE_SECURE') ?: false, FILTER_VALIDATE_BOOLEAN);
 
         $clickHouse = new ClickHouse(
@@ -32,7 +34,7 @@ class ClickHouseTest extends TestCase
             username: $username,
             password: $password,
             port: $port,
-            secure: $secure
+            secure: $secure,
         );
 
         if ($database = getenv('CLICKHOUSE_DATABASE')) {
@@ -76,7 +78,7 @@ class ClickHouseTest extends TestCase
         new ClickHouse(
             host: '',
             username: 'default',
-            password: ''
+            password: '',
         );
     }
 
@@ -92,7 +94,7 @@ class ClickHouseTest extends TestCase
             host: 'localhost',
             username: 'default',
             password: '',
-            port: 0
+            port: 0,
         );
     }
 
@@ -108,7 +110,7 @@ class ClickHouseTest extends TestCase
             host: 'localhost',
             username: 'default',
             password: '',
-            port: 65536
+            port: 65536,
         );
     }
 
@@ -122,11 +124,11 @@ class ClickHouseTest extends TestCase
             username: 'testuser',
             password: 'testpass',
             port: 8443,
-            secure: true
+            secure: true,
         );
 
         $this->assertInstanceOf(ClickHouse::class, $adapter);
-        $this->assertEquals('ClickHouse', $adapter->getName());
+        $this->assertSame('ClickHouse', $adapter->getName());
     }
 
     /**
@@ -137,10 +139,10 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
-        $this->assertEquals('ClickHouse', $adapter->getName());
+        $this->assertSame('ClickHouse', $adapter->getName());
     }
 
     /**
@@ -154,7 +156,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setDatabase('');
@@ -171,7 +173,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setDatabase(str_repeat('a', 256));
@@ -188,7 +190,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setDatabase('123invalid');
@@ -205,7 +207,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setDatabase('SELECT');
@@ -219,7 +221,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $result = $adapter->setDatabase('my_database_123');
@@ -237,7 +239,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setTable('');
@@ -254,7 +256,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setTable(str_repeat('a', 256));
@@ -271,7 +273,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setTable('123invalid');
@@ -288,7 +290,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setTable('SELECT');
@@ -302,12 +304,12 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $result = $adapter->setTable('my_audit_logs');
         $this->assertInstanceOf(ClickHouse::class, $result);
-        $this->assertEquals('my_audit_logs', $adapter->getTable());
+        $this->assertSame('my_audit_logs', $adapter->getTable());
     }
 
     /**
@@ -318,12 +320,12 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $result = $adapter->setNamespace('');
         $this->assertInstanceOf(ClickHouse::class, $result);
-        $this->assertEquals('', $adapter->getNamespace());
+        $this->assertSame('', $adapter->getNamespace());
     }
 
     /**
@@ -337,7 +339,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setNamespace('9invalid');
@@ -351,12 +353,12 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $result = $adapter->setNamespace('project_123');
         $this->assertInstanceOf(ClickHouse::class, $result);
-        $this->assertEquals('project_123', $adapter->getNamespace());
+        $this->assertSame('project_123', $adapter->getNamespace());
     }
 
     /**
@@ -369,7 +371,7 @@ class ClickHouseTest extends TestCase
             username: 'default',
             password: 'clickhouse',
             port: 8123,
-            secure: false
+            secure: false,
         );
 
         $result = $adapter->setSecure(true);
@@ -384,7 +386,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $this->assertNull($adapter->getRetention());
@@ -402,7 +404,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setRetention(30);
@@ -421,7 +423,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setRetention(0);
@@ -438,7 +440,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setRetention(-1);
@@ -452,7 +454,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         // Test initial state
@@ -488,8 +490,8 @@ class ClickHouseTest extends TestCase
                 'userAgent' => "User'Agent\"With'Quotes",
                 'ip' => '192.168.1.1',
                 'data' => ['special' => "data with 'quotes'"],
-                'time' => \Utopia\Database\DateTime::formatTz(\Utopia\Database\DateTime::now()) ?? ''
-            ]
+                'time' => \Utopia\Database\DateTime::formatTz(\Utopia\Database\DateTime::now()) ?? '',
+            ],
         ];
 
         $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
@@ -498,7 +500,7 @@ class ClickHouseTest extends TestCase
 
         // Verify retrieval
         $logs = $this->audit->getLogsByUser('actor`with`backticks');
-        $this->assertGreaterThan(0, count($logs));
+        $this->assertGreaterThan(0, \count($logs));
     }
 
     /**
@@ -509,11 +511,11 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $attributes = $adapter->getAttributes();
-        $attributeIds = array_map(fn ($attr) => $attr['$id'], $attributes);
+        $attributeIds = array_map(fn(array $attr): mixed => $attr['$id'], $attributes);
 
         // Verify all expected attributes exist
         $expectedAttributes = [
@@ -564,7 +566,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $attributes = $adapter->getAttributes();
@@ -603,11 +605,10 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $method = new \ReflectionMethod($adapter, 'getColumnDefinition');
-        $method->setAccessible(true);
 
         $lowCardinality = [
             'continentCode',
@@ -670,7 +671,7 @@ class ClickHouseTest extends TestCase
         $this->assertTrue($this->audit->logBatch($batchEvents));
 
         $logs = $this->audit->getLogsByUser($actorId);
-        $this->assertGreaterThan(0, count($logs), 'geo round-trip log was not persisted');
+        $this->assertGreaterThan(0, \count($logs), 'geo round-trip log was not persisted');
 
         $log = $logs[0];
         foreach ($geo as $key => $expected) {
@@ -686,11 +687,11 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $indexes = $adapter->getIndexes();
-        $indexIds = array_map(fn ($idx) => $idx['$id'], $indexes);
+        $indexIds = array_map(fn(array $idx): mixed => $idx['$id'], $indexes);
 
         // Verify all ClickHouse-specific indexes exist
         $expectedClickHouseIndexes = [
@@ -701,7 +702,7 @@ class ClickHouseTest extends TestCase
             '_key_actor_type',
             '_key_country',
             '_key_hostname',
-            '_key_sdk'
+            '_key_sdk',
         ];
 
         foreach ($expectedClickHouseIndexes as $expected) {
@@ -752,11 +753,10 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $method = new \ReflectionMethod($adapter, 'parseResource');
-        $method->setAccessible(true);
 
         $resource = 'database/6978484940ff05762e1a/table/697848498066e3d2ef64';
         $parsed = $method->invoke($adapter, $resource);
@@ -807,10 +807,10 @@ class ClickHouseTest extends TestCase
         $page2 = $this->audit->find([
             Query::orderAsc('id'),
             Query::limit(2),
-            Query::cursorAfter($page1[count($page1) - 1]),
+            Query::cursorAfter($page1[\count($page1) - 1]),
         ]);
 
-        $this->assertGreaterThanOrEqual(1, count($page2));
+        $this->assertGreaterThanOrEqual(1, \count($page2));
         foreach ($page2 as $log) {
             $this->assertNotEquals($page1[0]->getId(), $log->getId());
             $this->assertNotEquals($page1[1]->getId(), $log->getId());
@@ -824,17 +824,17 @@ class ClickHouseTest extends TestCase
             Query::limit(50),
         ]);
 
-        $this->assertGreaterThanOrEqual(3, count($all));
+        $this->assertGreaterThanOrEqual(3, \count($all));
 
         $before = $this->audit->find([
             Query::orderAsc('id'),
             Query::limit(2),
-            Query::cursorBefore($all[count($all) - 1]),
+            Query::cursorBefore($all[\count($all) - 1]),
         ]);
 
         $this->assertCount(2, $before);
-        $this->assertEquals($all[count($all) - 3]->getId(), $before[0]->getId());
-        $this->assertEquals($all[count($all) - 2]->getId(), $before[1]->getId());
+        $this->assertEquals($all[\count($all) - 3]->getId(), $before[0]->getId());
+        $this->assertEquals($all[\count($all) - 2]->getId(), $before[1]->getId());
     }
 
     public function testCursorAcceptsAssociativeArray(): void
@@ -844,7 +844,7 @@ class ClickHouseTest extends TestCase
             Query::limit(50),
         ]);
 
-        $this->assertGreaterThanOrEqual(2, count($all));
+        $this->assertGreaterThanOrEqual(2, \count($all));
 
         $page = $this->audit->find([
             Query::orderAsc('id'),
@@ -852,7 +852,7 @@ class ClickHouseTest extends TestCase
             Query::cursorAfter(['id' => $all[0]->getId()]),
         ]);
 
-        $this->assertEquals(count($all) - 1, count($page));
+        $this->assertCount(\count($all) - 1, $page);
         $this->assertEquals($all[1]->getId(), $page[0]->getId());
     }
 
@@ -862,19 +862,19 @@ class ClickHouseTest extends TestCase
         $this->assertGreaterThanOrEqual(4, $unbounded);
 
         $bounded = $this->audit->count([], max: 2);
-        $this->assertEquals(2, $bounded);
+        $this->assertSame(2, $bounded);
 
         $boundedAboveTotal = $this->audit->count([], max: 10_000);
-        $this->assertEquals($unbounded, $boundedAboveTotal);
+        $this->assertSame($unbounded, $boundedAboveTotal);
     }
 
     public function testCountByUserWithMaxBound(): void
     {
         $unbounded = $this->audit->countLogsByUser('userId');
-        $this->assertEquals(3, $unbounded);
+        $this->assertSame(3, $unbounded);
 
         $bounded = $this->audit->countLogsByUser('userId', max: 1);
-        $this->assertEquals(1, $bounded);
+        $this->assertSame(1, $bounded);
     }
 
     public function testNotEqualQuery(): void
@@ -902,13 +902,13 @@ class ClickHouseTest extends TestCase
 
     public function testLesserEqualAndGreaterEqualQueries(): void
     {
-        $now = (new \DateTime())->modify('+1 minute');
-        $past = (new \DateTime())->modify('-1 hour');
+        $now = new \DateTime()->modify('+1 minute');
+        $past = new \DateTime()->modify('-1 hour');
 
         $allLe = $this->audit->find([
             Query::lessThanEqual('time', \Utopia\Database\DateTime::format($now)),
         ]);
-        $this->assertGreaterThanOrEqual(4, count($allLe));
+        $this->assertGreaterThanOrEqual(4, \count($allLe));
 
         $noneLe = $this->audit->find([
             Query::lessThanEqual('time', \Utopia\Database\DateTime::format($past)),
@@ -918,13 +918,13 @@ class ClickHouseTest extends TestCase
         $allGe = $this->audit->find([
             Query::greaterThanEqual('time', \Utopia\Database\DateTime::format($past)),
         ]);
-        $this->assertGreaterThanOrEqual(4, count($allGe));
+        $this->assertGreaterThanOrEqual(4, \count($allGe));
     }
 
     public function testNotBetweenQuery(): void
     {
-        $past = (new \DateTime())->modify('-2 hour');
-        $oldPast = (new \DateTime())->modify('-3 hour');
+        $past = new \DateTime()->modify('-2 hour');
+        $oldPast = new \DateTime()->modify('-3 hour');
 
         $logs = $this->audit->find([
             Query::notBetween(
@@ -934,7 +934,7 @@ class ClickHouseTest extends TestCase
             ),
         ]);
         // All 4 fixture logs are outside the past window
-        $this->assertGreaterThanOrEqual(4, count($logs));
+        $this->assertGreaterThanOrEqual(4, \count($logs));
     }
 
     public function testIsNullAndIsNotNullQueries(): void
@@ -1009,7 +1009,7 @@ class ClickHouseTest extends TestCase
             Query::limit(1),
         ]);
 
-        $this->assertGreaterThanOrEqual(1, count($logs));
+        $this->assertGreaterThanOrEqual(1, \count($logs));
 
         $row = $logs[0]->getArrayCopy();
         // `id` is always projected so the Log model still has its identifier
@@ -1025,8 +1025,8 @@ class ClickHouseTest extends TestCase
 
     public function testSelectAutoIncludesTenantWhenShared(): void
     {
-        $host = getenv('CLICKHOUSE_HOST') ?: 'clickhouse';
-        $port = (int) (getenv('CLICKHOUSE_PORT') ?: 8123);
+        $host = getenv('CLICKHOUSE_HOST') ?: 'localhost';
+        $port = (int) (getenv('CLICKHOUSE_PORT') ?: 18123);
 
         $adapter = new ClickHouse(
             host: $host,
@@ -1141,10 +1141,10 @@ class ClickHouseTest extends TestCase
 
     public function testSharedTableSortKeyLeadsWithTenant(): void
     {
-        $host = getenv('CLICKHOUSE_HOST') ?: 'clickhouse';
+        $host = getenv('CLICKHOUSE_HOST') ?: 'localhost';
         $username = getenv('CLICKHOUSE_USER') ?: 'default';
         $password = getenv('CLICKHOUSE_PASSWORD') ?: 'clickhouse';
-        $port = (int) (getenv('CLICKHOUSE_PORT') ?: 8123);
+        $port = (int) (getenv('CLICKHOUSE_PORT') ?: 18123);
         $secure = filter_var(getenv('CLICKHOUSE_SECURE') ?: false, FILTER_VALIDATE_BOOLEAN);
         $database = getenv('CLICKHOUSE_DATABASE') ?: 'default';
 
@@ -1155,7 +1155,7 @@ class ClickHouseTest extends TestCase
             username: $username,
             password: $password,
             port: $port,
-            secure: $secure
+            secure: $secure,
         );
         $adapter->setDatabase($database);
         $adapter->setNamespace($namespace);
@@ -1181,20 +1181,20 @@ class ClickHouseTest extends TestCase
             ]]);
             $out = @file_get_contents($url, false, $ctx);
 
-            return $out === false ? '' : trim((string) $out);
+            return $out === false ? '' : trim($out);
         };
 
         try {
-            (new Audit($adapter))->setup();
+            new Audit($adapter)->setup();
 
             $sortingKey = $http(
                 'SELECT sorting_key FROM system.tables WHERE database = {db:String} AND name = {tbl:String}',
-                ['db' => $database, 'tbl' => $table]
+                ['db' => $database, 'tbl' => $table],
             );
 
             $this->assertTrue(
                 str_starts_with(trim($sortingKey), 'tenant'),
-                "Expected sorting key to lead with 'tenant', got: {$sortingKey}"
+                "Expected sorting key to lead with 'tenant', got: {$sortingKey}",
             );
         } finally {
             $escDb = '`' . str_replace('`', '``', $database) . '`';

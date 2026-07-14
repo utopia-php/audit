@@ -21,14 +21,13 @@ class Query extends BaseQuery
      * Accepts a single scalar/object/array value and stores it as the values
      * array. Matches the legacy audit signature.
      *
-     * @param string $attribute
      * @param mixed $value Single value or array of values
-     * @return static
      */
+    #[\Override]
     public static function equal(string $attribute, mixed $value): static
     {
         /** @var array<mixed> $values */
-        $values = is_array($value) ? $value : [$value];
+        $values = \is_array($value) ? $value : [$value];
         return new static(self::TYPE_EQUAL, $attribute, $values);
     }
 
@@ -37,11 +36,8 @@ class Query extends BaseQuery
      *
      * Accepts mixed (including `DateTime` for the `time` column); the
      * adapter handles type-specific formatting.
-     *
-     * @param string $attribute
-     * @param mixed $value
-     * @return static
      */
+    #[\Override]
     public static function lessThan(string $attribute, mixed $value): static
     {
         return new static(self::TYPE_LESSER, $attribute, [$value]);
@@ -49,11 +45,8 @@ class Query extends BaseQuery
 
     /**
      * Filter by greater than condition.
-     *
-     * @param string $attribute
-     * @param mixed $value
-     * @return static
      */
+    #[\Override]
     public static function greaterThan(string $attribute, mixed $value): static
     {
         return new static(self::TYPE_GREATER, $attribute, [$value]);
@@ -61,12 +54,8 @@ class Query extends BaseQuery
 
     /**
      * Filter by BETWEEN condition.
-     *
-     * @param string $attribute
-     * @param mixed $start
-     * @param mixed $end
-     * @return static
      */
+    #[\Override]
     public static function between(string $attribute, mixed $start, mixed $end): static
     {
         return new static(self::TYPE_BETWEEN, $attribute, [$start, $end]);
