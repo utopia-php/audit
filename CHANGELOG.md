@@ -2,6 +2,34 @@
 
 All notable changes to `utopia-php/audit` are documented in this file.
 
+## 2.9.0
+
+### ClickHouse adapter — user-agent columns
+
+The ClickHouse adapter now stores the parsed user-agent OS / client / device
+dimensions as dedicated optional columns (mirrors the usage events schema).
+
+#### Added
+
+- `Log` getters for ClickHouse-backed reads: `getOsCode()`, `getOsName()`,
+  `getOsVersion()`, `getClientType()`, `getClientCode()`, `getClientName()`,
+  `getClientVersion()`, `getClientEngine()`, `getClientEngineVersion()`,
+  `getDeviceName()`, `getDeviceBrand()`, `getDeviceModel()`.
+
+#### ClickHouse schema changes
+
+- `LowCardinality(Nullable(String))` — `osCode`, `osName`, `clientType`,
+  `clientCode`, `clientName`, `clientEngine`, `deviceName`, `deviceBrand`
+  (bounded name/code/type dimensions).
+- `Nullable(String)` — `osVersion`, `clientVersion`, `clientEngineVersion`,
+  `deviceModel` (high-cardinality version/model strings, mirroring `sdkVersion`).
+
+All columns are optional (`required = false`) so `createBatch()` never throws when a
+caller omits them. Newly created tables include the columns automatically via `setup()`.
+`setup()` only issues `CREATE TABLE IF NOT EXISTS`, so **existing** tables do not gain the
+columns automatically — apply them with an `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
+migration.
+
 ## 2.7.0
 
 ### ClickHouse adapter — SDK columns
