@@ -1004,6 +1004,40 @@ final class ClickHouseTest extends TestCase
         }
     }
 
+    public function testContainsSubstringQuery(): void
+    {
+        // Contains is a substring match (like utopia-php/database), not an
+        // exact IN match — 'dat' matches only the 'update' logs
+        $logs = $this->audit->find([
+            Query::contains('event', ['dat']),
+        ]);
+        $this->assertCount(2, $logs);
+        foreach ($logs as $log) {
+            $this->assertEquals('update', $log->getEvent());
+        }
+
+        // Multiple needles OR together: 'dat' (update) + 'ins' (insert)
+        $logs = $this->audit->find([
+            Query::contains('event', ['dat', 'ins']),
+        ]);
+        $this->assertCount(3, $logs);
+    }
+
+    public function testContainsEscapesLikeWildcards(): void
+    {
+        // '%' and '_' in needles are literals, not LIKE wildcards —
+        // no fixture event contains a literal '%'
+        $logs = $this->audit->find([
+            Query::contains('event', ['%']),
+        ]);
+        $this->assertCount(0, $logs);
+
+        $logs = $this->audit->find([
+            Query::contains('event', ['u_date']),
+        ]);
+        $this->assertCount(0, $logs);
+    }
+
     public function testNotContainsQuery(): void
     {
         $logs = $this->audit->find([
@@ -1012,6 +1046,16 @@ final class ClickHouseTest extends TestCase
         // Only the insert log
         $this->assertCount(1, $logs);
         $this->assertEquals('insert', $logs[0]->getEvent());
+
+        // Negated substring: excludes anything containing 'dat' (update),
+        // keeps delete + insert
+        $logs = $this->audit->find([
+            Query::notContains('event', ['dat']),
+        ]);
+        $this->assertCount(2, $logs);
+        foreach ($logs as $log) {
+            $this->assertStringNotContainsString('dat', $log->getEvent());
+        }
     }
 
     public function testLesserEqualAndGreaterEqualQueries(): void

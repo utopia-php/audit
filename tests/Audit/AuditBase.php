@@ -677,11 +677,20 @@ trait AuditBase
             }
         }
 
-        // Test 6: Find with IN filter
+        // Test 6: Find with contains filter (substring match, like utopia-php/database)
         $logs = $this->audit->find([
             \Utopia\Audit\Query::contains('event', ['event_0', 'event_1']),
         ]);
         $this->assertGreaterThanOrEqual(2, \count($logs));
+
+        // Substring needle matches without an exact value
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::contains('event', ['vent_0']),
+        ]);
+        $this->assertGreaterThanOrEqual(1, \count($logs));
+        foreach ($logs as $log) {
+            $this->assertStringContainsString('vent_0', $log->getEvent());
+        }
 
         // Test 7: Find with between query for time range
         $afterTime = new \DateTime('2024-06-15 12:01:00');
@@ -752,7 +761,7 @@ trait AuditBase
         ]);
         $this->assertEquals(1, $count);
 
-        // Test 3: Count with IN filter
+        // Test 3: Count with contains filter (substring match, like utopia-php/database)
         $count = $this->audit->count([
             \Utopia\Audit\Query::contains('event', ['event_0', 'event_1']),
         ]);

@@ -1542,33 +1542,37 @@ class ClickHouse extends SQL
                     break;
 
                 case Query::TYPE_CONTAINS:
+                    // Substring match, mirroring utopia-php/database: each
+                    // value becomes `LIKE '%value%'`, OR'd together.
                     $this->validateAttributeName($attribute);
                     $escapedAttr = $this->escapeIdentifier($attribute);
-                    $chType = $this->getParamType($attribute);
-                    $inParams = [];
+                    $conditions = [];
                     foreach ($values as $value) {
+                        if (!\is_string($value)) {
+                            throw new Exception("contains value must be a string for attribute '{$attribute}'");
+                        }
                         $paramName = 'param_' . $paramCounter++;
-                        $inParams[] = "{{$paramName}:{$chType}}";
-                        $params[$paramName] = $this->formatTypedValue($chType, $value);
+                        $conditions[] = "{$escapedAttr} LIKE {{$paramName}:String}";
+                        $params[$paramName] = '%' . $this->escapeLikeWildcards($value) . '%';
                     }
-                    if ($inParams !== []) {
-                        $filters[] = "{$escapedAttr} IN (" . implode(', ', $inParams) . ')';
-                    }
+                    $filters[] = '(' . implode(' OR ', $conditions) . ')';
                     break;
 
                 case Query::TYPE_NOT_CONTAINS:
+                    // Negated substring match, mirroring utopia-php/database:
+                    // each value becomes `NOT LIKE '%value%'`, AND'd together.
                     $this->validateAttributeName($attribute);
                     $escapedAttr = $this->escapeIdentifier($attribute);
-                    $chType = $this->getParamType($attribute);
-                    $inParams = [];
+                    $conditions = [];
                     foreach ($values as $value) {
+                        if (!\is_string($value)) {
+                            throw new Exception("notContains value must be a string for attribute '{$attribute}'");
+                        }
                         $paramName = 'param_' . $paramCounter++;
-                        $inParams[] = "{{$paramName}:{$chType}}";
-                        $params[$paramName] = $this->formatTypedValue($chType, $value);
+                        $conditions[] = "{$escapedAttr} NOT LIKE {{$paramName}:String}";
+                        $params[$paramName] = '%' . $this->escapeLikeWildcards($value) . '%';
                     }
-                    if ($inParams !== []) {
-                        $filters[] = "{$escapedAttr} NOT IN (" . implode(', ', $inParams) . ')';
-                    }
+                    $filters[] = '(' . implode(' AND ', $conditions) . ')';
                     break;
 
                 case Query::TYPE_IS_NULL:
@@ -1830,6 +1834,18 @@ class ClickHouse extends SQL
         }
 
         return $this->formatParamValue($value);
+    }
+
+    /**
+     * Escape ClickHouse LIKE-pattern wildcards in a user-supplied needle.
+     *
+     * Backslash is escaped first so already-escaped characters aren't
+     * double-escaped. Keeps `contains('event', ['100%'])` a literal
+     * substring match instead of a wildcard.
+     */
+    private function escapeLikeWildcards(string $value): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
     }
 
     /**
@@ -2375,7 +2391,7 @@ class ClickHouse extends SQL
     ): array {
         $queries = [
             Query::equal('actorId', $userId),
-            Query::contains('event', $events),
+            Query::equal('event', $events),
         ];
 
         if ($after instanceof \DateTime && $before instanceof \DateTime) {
@@ -2407,7 +2423,7 @@ class ClickHouse extends SQL
     ): int {
         $queries = [
             Query::equal('actorId', $userId),
-            Query::contains('event', $events),
+            Query::equal('event', $events),
         ];
 
         if ($after instanceof \DateTime && $before instanceof \DateTime) {
@@ -2437,7 +2453,7 @@ class ClickHouse extends SQL
     ): array {
         $queries = [
             Query::equal('resource', $resource),
-            Query::contains('event', $events),
+            Query::equal('event', $events),
         ];
 
         if ($after instanceof \DateTime && $before instanceof \DateTime) {
@@ -2469,7 +2485,7 @@ class ClickHouse extends SQL
     ): int {
         $queries = [
             Query::equal('resource', $resource),
-            Query::contains('event', $events),
+            Query::equal('event', $events),
         ];
 
         if ($after instanceof \DateTime && $before instanceof \DateTime) {
