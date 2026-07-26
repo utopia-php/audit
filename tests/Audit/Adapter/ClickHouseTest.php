@@ -1327,8 +1327,9 @@ final class ClickHouseTest extends TestCase
             $url = "{$scheme}://{$host}:{$port}/?database=" . rawurlencode($database)
                 . '&user=' . rawurlencode($username)
                 . '&password=' . rawurlencode($password);
+            /** @var array<string, string> $params */
             foreach ($params as $key => $value) {
-                $url .= '&param_' . rawurlencode((string) $key) . '=' . rawurlencode((string) $value);
+                $url .= '&param_' . rawurlencode($key) . '=' . rawurlencode($value);
             }
             $ctx = stream_context_create(['http' => [
                 'method' => 'POST',

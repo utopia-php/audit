@@ -7,9 +7,12 @@
     <testsuites>
         <testsuite name="unit">
             <file>tests/Audit/QueryTest.php</file>
+            <!-- Pure SQL-shape snapshots; no ClickHouse server required. -->
+            <file>tests/Audit/Adapter/ClickHouseSqlSnapshotTest.php</file>
         </testsuite>
         <testsuite name="e2e">
             <directory>tests/Audit/Adapter</directory>
+            <exclude>tests/Audit/Adapter/ClickHouseSqlSnapshotTest.php</exclude>
         </testsuite>
     </testsuites>
     <source>
