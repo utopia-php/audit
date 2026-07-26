@@ -31,7 +31,7 @@ trait AuditBase
     {
         $this->initializeAudit();
         $cleanup = new \DateTime();
-        $cleanup = $cleanup->modify('+10 second');
+        $cleanup->modify('+10 second');
         $this->audit->cleanup(new \DateTime());
         $this->createLogs();
     }
@@ -42,7 +42,7 @@ trait AuditBase
     public function tearDown(): void
     {
         $cleanup = new \DateTime();
-        $cleanup = $cleanup->modify('+10 second');
+        $cleanup->modify('+10 second');
         $this->audit->cleanup(new \DateTime());
     }
 
@@ -56,10 +56,10 @@ trait AuditBase
         $requiredAttributes = $this->getRequiredAttributes();
         $dataWithAttributes = array_merge($data, $requiredAttributes);
 
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $dataWithAttributes));
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $dataWithAttributes));
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $dataWithAttributes));
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log(null, 'insert', 'user/null', $userAgent, $ip, $dataWithAttributes));
+        $this->assertInstanceOf(\Utopia\Audit\Log::class, $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $dataWithAttributes));
+        $this->assertInstanceOf(\Utopia\Audit\Log::class, $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $dataWithAttributes));
+        $this->assertInstanceOf(\Utopia\Audit\Log::class, $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $dataWithAttributes));
+        $this->assertInstanceOf(\Utopia\Audit\Log::class, $this->audit->log(null, 'insert', 'user/null', $userAgent, $ip, $dataWithAttributes));
     }
 
     public function testPing(): void
@@ -214,7 +214,7 @@ trait AuditBase
                 'userAgent' => $userAgent,
                 'ip' => $ip,
                 'data' => ['key' => 'value1'],
-                'time' => $timestamp1
+                'time' => $timestamp1,
             ],
             [
                 'userId' => $userId,
@@ -223,7 +223,7 @@ trait AuditBase
                 'userAgent' => $userAgent,
                 'ip' => $ip,
                 'data' => ['key' => 'value2'],
-                'time' => $timestamp2
+                'time' => $timestamp2,
             ],
             [
                 'userId' => $userId,
@@ -232,7 +232,7 @@ trait AuditBase
                 'userAgent' => $userAgent,
                 'ip' => $ip,
                 'data' => ['key' => 'value3'],
-                'time' => $timestamp3
+                'time' => $timestamp3,
             ],
             [
                 'userId' => null,
@@ -241,8 +241,8 @@ trait AuditBase
                 'userAgent' => $userAgent,
                 'ip' => $ip,
                 'data' => ['key' => 'value4'],
-                'time' => $timestamp3
-            ]
+                'time' => $timestamp3,
+            ],
         ];
 
         // Test batch insertion
@@ -253,7 +253,7 @@ trait AuditBase
 
         // Verify the number of logs inserted
         $logs = $this->audit->getLogsByUser($userId);
-        $this->assertEquals(3, count($logs));
+        $this->assertEquals(3, \count($logs));
 
         // Verify chronological order (newest first due to orderDesc)
         $this->assertEquals('delete', $logs[0]->getAttribute('event'));
@@ -267,12 +267,12 @@ trait AuditBase
 
         // Test resource-based retrieval
         $resourceLogs = $this->audit->getLogsByResource('database/document/batch2');
-        $this->assertEquals(1, count($resourceLogs));
+        $this->assertEquals(1, \count($resourceLogs));
         $this->assertEquals('update', $resourceLogs[0]->getAttribute('event'));
 
         // Test resource with userId null
         $resourceLogs = $this->audit->getLogsByResource('user1/null');
-        $this->assertEquals(1, count($resourceLogs));
+        $this->assertEquals(1, \count($resourceLogs));
         foreach ($resourceLogs as $log) {
             $this->assertEquals('insert', $log->getAttribute('event'));
             $this->assertNull($log['userId']);
@@ -280,7 +280,7 @@ trait AuditBase
 
         // Test event-based retrieval
         $eventLogs = $this->audit->getLogsByUserAndEvents($userId, ['create', 'delete']);
-        $this->assertEquals(2, count($eventLogs));
+        $this->assertEquals(2, \count($eventLogs));
     }
 
     public function testGetLogsCustomFilters(): void
@@ -303,8 +303,8 @@ trait AuditBase
 
         // Events should be in opposite order
         if (\count($logsDesc) > 1) {
-            $descEvents = array_map(fn ($log) => $log->getAttribute('event'), $logsDesc);
-            $ascEvents = array_map(fn ($log) => $log->getAttribute('event'), $logsAsc);
+            $descEvents = array_map(fn($log) => $log->getAttribute('event'), $logsDesc);
+            $ascEvents = array_map(fn($log) => $log->getAttribute('event'), $logsAsc);
             $this->assertEquals($descEvents, array_reverse($ascEvents));
         }
     }
@@ -322,7 +322,7 @@ trait AuditBase
                 'userAgent' => 'Mozilla',
                 'ip' => '127.0.0.1',
                 'data' => ['index' => $i],
-                'time' => DateTime::formatTz($baseTime) ?? ''
+                'time' => DateTime::formatTz($baseTime) ?? '',
             ];
         }
 
@@ -357,7 +357,7 @@ trait AuditBase
                 'userAgent' => 'Mozilla',
                 'ip' => '127.0.0.1',
                 'data' => [],
-                'time' => $old
+                'time' => $old,
             ],
             [
                 'userId' => 'timerangeuser',
@@ -366,8 +366,8 @@ trait AuditBase
                 'userAgent' => 'Mozilla',
                 'ip' => '127.0.0.1',
                 'data' => [],
-                'time' => $recent
-            ]
+                'time' => $recent,
+            ],
         ];
 
         $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
@@ -401,11 +401,11 @@ trait AuditBase
         $requiredAttributes = $this->getRequiredAttributes();
         $dataWithAttributes = array_merge($data, $requiredAttributes);
 
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $dataWithAttributes));
+        $this->assertInstanceOf(\Utopia\Audit\Log::class, $this->audit->log($userId, 'update', 'database/document/1', $userAgent, $ip, $dataWithAttributes));
         sleep(5);
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $dataWithAttributes));
+        $this->assertInstanceOf(\Utopia\Audit\Log::class, $this->audit->log($userId, 'update', 'database/document/2', $userAgent, $ip, $dataWithAttributes));
         sleep(5);
-        $this->assertInstanceOf('Utopia\\Audit\\Log', $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $dataWithAttributes));
+        $this->assertInstanceOf(\Utopia\Audit\Log::class, $this->audit->log($userId, 'delete', 'database/document/2', $userAgent, $ip, $dataWithAttributes));
         sleep(5);
 
         // DELETE logs older than 11 seconds and check that status is true
@@ -432,7 +432,7 @@ trait AuditBase
         $ip = '192.168.1.1';
 
         // Create 5 logs with different timestamps
-        $baseTime = new \DateTime('2024-06-15 12:00:00');
+        new \DateTime('2024-06-15 12:00:00');
         $batchEvents = [];
         for ($i = 0; $i < 5; $i++) {
             $offset = $i * 60;
@@ -446,7 +446,7 @@ trait AuditBase
                 'userAgent' => $userAgent,
                 'ip' => $ip,
                 'data' => ['sequence' => $i],
-                'time' => $timestamp
+                'time' => $timestamp,
             ];
         }
 
@@ -483,10 +483,11 @@ trait AuditBase
 
         // Verify order is reversed
         if (\count($logsDesc) === \count($logsAsc)) {
-            for ($i = 0; $i < \count($logsDesc); $i++) {
+            $counter = \count($logsDesc);
+            for ($i = 0; $i < $counter; $i++) {
                 $this->assertEquals(
                     $logsDesc[$i]->getId(),
-                    $logsAsc[\count($logsAsc) - 1 - $i]->getId()
+                    $logsAsc[\count($logsAsc) - 1 - $i]->getId(),
                 );
             }
         }
@@ -538,7 +539,7 @@ trait AuditBase
             ['event_1', 'event_2'],
             limit: 1,
             offset: 0,
-            ascending: false
+            ascending: false,
         );
         $this->assertGreaterThanOrEqual(0, \count($logsEvt));
 
@@ -566,7 +567,7 @@ trait AuditBase
         $countEvtAfter = $this->audit->countLogsByUserAndEvents(
             $userId,
             ['event_1', 'event_2'],
-            after: $afterTimeObj
+            after: $afterTimeObj,
         );
         $this->assertGreaterThanOrEqual(0, $countEvtAfter);
 
@@ -577,7 +578,7 @@ trait AuditBase
         $countResEvtAfter = $this->audit->countLogsByResourceAndEvents(
             'doc/0',
             ['event_0'],
-            after: $afterTimeObj
+            after: $afterTimeObj,
         );
         $this->assertGreaterThanOrEqual(0, $countResEvtAfter);
 
@@ -587,7 +588,7 @@ trait AuditBase
             ['event_1'],
             limit: 1,
             offset: 0,
-            ascending: true
+            ascending: true,
         );
         $this->assertGreaterThanOrEqual(0, \count($logsResEvt));
     }
@@ -602,7 +603,7 @@ trait AuditBase
         $ip = '192.168.1.1';
 
         // Create test logs with specific attributes
-        $baseTime = new \DateTime('2024-06-15 12:00:00');
+        new \DateTime('2024-06-15 12:00:00');
         $batchEvents = [];
         for ($i = 0; $i < 3; $i++) {
             $offset = $i * 60;
@@ -616,7 +617,7 @@ trait AuditBase
                 'userAgent' => $userAgent,
                 'ip' => $ip,
                 'data' => ['sequence' => $i],
-                'time' => $timestamp
+                'time' => $timestamp,
             ];
         }
         $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
@@ -665,19 +666,29 @@ trait AuditBase
 
         // Verify order is reversed
         if (\count($logsDesc) === \count($logsAsc)) {
-            for ($i = 0; $i < \count($logsDesc); $i++) {
+            $counter = \count($logsDesc);
+            for ($i = 0; $i < $counter; $i++) {
                 $this->assertEquals(
                     $logsDesc[$i]->getId(),
-                    $logsAsc[\count($logsAsc) - 1 - $i]->getId()
+                    $logsAsc[\count($logsAsc) - 1 - $i]->getId(),
                 );
             }
         }
 
-        // Test 6: Find with IN filter
+        // Test 6: Find with contains filter (substring match, like utopia-php/database)
         $logs = $this->audit->find([
             \Utopia\Audit\Query::contains('event', ['event_0', 'event_1']),
         ]);
         $this->assertGreaterThanOrEqual(2, \count($logs));
+
+        // Substring needle matches without an exact value
+        $logs = $this->audit->find([
+            \Utopia\Audit\Query::contains('event', ['vent_0']),
+        ]);
+        $this->assertGreaterThanOrEqual(1, \count($logs));
+        foreach ($logs as $log) {
+            $this->assertStringContainsString('vent_0', $log->getEvent());
+        }
 
         // Test 7: Find with between query for time range
         $afterTime = new \DateTime('2024-06-15 12:01:00');
@@ -715,7 +726,7 @@ trait AuditBase
         $ip = '192.168.1.1';
 
         // Create test logs with specific attributes
-        $baseTime = new \DateTime('2024-06-15 12:00:00');
+        new \DateTime('2024-06-15 12:00:00');
         $batchEvents = [];
         for ($i = 0; $i < 3; $i++) {
             $offset = $i * 60;
@@ -729,7 +740,7 @@ trait AuditBase
                 'userAgent' => $userAgent,
                 'ip' => $ip,
                 'data' => ['sequence' => $i],
-                'time' => $timestamp
+                'time' => $timestamp,
             ];
         }
         $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
@@ -748,7 +759,7 @@ trait AuditBase
         ]);
         $this->assertEquals(1, $count);
 
-        // Test 3: Count with IN filter
+        // Test 3: Count with contains filter (substring match, like utopia-php/database)
         $count = $this->audit->count([
             \Utopia\Audit\Query::contains('event', ['event_0', 'event_1']),
         ]);
@@ -804,12 +815,11 @@ trait AuditBase
     {
         $requiredAttributes = $this->getRequiredAttributes();
         if ($requiredAttributes === []) {
-            /** @var array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, time: string, data?: array<string, mixed>}> */
             return $batchEvents;
         }
 
         /** @var array<array{userId: string|null, event: string, resource: string, userAgent: string, ip: string, time: string, data?: array<string, mixed>}> */
-        return array_map(static fn (array $event) => array_merge($event, $requiredAttributes), $batchEvents);
+        return array_map(static fn(array $event): array => array_merge($event, $requiredAttributes), $batchEvents);
     }
 
     /**

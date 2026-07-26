@@ -10,12 +10,10 @@
         "audit"
     ],
     "license": "MIT",
-    "minimum-stability": "dev",
-    "prefer-stable": true,
+    "minimum-stability": "stable",
     "scripts": {
-        "lint": "./vendor/bin/pint --test",
-        "format": "./vendor/bin/pint",
-        "check": "./vendor/bin/phpstan analyse --level max src tests"
+        "test": "phpunit --testsuite unit",
+        "test:e2e": "phpunit --testsuite e2e"
     },
     "autoload": {
         "psr-4": {
@@ -28,17 +26,11 @@
         }
     },
     "require": {
-        "php": ">=8.4",
-        "psr/http-client": "^1.0",
-        "utopia-php/client": "^0.1|^0.2",
+        "php": ">=8.5",
         "utopia-php/database": "^6.0.0",
+        "utopia-php/fetch": "^1.1",
         "utopia-php/query": "0.3.*",
-        "utopia-php/validators": "0.2.*"
-    },
-    "require-dev": {
-        "phpunit/phpunit": "9.*",
-        "phpstan/phpstan": "^2.0",
-        "laravel/pint": "1.*"
+        "utopia-php/validators": "0.3.*"
     },
     "config": {
         "allow-plugins": {

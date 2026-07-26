@@ -2,6 +2,85 @@
 
 All notable changes to `utopia-php/audit` are documented in this file.
 
+## Unreleased
+
+### ClickHouse adapter — migrated to the utopia-php/query 0.3 builder
+
+#### Changed
+
+- `utopia-php/query` bumped from `0.1.*` to `0.3.*` (locked at 0.3.3).
+- `setup()` builds its DDL through `Utopia\Query\Schema\ClickHouse` instead of
+  hand-assembled SQL. Column types, `LowCardinality(...)` / `Nullable(...)`
+  wrapping, bloom-filter indexes, engine, `ORDER BY`, `PARTITION BY` and
+  `SETTINGS` are all emitted by the schema builder. The retention `MODIFY TTL`
+  / `REMOVE TTL` statements are unchanged.
+- `find()`, `count()`, `getById()`, `createBatch()` and `cleanup()` build their
+  SQL through `Utopia\Query\Builder\ClickHouse`. Positional bindings are
+  rewritten to typed `{paramN:Type}` ClickHouse placeholders from a column →
+  type map derived from `getAttributes()`.
+- `createBatch()` uses `Builder\ClickHouse::bulkInsert(Format::JSONEachRow, …)`
+  to emit the `INSERT … FORMAT JSONEachRow` envelope and serialize the body.
+- `Query::getMethod()` now returns the `Utopia\Query\Method` enum (upstream
+  0.3 change). `Utopia\Audit\Query` continues to expose the legacy `TYPE_*`
+  string constants, which map to the same string values.
+
+Filter semantics are unchanged: `contains` / `notContains` remain substring
+matches (now compiled to ClickHouse `position(col, ?) > 0` / `= 0` rather than
+`LIKE '%needle%'`, which also removes the need for wildcard escaping).
+
+## 2.9.0
+
+### ClickHouse adapter — user-agent columns
+
+The ClickHouse adapter now stores the parsed user-agent OS / client / device
+dimensions as dedicated optional columns (mirrors the usage events schema).
+
+#### Added
+
+- `Log` getters for ClickHouse-backed reads: `getOsCode()`, `getOsName()`,
+  `getOsVersion()`, `getClientType()`, `getClientCode()`, `getClientName()`,
+  `getClientVersion()`, `getClientEngine()`, `getClientEngineVersion()`,
+  `getDeviceName()`, `getDeviceBrand()`, `getDeviceModel()`.
+
+#### ClickHouse schema changes
+
+- `LowCardinality(Nullable(String))` — `osCode`, `osName`, `clientType`,
+  `clientCode`, `clientName`, `clientEngine`, `deviceName`, `deviceBrand`
+  (bounded name/code/type dimensions).
+- `Nullable(String)` — `osVersion`, `clientVersion`, `clientEngineVersion`,
+  `deviceModel` (high-cardinality version/model strings, mirroring `sdkVersion`).
+
+All columns are optional (`required = false`) so `createBatch()` never throws when a
+caller omits them. Newly created tables include the columns automatically via `setup()`.
+`setup()` only issues `CREATE TABLE IF NOT EXISTS`, so **existing** tables do not gain the
+columns automatically — apply them with an `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
+migration.
+
+## 2.7.0
+
+### ClickHouse adapter — SDK columns
+
+The ClickHouse adapter now stores two additional optional columns capturing the
+SDK that produced an audit event:
+
+#### Added
+
+- `Log::getSdk()` and `Log::getSdkVersion()` getters for ClickHouse-backed log reads.
+
+#### ClickHouse schema changes
+
+- Column `sdk` `LowCardinality(Nullable(String))` — SDK name (e.g. `web`, `flutter`,
+  `console`, `cli`); low-cardinality, optional.
+- Column `sdkVersion` `Nullable(String)` — SDK version (e.g. `14.0.0`); high-cardinality,
+  optional.
+- Index `_key_sdk` — bloom-filter index on the `sdk` column.
+
+Both columns are optional (`required = false`) so `createBatch()` never throws when a
+caller omits them. Newly created tables include the columns automatically via `setup()`.
+`setup()` only issues `CREATE TABLE IF NOT EXISTS`, so **existing** tables do not gain the
+columns automatically — apply them with an `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
+migration.
+
 ## 2.4.0
 
 ### ClickHouse adapter — actor terminology

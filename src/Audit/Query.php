@@ -90,10 +90,11 @@ class Query extends BaseQuery
      *
      * @param  mixed  $value  Single value or array of values
      */
+    #[\Override]
     public static function equal(string $attribute, mixed $value): static
     {
         /** @var array<mixed> $values */
-        $values = is_array($value) ? $value : [$value];
+        $values = \is_array($value) ? $value : [$value];
 
         return new static(Method::Equal, $attribute, $values);
     }
@@ -104,6 +105,7 @@ class Query extends BaseQuery
      * Accepts mixed (including `DateTime` for the `time` column); the
      * adapter handles type-specific formatting.
      */
+    #[\Override]
     public static function lessThan(string $attribute, mixed $value): static
     {
         return new static(Method::LessThan, $attribute, [$value]);
@@ -112,6 +114,7 @@ class Query extends BaseQuery
     /**
      * Filter by greater than condition.
      */
+    #[\Override]
     public static function greaterThan(string $attribute, mixed $value): static
     {
         return new static(Method::GreaterThan, $attribute, [$value]);
@@ -120,6 +123,7 @@ class Query extends BaseQuery
     /**
      * Filter by BETWEEN condition.
      */
+    #[\Override]
     public static function between(string $attribute, mixed $start, mixed $end): static
     {
         return new static(Method::Between, $attribute, [$start, $end]);

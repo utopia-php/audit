@@ -1,5 +1,8 @@
 # Utopia Audit
 
+> [!IMPORTANT]
+> This repository is a read-only mirror of the [utopia-php monorepo](https://github.com/utopia-php/monorepo). Development happens in [`packages/audit`](https://github.com/utopia-php/monorepo/tree/main/packages/audit) — please open issues and pull requests there.
+
 [![Build Status](https://travis-ci.org/utopia-php/audit.svg?branch=master)](https://travis-ci.com/utopia-php/audit)
 ![Total Downloads](https://img.shields.io/packagist/dt/utopia-php/audit.svg)
 [![Discord](https://img.shields.io/discord/564160730845151244)](https://appwrite.io/discord)
@@ -16,16 +19,16 @@ Although this library is part of the [Utopia Framework](https://github.com/utopi
 - **Batch Operations**: Support for logging multiple events at once
 - **Query Support**: Rich querying capabilities for retrieving logs
 
-## Getting Started
+## Getting started
 
-Install using composer:
+Install using Composer:
 ```bash
 composer require utopia-php/audit
 ```
 
 ## Usage
 
-### Using the Database Adapter (Default)
+### Using the database adapter (default)
 
 The simplest way to use Utopia Audit is with the built-in Database adapter:
 
@@ -66,7 +69,7 @@ $audit = new Audit(new DatabaseAdapter($database));
 $audit->setup();
 ```
 
-### Using a Custom Adapter
+### Using a custom adapter
 
 You can create custom adapters by extending the `Utopia\Audit\Adapter` abstract class:
 
@@ -82,7 +85,7 @@ $adapter = new DatabaseAdapter($database);
 $audit = new Audit($adapter);
 ```
 
-### Basic Operations
+### Basic operations
 
 **Create Log**
 
@@ -94,10 +97,9 @@ $event = 'deleted'; // Log specific action name
 $resource = 'database/document-1'; // Resource unique ID (great for filtering specific logs)
 $userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36'; // Set user-agent
 $ip = '127.0.0.1'; // User IP
-$location = 'US'; // Country name or code
 $data = ['key1' => 'value1','key2' => 'value2']; // Any key-value pair you need to log
 
-$audit->log($userId, $event, $resource, $userAgent, $ip, $location, $data);
+$audit->log($userId, $event, $resource, $userAgent, $ip, $data);
 ```
 
 **Get Logs By User**
@@ -248,7 +250,7 @@ $logs = $audit->getLogsByResourceAndEvents(
 );
 ```
 
-### Filtering Parameters
+### Filtering parameters
 
 All retrieval methods support the following optional parameters:
 
@@ -262,12 +264,12 @@ All retrieval methods support the following optional parameters:
 
 Utopia Audit uses an adapter pattern to support different storage backends. Currently available adapters:
 
-### Database Adapter (Default)
+### Database adapter (default)
 
 The Database adapter uses [utopia-php/database](https://github.com/utopia-php/database) to store audit logs in a database.
 
 
-### ClickHouse Adapter
+### ClickHouse adapter
 
 The ClickHouse adapter uses [ClickHouse](https://clickhouse.com/) for high-performance analytical queries on massive amounts of log data. It communicates with ClickHouse via HTTP interface using Utopia Fetch.
 
@@ -289,25 +291,32 @@ use Utopia\Audit\Adapter\ClickHouse;
 // Create ClickHouse adapter
 $adapter = new ClickHouse(
     host: 'localhost',
-    database: 'audit',
     username: 'default',
     password: '',
-    port: 8123,
-    table: 'audit_logs'
+    port: 8123
 );
+$adapter->setDatabase('audit');
+$adapter->setTable('audit_logs');
 
 $audit = new Audit($adapter);
 $audit->setup(); // Creates database and table
 
-// Use as normal
+// Use as normal — the ClickHouse adapter requires extra attributes in data
 $document = $audit->log(
     userId: 'user-123',
     event: 'document.create',
     resource: 'database/document/1',
     userAgent: 'Mozilla/5.0...',
     ip: '127.0.0.1',
-    location: 'US',
-    data: ['key' => 'value']
+    data: [
+        'actorType' => 'member',
+        'projectId' => 'proj-1',
+        'projectInternalId' => 'proj-int-1',
+        'teamId' => 'team-1',
+        'teamInternalId' => 'team-int-1',
+        'hostname' => 'example.org',
+        'key' => 'value',
+    ]
 );
 ```
 
@@ -317,7 +326,7 @@ $document = $audit->log(
 - Efficient storage with compression
 - Automatic data partitioning and retention policies
 
-### Creating Custom Adapters
+### Creating custom adapters
 
 To create a custom adapter, extend the `Utopia\Audit\Adapter` abstract class and implement all required methods:
 
@@ -446,7 +455,7 @@ $adapter = new CustomAdapter();
 $audit = new Audit($adapter);
 ```
 
-## System Requirements
+## System requirements
 
 Utopia Framework requires PHP 8.0 or later. We recommend using the latest PHP version whenever possible.
 

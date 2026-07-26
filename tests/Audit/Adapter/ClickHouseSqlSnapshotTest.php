@@ -52,12 +52,15 @@ class ClickHouseSqlSnapshotTest extends TestCase
         $table = $schema->table('default.audits');
         $table->string('id')->primary();
         $table->string('actorId')->nullable();
-        $table->string('actorType');
+        $table->string('actorType')->lowCardinality();
         $table->string('actorInternalId')->nullable();
-        $table->string('event');
+        $table->string('event')->lowCardinality();
         $table->string('resource')->nullable();
         $table->string('userAgent');
         $table->string('ip');
+        // Optional low-cardinality dimension, as emitted for sdk / country /
+        // the premium-geo and user-agent columns added in audit 2.7–2.9.
+        $table->addColumn('sdk', ColumnType::String)->lowCardinality()->nullable();
         $table->datetime('time', precision: 3);
         $table->addColumn('data', ColumnType::String)->nullable();
 
@@ -90,9 +93,10 @@ class ClickHouseSqlSnapshotTest extends TestCase
         $this->assertStringContainsString('CREATE TABLE IF NOT EXISTS `default`.`audits`', $sql);
         $this->assertStringContainsString('`id` String', $sql);
         $this->assertStringContainsString('`actorId` Nullable(String)', $sql);
-        $this->assertStringContainsString('`actorType` String', $sql);
+        $this->assertStringContainsString('`actorType` LowCardinality(String)', $sql);
         $this->assertStringContainsString('`actorInternalId` Nullable(String)', $sql);
-        $this->assertStringContainsString('`event` String', $sql);
+        $this->assertStringContainsString('`event` LowCardinality(String)', $sql);
+        $this->assertStringContainsString('`sdk` LowCardinality(Nullable(String))', $sql);
         $this->assertStringContainsString('`time` DateTime64(3)', $sql);
         $this->assertStringNotContainsString('`location`', $sql);
         $this->assertStringNotContainsString('`userId`', $sql);
@@ -204,7 +208,7 @@ class ClickHouseSqlSnapshotTest extends TestCase
         );
     }
 
-    public function testNotContainsMultiValueEmitsTypedNotIn(): void
+    public function testEqualMultiValueEmitsTypedIn(): void
     {
         $statement = $this->newAuditBuilder()
             ->from('default.audits')
@@ -228,6 +232,59 @@ class ClickHouseSqlSnapshotTest extends TestCase
             ],
             $statement->namedBindings,
         );
+    }
+
+    /**
+     * `contains` is a substring match on ClickHouse — the builder emits
+     * `position(col, ?) > 0`, which replaces the adapter's previous
+     * hand-written `LIKE '%needle%'` (and needs no wildcard escaping).
+     */
+    public function testContainsEmitsPositionPredicate(): void
+    {
+        $statement = $this->newAuditBuilder()
+            ->from('default.audits')
+            ->selectRaw('`id`, `event`, `time`')
+            ->filter([Query::contains('event', ['dat'])])
+            ->build();
+
+        $this->assertEquals(
+            'SELECT `id`, `event`, `time` FROM `default`.`audits` '
+            . 'WHERE position(`event`, {param0:String}) > 0',
+            $statement->query,
+        );
+        $this->assertSame(['param0' => 'dat'], $statement->namedBindings);
+    }
+
+    public function testContainsMultiValueOrsPositionPredicates(): void
+    {
+        $statement = $this->newAuditBuilder()
+            ->from('default.audits')
+            ->selectRaw('`id`')
+            ->filter([Query::contains('event', ['dat', 'ins'])])
+            ->build();
+
+        $this->assertEquals(
+            'SELECT `id` FROM `default`.`audits` '
+            . 'WHERE (position(`event`, {param0:String}) > 0 OR position(`event`, {param1:String}) > 0)',
+            $statement->query,
+        );
+        $this->assertSame(['param0' => 'dat', 'param1' => 'ins'], $statement->namedBindings);
+    }
+
+    public function testNotContainsMultiValueAndsNegatedPositionPredicates(): void
+    {
+        $statement = $this->newAuditBuilder()
+            ->from('default.audits')
+            ->selectRaw('`id`')
+            ->filter([Query::notContains('event', ['update', 'delete'])])
+            ->build();
+
+        $this->assertEquals(
+            'SELECT `id` FROM `default`.`audits` '
+            . 'WHERE (position(`event`, {param0:String}) = 0 AND position(`event`, {param1:String}) = 0)',
+            $statement->query,
+        );
+        $this->assertSame(['param0' => 'update', 'param1' => 'delete'], $statement->namedBindings);
     }
 
     public function testFindCursorRawFragmentMergesWithTypedBindings(): void

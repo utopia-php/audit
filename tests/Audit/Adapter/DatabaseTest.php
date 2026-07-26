@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Utopia\Tests\Audit\Adapter;
 
 use PDO;
@@ -15,14 +17,14 @@ use Utopia\Tests\Audit\AuditBase;
 /**
  * Database Adapter Tests
  */
-class DatabaseTest extends TestCase
+final class DatabaseTest extends TestCase
 {
     use AuditBase;
 
     protected function initializeAudit(): void
     {
-        $dbHost = 'mariadb';
-        $dbPort = '3306';
+        $dbHost = getenv('MARIADB_HOST') ?: '127.0.0.1';
+        $dbPort = getenv('MARIADB_PORT') ?: '13307';
         $dbUser = 'root';
         $dbPass = 'password';
 

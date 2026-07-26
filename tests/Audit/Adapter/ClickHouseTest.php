@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Utopia\Tests\Audit\Adapter;
 
 use Exception;
@@ -15,16 +17,16 @@ use Utopia\Tests\Audit\AuditBase;
  * Tests ClickHouse-specific features and configurations.
  * Generic audit functionality tests are in AuditBase trait.
  */
-class ClickHouseTest extends TestCase
+final class ClickHouseTest extends TestCase
 {
     use AuditBase;
 
     protected function initializeAudit(): void
     {
-        $host = getenv('CLICKHOUSE_HOST') ?: 'clickhouse';
+        $host = getenv('CLICKHOUSE_HOST') ?: 'localhost';
         $username = getenv('CLICKHOUSE_USER') ?: 'default';
         $password = getenv('CLICKHOUSE_PASSWORD') ?: 'clickhouse';
-        $port = (int) (getenv('CLICKHOUSE_PORT') ?: 8123);
+        $port = (int) (getenv('CLICKHOUSE_PORT') ?: 18123);
         $secure = filter_var(getenv('CLICKHOUSE_SECURE') ?: false, FILTER_VALIDATE_BOOLEAN);
 
         $clickHouse = new ClickHouse(
@@ -32,7 +34,7 @@ class ClickHouseTest extends TestCase
             username: $username,
             password: $password,
             port: $port,
-            secure: $secure
+            secure: $secure,
         );
 
         if ($database = getenv('CLICKHOUSE_DATABASE')) {
@@ -76,7 +78,7 @@ class ClickHouseTest extends TestCase
         new ClickHouse(
             host: '',
             username: 'default',
-            password: ''
+            password: '',
         );
     }
 
@@ -92,7 +94,7 @@ class ClickHouseTest extends TestCase
             host: 'localhost',
             username: 'default',
             password: '',
-            port: 0
+            port: 0,
         );
     }
 
@@ -108,7 +110,7 @@ class ClickHouseTest extends TestCase
             host: 'localhost',
             username: 'default',
             password: '',
-            port: 65536
+            port: 65536,
         );
     }
 
@@ -122,11 +124,11 @@ class ClickHouseTest extends TestCase
             username: 'testuser',
             password: 'testpass',
             port: 8443,
-            secure: true
+            secure: true,
         );
 
         $this->assertInstanceOf(ClickHouse::class, $adapter);
-        $this->assertEquals('ClickHouse', $adapter->getName());
+        $this->assertSame('ClickHouse', $adapter->getName());
     }
 
     /**
@@ -137,10 +139,10 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
-        $this->assertEquals('ClickHouse', $adapter->getName());
+        $this->assertSame('ClickHouse', $adapter->getName());
     }
 
     /**
@@ -154,7 +156,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setDatabase('');
@@ -171,7 +173,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setDatabase(str_repeat('a', 256));
@@ -188,7 +190,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setDatabase('123invalid');
@@ -205,7 +207,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setDatabase('SELECT');
@@ -219,7 +221,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $result = $adapter->setDatabase('my_database_123');
@@ -237,7 +239,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setTable('');
@@ -254,7 +256,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setTable(str_repeat('a', 256));
@@ -271,7 +273,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setTable('123invalid');
@@ -288,7 +290,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setTable('SELECT');
@@ -302,12 +304,12 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $result = $adapter->setTable('my_audit_logs');
         $this->assertInstanceOf(ClickHouse::class, $result);
-        $this->assertEquals('my_audit_logs', $adapter->getTable());
+        $this->assertSame('my_audit_logs', $adapter->getTable());
     }
 
     /**
@@ -318,12 +320,12 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $result = $adapter->setNamespace('');
         $this->assertInstanceOf(ClickHouse::class, $result);
-        $this->assertEquals('', $adapter->getNamespace());
+        $this->assertSame('', $adapter->getNamespace());
     }
 
     /**
@@ -337,7 +339,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $adapter->setNamespace('9invalid');
@@ -351,12 +353,12 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $result = $adapter->setNamespace('project_123');
         $this->assertInstanceOf(ClickHouse::class, $result);
-        $this->assertEquals('project_123', $adapter->getNamespace());
+        $this->assertSame('project_123', $adapter->getNamespace());
     }
 
     /**
@@ -369,11 +371,79 @@ class ClickHouseTest extends TestCase
             username: 'default',
             password: 'clickhouse',
             port: 8123,
-            secure: false
+            secure: false,
         );
 
         $result = $adapter->setSecure(true);
         $this->assertInstanceOf(ClickHouse::class, $result);
+    }
+
+    /**
+     * Test setRetention stores the value and getRetention returns it
+     */
+    public function testSetRetention(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+        );
+
+        $this->assertNull($adapter->getRetention());
+
+        $result = $adapter->setRetention(30);
+        $this->assertInstanceOf(ClickHouse::class, $result);
+        $this->assertEquals(30, $adapter->getRetention());
+    }
+
+    /**
+     * Test setRetention accepts null to disable retention
+     */
+    public function testSetRetentionAcceptsNull(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+        );
+
+        $adapter->setRetention(30);
+        $adapter->setRetention(null);
+        $this->assertNull($adapter->getRetention());
+    }
+
+    /**
+     * Test setRetention rejects zero days
+     */
+    public function testSetRetentionRejectsZero(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Retention must be a positive number of days');
+
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+        );
+
+        $adapter->setRetention(0);
+    }
+
+    /**
+     * Test setRetention rejects negative days
+     */
+    public function testSetRetentionRejectsNegative(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Retention must be a positive number of days');
+
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+        );
+
+        $adapter->setRetention(-1);
     }
 
     /**
@@ -384,7 +454,7 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         // Test initial state
@@ -420,8 +490,8 @@ class ClickHouseTest extends TestCase
                 'userAgent' => "User'Agent\"With'Quotes",
                 'ip' => '192.168.1.1',
                 'data' => ['special' => "data with 'quotes'"],
-                'time' => \Utopia\Database\DateTime::formatTz(\Utopia\Database\DateTime::now()) ?? ''
-            ]
+                'time' => \Utopia\Database\DateTime::formatTz(\Utopia\Database\DateTime::now()) ?? '',
+            ],
         ];
 
         $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
@@ -430,7 +500,7 @@ class ClickHouseTest extends TestCase
 
         // Verify retrieval
         $logs = $this->audit->getLogsByUser('actor`with`backticks');
-        $this->assertGreaterThan(0, count($logs));
+        $this->assertGreaterThan(0, \count($logs));
     }
 
     /**
@@ -441,11 +511,11 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $attributes = $adapter->getAttributes();
-        $attributeIds = array_map(fn ($attr) => $attr['$id'], $attributes);
+        $attributeIds = array_map(fn(array $attr): mixed => $attr['$id'], $attributes);
 
         // Verify all expected attributes exist
         $expectedAttributes = [
@@ -467,12 +537,260 @@ class ClickHouseTest extends TestCase
             'projectInternalId',
             'teamId',
             'teamInternalId',
-            'hostname'
+            'hostname',
+            // premium geo
+            'city',
+            'continentCode',
+            'subdivisions',
+            'isp',
+            'autonomousSystemNumber',
+            'autonomousSystemOrganization',
+            'connectionType',
+            'connectionUsageType',
+            'connectionOrganization',
+            // sdk
+            'sdk',
+            'sdkVersion',
+            // user-agent — parsed OS / client / device
+            'osCode',
+            'osName',
+            'osVersion',
+            'clientType',
+            'clientCode',
+            'clientName',
+            'clientVersion',
+            'clientEngine',
+            'clientEngineVersion',
+            'deviceName',
+            'deviceBrand',
+            'deviceModel',
         ];
 
         foreach ($expectedAttributes as $expected) {
             $this->assertContains($expected, $attributeIds, "Attribute '{$expected}' not found in ClickHouse adapter");
         }
+    }
+
+    /**
+     * Test that user-agent columns get the correct ClickHouse type: bounded
+     * name/code/type dimensions use LowCardinality(Nullable(String)), while
+     * high-cardinality version/model strings stay plain Nullable(String).
+     */
+    public function testUserAgentColumnTypes(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+        );
+
+        $method = new \ReflectionMethod($adapter, 'getColumnDefinition');
+
+        $lowCardinality = [
+            'osCode',
+            'osName',
+            'clientType',
+            'clientCode',
+            'clientName',
+            'clientEngine',
+            'deviceName',
+            'deviceBrand',
+        ];
+        foreach ($lowCardinality as $column) {
+            $definition = $method->invoke($adapter, $column);
+            $this->assertEquals("{$column} LowCardinality(Nullable(String))", $definition);
+        }
+
+        $highCardinality = [
+            'osVersion',
+            'clientVersion',
+            'clientEngineVersion',
+            'deviceModel',
+        ];
+        foreach ($highCardinality as $column) {
+            $definition = $method->invoke($adapter, $column);
+            $this->assertEquals("{$column} Nullable(String)", $definition);
+        }
+    }
+
+    /**
+     * Test that premium geo attributes are all optional String columns.
+     */
+    public function testPremiumGeoAttributesAreOptionalStrings(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+        );
+
+        $attributes = $adapter->getAttributes();
+        $byId = [];
+        foreach ($attributes as $attribute) {
+            $byId[$attribute['$id']] = $attribute;
+        }
+
+        $geoColumns = [
+            'city',
+            'continentCode',
+            'subdivisions',
+            'isp',
+            'autonomousSystemNumber',
+            'autonomousSystemOrganization',
+            'connectionType',
+            'connectionUsageType',
+            'connectionOrganization',
+        ];
+
+        foreach ($geoColumns as $column) {
+            $this->assertArrayHasKey($column, $byId, "Premium geo attribute '{$column}' not found");
+            $this->assertEquals(\Utopia\Database\Database::VAR_STRING, $byId[$column]['type'], "'{$column}' should be a string");
+            $this->assertFalse($byId[$column]['required'], "'{$column}' should be optional");
+            $this->assertFalse($byId[$column]['array'], "'{$column}' should not be an array");
+        }
+    }
+
+    /**
+     * Test that premium geo columns get the correct ClickHouse type:
+     * low-cardinality dimensions use LowCardinality(Nullable(String)), while
+     * high-cardinality ones stay plain Nullable(String).
+     */
+    public function testPremiumGeoColumnTypes(): void
+    {
+        $adapter = new ClickHouse(
+            host: 'clickhouse',
+            username: 'default',
+            password: 'clickhouse',
+        );
+
+        $method = new \ReflectionMethod($adapter, 'getColumnDefinition');
+
+        $lowCardinality = [
+            'continentCode',
+            'subdivisions',
+            'connectionType',
+            'connectionUsageType',
+        ];
+        foreach ($lowCardinality as $column) {
+            $definition = $method->invoke($adapter, $column);
+            $this->assertEquals("{$column} LowCardinality(Nullable(String))", $definition);
+        }
+
+        // autonomousSystemNumber is high-cardinality (~100k ASNs) so it is a
+        // plain Nullable(String), not LowCardinality.
+        $highCardinality = [
+            'city',
+            'isp',
+            'autonomousSystemNumber',
+            'autonomousSystemOrganization',
+            'connectionOrganization',
+        ];
+        foreach ($highCardinality as $column) {
+            $definition = $method->invoke($adapter, $column);
+            $this->assertEquals("{$column} Nullable(String)", $definition);
+        }
+    }
+
+    /**
+     * Premium geo values must round-trip through a real write/read cycle:
+     * write a log carrying all 9 geo fields and read it back unchanged. This
+     * proves the columns are actually created, written and selected (not just
+     * present in the schema definition).
+     */
+    public function testPremiumGeoRoundTrip(): void
+    {
+        $actorId = 'geo-actor-' . uniqid('', true);
+        $geo = [
+            'city' => 'Mountain View',
+            'continentCode' => 'NA',
+            'subdivisions' => 'California',
+            'isp' => 'Google',
+            'autonomousSystemNumber' => '15169',
+            'autonomousSystemOrganization' => 'GOOGLE',
+            'connectionType' => 'cable',
+            'connectionUsageType' => 'residential',
+            'connectionOrganization' => 'Google LLC',
+        ];
+
+        $batchEvents = [array_merge([
+            'actorId' => $actorId,
+            'event' => 'geo.roundtrip',
+            'resource' => 'document/geo-1',
+            'userAgent' => 'RoundTrip/1.0',
+            'ip' => '8.8.8.8',
+            'data' => [],
+            'time' => \Utopia\Database\DateTime::formatTz(\Utopia\Database\DateTime::now()) ?? '',
+        ], $geo)];
+
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
+        $this->assertTrue($this->audit->logBatch($batchEvents));
+
+        $logs = $this->audit->getLogsByUser($actorId);
+        $this->assertGreaterThan(0, \count($logs), 'geo round-trip log was not persisted');
+
+        $log = $logs[0];
+        foreach ($geo as $key => $expected) {
+            $this->assertSame($expected, $log->getAttribute($key), "premium geo '{$key}' did not round-trip");
+        }
+    }
+
+    /**
+     * User-agent OS / client / device values must round-trip through a real
+     * write/read cycle, proving the columns are created, written and selected.
+     */
+    public function testUserAgentRoundTrip(): void
+    {
+        $actorId = 'ua-actor-' . uniqid('', true);
+        $ua = [
+            'osCode' => 'IOS',
+            'osName' => 'iOS',
+            'osVersion' => '17.4',
+            'clientType' => 'browser',
+            'clientCode' => 'MF',
+            'clientName' => 'Mobile Safari',
+            'clientVersion' => '17.4',
+            'clientEngine' => 'WebKit',
+            'clientEngineVersion' => '605.1.15',
+            'deviceName' => 'smartphone',
+            'deviceBrand' => 'Apple',
+            'deviceModel' => 'iPhone',
+        ];
+
+        $batchEvents = [array_merge([
+            'actorId' => $actorId,
+            'event' => 'ua.roundtrip',
+            'resource' => 'document/ua-1',
+            'userAgent' => 'RoundTrip/1.0',
+            'ip' => '8.8.8.8',
+            'data' => [],
+            'time' => \Utopia\Database\DateTime::formatTz(\Utopia\Database\DateTime::now()) ?? '',
+        ], $ua)];
+
+        $batchEvents = $this->applyRequiredAttributesToBatch($batchEvents);
+        $this->assertTrue($this->audit->logBatch($batchEvents));
+
+        $logs = $this->audit->getLogsByUser($actorId);
+        $this->assertGreaterThan(0, \count($logs), 'user-agent round-trip log was not persisted');
+
+        $log = $logs[0];
+        foreach ($ua as $key => $expected) {
+            $this->assertSame($expected, $log->getAttribute($key), "user-agent '{$key}' did not round-trip");
+        }
+
+        // Exercise the typed getters so a wrong attribute key in any of them is
+        // caught (getAttribute() above can't detect that).
+        $this->assertSame($ua['osCode'], $log->getOsCode());
+        $this->assertSame($ua['osName'], $log->getOsName());
+        $this->assertSame($ua['osVersion'], $log->getOsVersion());
+        $this->assertSame($ua['clientType'], $log->getClientType());
+        $this->assertSame($ua['clientCode'], $log->getClientCode());
+        $this->assertSame($ua['clientName'], $log->getClientName());
+        $this->assertSame($ua['clientVersion'], $log->getClientVersion());
+        $this->assertSame($ua['clientEngine'], $log->getClientEngine());
+        $this->assertSame($ua['clientEngineVersion'], $log->getClientEngineVersion());
+        $this->assertSame($ua['deviceName'], $log->getDeviceName());
+        $this->assertSame($ua['deviceBrand'], $log->getDeviceBrand());
+        $this->assertSame($ua['deviceModel'], $log->getDeviceModel());
     }
 
     /**
@@ -483,11 +801,11 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $indexes = $adapter->getIndexes();
-        $indexIds = array_map(fn ($idx) => $idx['$id'], $indexes);
+        $indexIds = array_map(fn(array $idx): mixed => $idx['$id'], $indexes);
 
         // Verify all ClickHouse-specific indexes exist
         $expectedClickHouseIndexes = [
@@ -497,7 +815,8 @@ class ClickHouseTest extends TestCase
             '_key_actor_internal_id',
             '_key_actor_type',
             '_key_country',
-            '_key_hostname'
+            '_key_hostname',
+            '_key_sdk',
         ];
 
         foreach ($expectedClickHouseIndexes as $expected) {
@@ -548,11 +867,10 @@ class ClickHouseTest extends TestCase
         $adapter = new ClickHouse(
             host: 'clickhouse',
             username: 'default',
-            password: 'clickhouse'
+            password: 'clickhouse',
         );
 
         $method = new \ReflectionMethod($adapter, 'parseResource');
-        $method->setAccessible(true);
 
         $resource = 'database/6978484940ff05762e1a/table/697848498066e3d2ef64';
         $parsed = $method->invoke($adapter, $resource);
@@ -603,10 +921,10 @@ class ClickHouseTest extends TestCase
         $page2 = $this->audit->find([
             Query::orderAsc('id'),
             Query::limit(2),
-            Query::cursorAfter($page1[count($page1) - 1]),
+            Query::cursorAfter($page1[\count($page1) - 1]),
         ]);
 
-        $this->assertGreaterThanOrEqual(1, count($page2));
+        $this->assertGreaterThanOrEqual(1, \count($page2));
         foreach ($page2 as $log) {
             $this->assertNotEquals($page1[0]->getId(), $log->getId());
             $this->assertNotEquals($page1[1]->getId(), $log->getId());
@@ -620,17 +938,17 @@ class ClickHouseTest extends TestCase
             Query::limit(50),
         ]);
 
-        $this->assertGreaterThanOrEqual(3, count($all));
+        $this->assertGreaterThanOrEqual(3, \count($all));
 
         $before = $this->audit->find([
             Query::orderAsc('id'),
             Query::limit(2),
-            Query::cursorBefore($all[count($all) - 1]),
+            Query::cursorBefore($all[\count($all) - 1]),
         ]);
 
         $this->assertCount(2, $before);
-        $this->assertEquals($all[count($all) - 3]->getId(), $before[0]->getId());
-        $this->assertEquals($all[count($all) - 2]->getId(), $before[1]->getId());
+        $this->assertEquals($all[\count($all) - 3]->getId(), $before[0]->getId());
+        $this->assertEquals($all[\count($all) - 2]->getId(), $before[1]->getId());
     }
 
     public function testCursorAcceptsAssociativeArray(): void
@@ -640,7 +958,7 @@ class ClickHouseTest extends TestCase
             Query::limit(50),
         ]);
 
-        $this->assertGreaterThanOrEqual(2, count($all));
+        $this->assertGreaterThanOrEqual(2, \count($all));
 
         $page = $this->audit->find([
             Query::orderAsc('id'),
@@ -648,7 +966,7 @@ class ClickHouseTest extends TestCase
             Query::cursorAfter(['id' => $all[0]->getId()]),
         ]);
 
-        $this->assertEquals(count($all) - 1, count($page));
+        $this->assertCount(\count($all) - 1, $page);
         $this->assertEquals($all[1]->getId(), $page[0]->getId());
     }
 
@@ -658,19 +976,19 @@ class ClickHouseTest extends TestCase
         $this->assertGreaterThanOrEqual(4, $unbounded);
 
         $bounded = $this->audit->count([], max: 2);
-        $this->assertEquals(2, $bounded);
+        $this->assertSame(2, $bounded);
 
         $boundedAboveTotal = $this->audit->count([], max: 10_000);
-        $this->assertEquals($unbounded, $boundedAboveTotal);
+        $this->assertSame($unbounded, $boundedAboveTotal);
     }
 
     public function testCountByUserWithMaxBound(): void
     {
         $unbounded = $this->audit->countLogsByUser('userId');
-        $this->assertEquals(3, $unbounded);
+        $this->assertSame(3, $unbounded);
 
         $bounded = $this->audit->countLogsByUser('userId', max: 1);
-        $this->assertEquals(1, $bounded);
+        $this->assertSame(1, $bounded);
     }
 
     public function testNotEqualQuery(): void
@@ -686,6 +1004,40 @@ class ClickHouseTest extends TestCase
         }
     }
 
+    public function testContainsSubstringQuery(): void
+    {
+        // Contains is a substring match (like utopia-php/database), not an
+        // exact IN match — 'dat' matches only the 'update' logs
+        $logs = $this->audit->find([
+            Query::contains('event', ['dat']),
+        ]);
+        $this->assertCount(2, $logs);
+        foreach ($logs as $log) {
+            $this->assertEquals('update', $log->getEvent());
+        }
+
+        // Multiple needles OR together: 'dat' (update) + 'ins' (insert)
+        $logs = $this->audit->find([
+            Query::contains('event', ['dat', 'ins']),
+        ]);
+        $this->assertCount(3, $logs);
+    }
+
+    public function testContainsEscapesLikeWildcards(): void
+    {
+        // '%' and '_' in needles are literals, not LIKE wildcards —
+        // no fixture event contains a literal '%'
+        $logs = $this->audit->find([
+            Query::contains('event', ['%']),
+        ]);
+        $this->assertCount(0, $logs);
+
+        $logs = $this->audit->find([
+            Query::contains('event', ['u_date']),
+        ]);
+        $this->assertCount(0, $logs);
+    }
+
     public function testNotContainsQuery(): void
     {
         $logs = $this->audit->find([
@@ -694,17 +1046,27 @@ class ClickHouseTest extends TestCase
         // Only the insert log
         $this->assertCount(1, $logs);
         $this->assertEquals('insert', $logs[0]->getEvent());
+
+        // Negated substring: excludes anything containing 'dat' (update),
+        // keeps delete + insert
+        $logs = $this->audit->find([
+            Query::notContains('event', ['dat']),
+        ]);
+        $this->assertCount(2, $logs);
+        foreach ($logs as $log) {
+            $this->assertStringNotContainsString('dat', $log->getEvent());
+        }
     }
 
     public function testLesserEqualAndGreaterEqualQueries(): void
     {
-        $now = (new \DateTime())->modify('+1 minute');
-        $past = (new \DateTime())->modify('-1 hour');
+        $now = new \DateTime()->modify('+1 minute');
+        $past = new \DateTime()->modify('-1 hour');
 
         $allLe = $this->audit->find([
             Query::lessThanEqual('time', \Utopia\Database\DateTime::format($now)),
         ]);
-        $this->assertGreaterThanOrEqual(4, count($allLe));
+        $this->assertGreaterThanOrEqual(4, \count($allLe));
 
         $noneLe = $this->audit->find([
             Query::lessThanEqual('time', \Utopia\Database\DateTime::format($past)),
@@ -714,13 +1076,13 @@ class ClickHouseTest extends TestCase
         $allGe = $this->audit->find([
             Query::greaterThanEqual('time', \Utopia\Database\DateTime::format($past)),
         ]);
-        $this->assertGreaterThanOrEqual(4, count($allGe));
+        $this->assertGreaterThanOrEqual(4, \count($allGe));
     }
 
     public function testNotBetweenQuery(): void
     {
-        $past = (new \DateTime())->modify('-2 hour');
-        $oldPast = (new \DateTime())->modify('-3 hour');
+        $past = new \DateTime()->modify('-2 hour');
+        $oldPast = new \DateTime()->modify('-3 hour');
 
         $logs = $this->audit->find([
             Query::notBetween(
@@ -730,7 +1092,7 @@ class ClickHouseTest extends TestCase
             ),
         ]);
         // All 4 fixture logs are outside the past window
-        $this->assertGreaterThanOrEqual(4, count($logs));
+        $this->assertGreaterThanOrEqual(4, \count($logs));
     }
 
     public function testIsNullAndIsNotNullQueries(): void
@@ -805,7 +1167,7 @@ class ClickHouseTest extends TestCase
             Query::limit(1),
         ]);
 
-        $this->assertGreaterThanOrEqual(1, count($logs));
+        $this->assertGreaterThanOrEqual(1, \count($logs));
 
         $row = $logs[0]->getArrayCopy();
         // `id` is always projected so the Log model still has its identifier
@@ -821,8 +1183,8 @@ class ClickHouseTest extends TestCase
 
     public function testSelectAutoIncludesTenantWhenShared(): void
     {
-        $host = getenv('CLICKHOUSE_HOST') ?: 'clickhouse';
-        $port = (int) (getenv('CLICKHOUSE_PORT') ?: 8123);
+        $host = getenv('CLICKHOUSE_HOST') ?: 'localhost';
+        $port = (int) (getenv('CLICKHOUSE_PORT') ?: 18123);
 
         $adapter = new ClickHouse(
             host: $host,
@@ -937,10 +1299,10 @@ class ClickHouseTest extends TestCase
 
     public function testSharedTableSortKeyLeadsWithTenant(): void
     {
-        $host = getenv('CLICKHOUSE_HOST') ?: 'clickhouse';
+        $host = getenv('CLICKHOUSE_HOST') ?: 'localhost';
         $username = getenv('CLICKHOUSE_USER') ?: 'default';
         $password = getenv('CLICKHOUSE_PASSWORD') ?: 'clickhouse';
-        $port = (int) (getenv('CLICKHOUSE_PORT') ?: 8123);
+        $port = (int) (getenv('CLICKHOUSE_PORT') ?: 18123);
         $secure = filter_var(getenv('CLICKHOUSE_SECURE') ?: false, FILTER_VALIDATE_BOOLEAN);
         $database = getenv('CLICKHOUSE_DATABASE') ?: 'default';
 
@@ -951,7 +1313,7 @@ class ClickHouseTest extends TestCase
             username: $username,
             password: $password,
             port: $port,
-            secure: $secure
+            secure: $secure,
         );
         $adapter->setDatabase($database);
         $adapter->setNamespace($namespace);
@@ -978,20 +1340,20 @@ class ClickHouseTest extends TestCase
             ]]);
             $out = @file_get_contents($url, false, $ctx);
 
-            return $out === false ? '' : trim((string) $out);
+            return $out === false ? '' : trim($out);
         };
 
         try {
-            (new Audit($adapter))->setup();
+            new Audit($adapter)->setup();
 
             $sortingKey = $http(
                 'SELECT sorting_key FROM system.tables WHERE database = {db:String} AND name = {tbl:String}',
-                ['db' => $database, 'tbl' => $table]
+                ['db' => $database, 'tbl' => $table],
             );
 
             $this->assertTrue(
                 str_starts_with(trim($sortingKey), 'tenant'),
-                "Expected sorting key to lead with 'tenant', got: {$sortingKey}"
+                "Expected sorting key to lead with 'tenant', got: {$sortingKey}",
             );
         } finally {
             $escDb = '`' . str_replace('`', '``', $database) . '`';

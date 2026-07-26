@@ -3,10 +3,8 @@ services:
     image: mariadb:10.11
     environment:
       - MYSQL_ROOT_PASSWORD=password
-    networks:
-      - abuse
     ports:
-      - "9306:3306"
+      - "13307:3306"
     healthcheck:
       test: ["CMD", "sh", "-c", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
       interval: 5s
@@ -21,39 +19,11 @@ services:
       - CLICKHOUSE_USER=default
       - CLICKHOUSE_PASSWORD=clickhouse
       - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
-    networks:
-      - abuse
     ports:
-      - "8123:8123"
-      - "9000:9000"
+      - "18123:8123"
     healthcheck:
       test: ["CMD", "clickhouse-client", "--host=localhost", "--port=9000", "--query=SELECT 1", "--format=Null"]
       interval: 5s
       timeout: 3s
       retries: 10
       start_period: 15s
-
-  tests:
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-    networks:
-      - abuse
-    depends_on:
-      mariadb:
-        condition: service_healthy
-      clickhouse:
-        condition: service_healthy
-    volumes:
-      - ./phpunit.xml:/code/phpunit.xml
-      - ./src:/code/src
-      - ./tests:/code/tests
-    healthcheck:
-      test: ["CMD", "php", "--version"]
-      interval: 5s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
-
-networks:
-  abuse:

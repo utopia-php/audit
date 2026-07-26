@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Utopia\Audit;
 
 /**
@@ -19,7 +21,6 @@ abstract class Adapter
     /**
      * Setup the adapter (create required tables/collections, indexes, etc.)
      *
-     * @return void
      * @throws \Exception
      */
     abstract public function setup(): void;
@@ -27,9 +28,7 @@ abstract class Adapter
     /**
      * Get a single log by its ID.
      *
-     * @param string $id
      * @return Log|null The log entry or null if not found
-     *
      * @throws \Exception
      */
     abstract public function getById(string $id): ?Log;
@@ -63,7 +62,6 @@ abstract class Adapter
      *     time: \DateTime|string|null,
      *     data?: array<string, mixed>
      * }> $logs
-     * @return bool
      *
      * @throws \Exception
      */
@@ -72,9 +70,7 @@ abstract class Adapter
     /**
      * Get logs by user ID.
      *
-     * @param string $userId
      * @return array<Log>
-     *
      * @throws \Exception
      */
     abstract public function getByUser(
@@ -89,8 +85,6 @@ abstract class Adapter
     /**
      * Count logs by user ID.
      *
-     * @param string $userId
-     * @return int
      *
      * @throws \Exception
      */
@@ -104,9 +98,7 @@ abstract class Adapter
     /**
      * Get logs by resource.
      *
-     * @param string $resource
      * @return array<Log>
-     *
      * @throws \Exception
      */
     abstract public function getByResource(
@@ -121,8 +113,6 @@ abstract class Adapter
     /**
      * Count logs by resource.
      *
-     * @param string $resource
-     * @return int
      *
      * @throws \Exception
      */
@@ -136,10 +126,8 @@ abstract class Adapter
     /**
      * Get logs by user and events.
      *
-     * @param string $userId
      * @param array<int, string> $events
      * @return array<Log>
-     *
      * @throws \Exception
      */
     abstract public function getByUserAndEvents(
@@ -155,9 +143,7 @@ abstract class Adapter
     /**
      * Count logs by user and events.
      *
-     * @param string $userId
      * @param array<int, string> $events
-     * @return int
      *
      * @throws \Exception
      */
@@ -172,10 +158,8 @@ abstract class Adapter
     /**
      * Get logs by resource and events.
      *
-     * @param string $resource
      * @param array<int, string> $events
      * @return array<Log>
-     *
      * @throws \Exception
      */
     abstract public function getByResourceAndEvents(
@@ -191,9 +175,7 @@ abstract class Adapter
     /**
      * Count logs by resource and events.
      *
-     * @param string $resource
      * @param array<int, string> $events
-     * @return int
      *
      * @throws \Exception
      */
@@ -208,8 +190,6 @@ abstract class Adapter
     /**
      * Delete logs older than the specified datetime.
      *
-     * @param \DateTime $datetime
-     * @return bool
      *
      * @throws \Exception
      */
@@ -234,7 +214,6 @@ abstract class Adapter
      *
      * @param array<\Utopia\Audit\Query> $queries
      * @param int|null $max Optional upper bound (inclusive) for the count
-     * @return int
      *
      * @throws \Exception
      */
