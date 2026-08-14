@@ -12,59 +12,59 @@ final class QueryTest extends TestCase
     /**
      * Test Query class static factory methods
      */
-    public function testQueryStaticFactoryMethods(): void
+    public function test_query_static_factory_methods(): void
     {
         // Test equal
         $query = Query::equal('userId', '123');
-        $this->assertSame(Query::TYPE_EQUAL, $query->getMethod());
+        $this->assertSame(Query::TYPE_EQUAL, $query->getMethod()->value);
         $this->assertSame('userId', $query->getAttribute());
         $this->assertSame(['123'], $query->getValues());
 
         // Test lessThan
         $query = Query::lessThan('time', '2024-01-01');
-        $this->assertSame(Query::TYPE_LESSER, $query->getMethod());
+        $this->assertSame(Query::TYPE_LESSER, $query->getMethod()->value);
         $this->assertSame('time', $query->getAttribute());
         $this->assertSame(['2024-01-01'], $query->getValues());
 
         // Test greaterThan
         $query = Query::greaterThan('time', '2023-01-01');
-        $this->assertSame(Query::TYPE_GREATER, $query->getMethod());
+        $this->assertSame(Query::TYPE_GREATER, $query->getMethod()->value);
         $this->assertSame('time', $query->getAttribute());
         $this->assertSame(['2023-01-01'], $query->getValues());
 
         // Test between
         $query = Query::between('time', '2023-01-01', '2024-01-01');
-        $this->assertSame(Query::TYPE_BETWEEN, $query->getMethod());
+        $this->assertSame(Query::TYPE_BETWEEN, $query->getMethod()->value);
         $this->assertSame('time', $query->getAttribute());
         $this->assertSame(['2023-01-01', '2024-01-01'], $query->getValues());
 
         // Test contains
         $query = Query::contains('event', ['create', 'update', 'delete']);
-        $this->assertSame(Query::TYPE_CONTAINS, $query->getMethod());
+        $this->assertSame(Query::TYPE_CONTAINS, $query->getMethod()->value);
         $this->assertSame('event', $query->getAttribute());
         $this->assertSame(['create', 'update', 'delete'], $query->getValues());
 
         // Test orderDesc
         $query = Query::orderDesc('time');
-        $this->assertSame(Query::TYPE_ORDER_DESC, $query->getMethod());
+        $this->assertSame(Query::TYPE_ORDER_DESC, $query->getMethod()->value);
         $this->assertSame('time', $query->getAttribute());
         $this->assertSame([], $query->getValues());
 
         // Test orderAsc
         $query = Query::orderAsc('userId');
-        $this->assertSame(Query::TYPE_ORDER_ASC, $query->getMethod());
+        $this->assertSame(Query::TYPE_ORDER_ASC, $query->getMethod()->value);
         $this->assertSame('userId', $query->getAttribute());
         $this->assertSame([], $query->getValues());
 
         // Test limit
         $query = Query::limit(10);
-        $this->assertSame(Query::TYPE_LIMIT, $query->getMethod());
+        $this->assertSame(Query::TYPE_LIMIT, $query->getMethod()->value);
         $this->assertSame('', $query->getAttribute());
         $this->assertSame([10], $query->getValues());
 
         // Test offset
         $query = Query::offset(5);
-        $this->assertSame(Query::TYPE_OFFSET, $query->getMethod());
+        $this->assertSame(Query::TYPE_OFFSET, $query->getMethod()->value);
         $this->assertSame('', $query->getAttribute());
         $this->assertSame([5], $query->getValues());
     }
@@ -72,12 +72,12 @@ final class QueryTest extends TestCase
     /**
      * Test Query parse and toString methods
      */
-    public function testQueryParseAndToString(): void
+    public function test_query_parse_and_to_string(): void
     {
         // Test parsing equal query
         $json = '{"method":"equal","attribute":"userId","values":["123"]}';
         $query = Query::parse($json);
-        $this->assertSame(Query::TYPE_EQUAL, $query->getMethod());
+        $this->assertSame(Query::TYPE_EQUAL, $query->getMethod()->value);
         $this->assertSame('userId', $query->getAttribute());
         $this->assertSame(['123'], $query->getValues());
 
@@ -87,7 +87,7 @@ final class QueryTest extends TestCase
         $this->assertJson($json);
 
         $parsed = Query::parse($json);
-        $this->assertSame(Query::TYPE_EQUAL, $parsed->getMethod());
+        $this->assertSame(Query::TYPE_EQUAL, $parsed->getMethod()->value);
         $this->assertSame('event', $parsed->getAttribute());
         $this->assertSame(['create'], $parsed->getValues());
 
@@ -104,7 +104,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query parseQueries method
      */
-    public function testQueryParseQueries(): void
+    public function test_query_parse_queries(): void
     {
         $queries = [
             '{"method":"equal","attribute":"userId","values":["123"]}',
@@ -119,15 +119,15 @@ final class QueryTest extends TestCase
         $this->assertInstanceOf(Query::class, $parsed[1]);
         $this->assertInstanceOf(Query::class, $parsed[2]);
 
-        $this->assertSame(Query::TYPE_EQUAL, $parsed[0]->getMethod());
-        $this->assertSame(Query::TYPE_GREATER, $parsed[1]->getMethod());
-        $this->assertSame(Query::TYPE_LIMIT, $parsed[2]->getMethod());
+        $this->assertSame(Query::TYPE_EQUAL, $parsed[0]->getMethod()->value);
+        $this->assertSame(Query::TYPE_GREATER, $parsed[1]->getMethod()->value);
+        $this->assertSame(Query::TYPE_LIMIT, $parsed[2]->getMethod()->value);
     }
 
     /**
      * Test Query getValue method
      */
-    public function testGetValue(): void
+    public function test_get_value(): void
     {
         $query = Query::equal('userId', '123');
         $this->assertEquals('123', $query->getValue());
@@ -144,7 +144,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query with empty attribute
      */
-    public function testQueryWithEmptyAttribute(): void
+    public function test_query_with_empty_attribute(): void
     {
         $query = Query::limit(25);
         $this->assertSame('', $query->getAttribute());
@@ -158,7 +158,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query parse with invalid JSON
      */
-    public function testQueryParseInvalidJson(): void
+    public function test_query_parse_invalid_json(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Invalid query');
@@ -169,7 +169,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query parse with non-array value
      */
-    public function testQueryParseNonArray(): void
+    public function test_query_parse_non_array(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Invalid query. Must be an array');
@@ -180,7 +180,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query parse with invalid method type
      */
-    public function testQueryParseInvalidMethodType(): void
+    public function test_query_parse_invalid_method_type(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Invalid query method. Must be a string');
@@ -191,7 +191,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query parse with invalid attribute type
      */
-    public function testQueryParseInvalidAttributeType(): void
+    public function test_query_parse_invalid_attribute_type(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Invalid query attribute. Must be a string');
@@ -202,7 +202,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query parse with invalid values type
      */
-    public function testQueryParseInvalidValuesType(): void
+    public function test_query_parse_invalid_values_type(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Invalid query values. Must be an array');
@@ -213,14 +213,14 @@ final class QueryTest extends TestCase
     /**
      * Test Query toString with complex values
      */
-    public function testQueryToStringWithComplexValues(): void
+    public function test_query_to_string_with_complex_values(): void
     {
         $query = Query::between('time', '2023-01-01', '2024-12-31');
         $json = $query->toString();
         $this->assertJson($json);
 
         $parsed = Query::parse($json);
-        $this->assertSame(Query::TYPE_BETWEEN, $parsed->getMethod());
+        $this->assertSame(Query::TYPE_BETWEEN, $parsed->getMethod()->value);
         $this->assertSame('time', $parsed->getAttribute());
         $this->assertSame(['2023-01-01', '2024-12-31'], $parsed->getValues());
     }
