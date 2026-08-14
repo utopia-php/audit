@@ -30,7 +30,7 @@
         "utopia-php/database": "^7.0.0",
         "utopia-php/fetch": "^1.1",
         "utopia-php/query": "0.1.*",
-        "utopia-php/validators": "^0.4"
+        "utopia-php/validators": "^0.5"
     },
     "config": {
         "allow-plugins": {
