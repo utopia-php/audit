@@ -14,10 +14,17 @@ use Utopia\Query\Schema\ClickHouse\IndexAlgorithm;
 use Utopia\Query\Schema\ColumnType;
 
 /**
- * Snapshot tests for the SQL emitted by the migrated ClickHouse adapter
- * paths. These pin the exact shape produced by `Schema\ClickHouse` and
- * `Builder\ClickHouse` for the audit DDL/INSERT/DELETE/SELECT surfaces so
- * a query-lib upgrade can't quietly change adapter SQL.
+ * Snapshots of the SQL that `Schema\ClickHouse` and `Builder\ClickHouse`
+ * produce for the audit DDL/INSERT/DELETE/SELECT surfaces, so a query-library
+ * upgrade cannot quietly change the emitted SQL.
+ *
+ * These rebuild the schema and builder calls rather than invoking the adapter,
+ * so they deliberately do NOT cover the adapter's own use of the library: a
+ * missing column or a wrong argument in `ClickHouse::setup()` would not show up
+ * here. That is `ClickHouseTest`, which drives the real adapter - setup, log,
+ * find, count and cleanup - against a live ClickHouse in CI. The two are
+ * complementary: this file pins the library's output shape, that one pins the
+ * adapter's behaviour.
  */
 final class ClickHouseSqlSnapshotTest extends TestCase
 {
