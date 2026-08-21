@@ -128,4 +128,18 @@ class Query extends BaseQuery
     {
         return new static(Method::Between, $attribute, [$start, $end]);
     }
+
+    /**
+     * Filter by contains condition.
+     *
+     * @param  mixed  $value  Single value or array of values
+     */
+    #[\Override]
+    public static function contains(string $attribute, mixed $value): static
+    {
+        /** @var array<mixed> $values */
+        $values = \is_array($value) ? $value : [$value];
+
+        return new static(Method::Contains, $attribute, $values);
+    }
 }

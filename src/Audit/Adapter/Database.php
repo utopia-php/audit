@@ -403,7 +403,6 @@ class Database extends SQL
     /**
      * Delete logs older than the specified datetime.
      *
-    /**
      * @throws AuthorizationException|\Exception
      */
     public function cleanup(\DateTime $datetime): bool

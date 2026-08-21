@@ -390,9 +390,17 @@ class ClickHouse extends SQL
     {
         $parentAttributes = parent::getAttributes();
 
-        foreach ($parentAttributes as $attribute) {
+        foreach ($parentAttributes as $index => $attribute) {
             if ($attribute->key === 'userId') {
-                $attribute->key = 'actorId';
+                $parentAttributes[$index] = new Attribute(
+                    key: 'actorId',
+                    type: $attribute->type,
+                    size: $attribute->size,
+                    required: $attribute->required,
+                    signed: $attribute->signed,
+                    array: $attribute->array,
+                    filters: $attribute->filters,
+                );
                 break;
             }
         }
@@ -448,10 +456,16 @@ class ClickHouse extends SQL
     {
         $parentIndexes = parent::getIndexes();
 
-        foreach ($parentIndexes as $index) {
-            if ($index->key === 'idx_userId_event') {
-                $index->key = 'idx_actorId_event';
-                $index->attributes = ['actorId', 'event'];
+        foreach ($parentIndexes as $index => $definition) {
+            if ($definition->key === 'idx_userId_event') {
+                $parentIndexes[$index] = new Index(
+                    key: 'idx_actorId_event',
+                    type: $definition->type,
+                    attributes: ['actorId', 'event'],
+                    lengths: $definition->lengths,
+                    orders: $definition->orders,
+                    ttl: $definition->ttl,
+                );
                 break;
             }
         }
@@ -720,15 +734,6 @@ class ClickHouse extends SQL
     }
 
     /**
-     * Validate that an attribute name exists in the schema.
-     * Prevents SQL injection by ensuring only valid column names are used.
-     *
-     * @param  string  $attributeName  The attribute name to validate
-     * @return bool True if valid
-     *
-     * @throws Exception If attribute name is invalid
-     */
-    /**
      * Translate legacy user* attribute names to actor* column names.
      */
     private function translateAttribute(string $attribute): string
@@ -741,6 +746,9 @@ class ClickHouse extends SQL
         };
     }
 
+    /**
+     * @throws Exception If the name is not a known column
+     */
     private function validateAttributeName(string $attributeName): bool
     {
         // Special case: 'id' is always valid
