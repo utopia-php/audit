@@ -6,8 +6,6 @@ use Utopia\Audit\Adapter;
 use Utopia\Database\Attribute;
 use Utopia\Database\Database;
 use Utopia\Database\Index;
-use Utopia\Query\Schema\ColumnType;
-use Utopia\Query\Schema\IndexType;
 
 /**
  * Base SQL Adapter for Audit
@@ -35,13 +33,13 @@ abstract class SQL extends Adapter
     public function getAttributes(): array
     {
         return [
-            new Attribute(key: 'userId', type: ColumnType::String, size: Database::LENGTH_KEY, required: false, signed: true, array: false, filters: []),
-            new Attribute(key: 'event', type: ColumnType::String, size: 255, required: true, signed: true, array: false, filters: []),
-            new Attribute(key: 'resource', type: ColumnType::String, size: 255, required: false, signed: true, array: false, filters: []),
-            new Attribute(key: 'userAgent', type: ColumnType::String, size: 65534, required: true, signed: true, array: false, filters: []),
-            new Attribute(key: 'ip', type: ColumnType::String, size: 45, required: true, signed: true, array: false, filters: []),
-            new Attribute(key: 'time', type: ColumnType::Datetime, size: 0, required: false, signed: true, array: false, filters: ['datetime']),
-            new Attribute(key: 'data', type: ColumnType::String, size: 16777216, required: false, signed: true, array: false, filters: ['json']),
+            Attribute::string(key: 'userId'),
+            Attribute::string(key: 'event', required: true),
+            Attribute::string(key: 'resource'),
+            Attribute::string(key: 'userAgent', size: 65534, required: true),
+            Attribute::string(key: 'ip', size: 45, required: true),
+            Attribute::datetime(key: 'time', filters: ['datetime']),
+            Attribute::string(key: 'data', size: 16777216, filters: ['json']),
         ];
     }
 
@@ -63,10 +61,10 @@ abstract class SQL extends Adapter
     public function getIndexes(): array
     {
         return [
-            new Index(key: 'idx_event', type: IndexType::Key, attributes: ['event']),
-            new Index(key: 'idx_userId_event', type: IndexType::Key, attributes: ['userId', 'event']),
-            new Index(key: 'idx_resource_event', type: IndexType::Key, attributes: ['resource', 'event']),
-            new Index(key: 'idx_time_desc', type: IndexType::Key, attributes: ['time']),
+            Index::key(key: 'idx_event', attributes: ['event']),
+            Index::key(key: 'idx_userId_event', attributes: ['userId', 'event']),
+            Index::key(key: 'idx_resource_event', attributes: ['resource', 'event']),
+            Index::key(key: 'idx_time_desc', attributes: ['time']),
         ];
     }
 
