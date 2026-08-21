@@ -4,6 +4,7 @@ namespace Utopia\Audit\Adapter;
 
 use Exception;
 use Utopia\Audit\Log;
+use Utopia\Database\Collection;
 use Utopia\Database\DateTime;
 use Utopia\Database\Document;
 use Utopia\Database\Exception\Authorization as AuthorizationException;
@@ -48,7 +49,7 @@ class Database extends SQL
     /**
      * Setup database structure.
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function setup(): void
     {
@@ -60,11 +61,7 @@ class Database extends SQL
         $indexes = $this->getIndexDocuments();
 
         try {
-            $this->db->createCollection(
-                $this->getCollectionName(),
-                $attributes,
-                $indexes,
-            );
+            $this->db->createCollection(new Collection(id: $this->getCollectionName(), attributes: $attributes, indexes: $indexes));
         } catch (DuplicateException) {
             // Collection already exists
         }
@@ -75,12 +72,12 @@ class Database extends SQL
      *
      * @param  array<string, mixed>  $log
      *
-     * @throws AuthorizationException|\Exception
+     * @throws AuthorizationException|Exception
      */
     public function create(array $log): Log
     {
         $log['time'] ??= DateTime::now();
-        $document = $this->db->getAuthorization()->skip(fn (): \Utopia\Database\Document => $this->db->createDocument($this->getCollectionName(), new Document($log)));
+        $document = $this->db->getAuthorization()->skip(fn (): Document => $this->db->createDocument($this->getCollectionName(), new Document($log)));
 
         return new Log($document->getArrayCopy());
     }
@@ -90,12 +87,12 @@ class Database extends SQL
      *
      * @param  array<int, array<string, mixed>>  $logs
      *
-     * @throws AuthorizationException|\Exception
+     * @throws AuthorizationException|Exception
      */
     public function createBatch(array $logs): bool
     {
         $this->db->getAuthorization()->skip(function () use ($logs): void {
-            $documents = array_map(function (array $log): \Utopia\Database\Document {
+            $documents = array_map(function (array $log): Document {
                 $time = $log['time'] ?? new \DateTime;
                 if (\is_string($time)) {
                     $time = new \DateTime($time);
@@ -116,11 +113,11 @@ class Database extends SQL
      *
      * @return Log|null The log entry or null if not found
      *
-     * @throws AuthorizationException|\Exception
+     * @throws AuthorizationException|Exception
      */
     public function getById(string $id): ?Log
     {
-        $document = $this->db->getAuthorization()->skip(fn (): \Utopia\Database\Document => $this->db->getDocument($this->getCollectionName(), $id));
+        $document = $this->db->getAuthorization()->skip(fn (): Document => $this->db->getDocument($this->getCollectionName(), $id));
 
         if ($document->isEmpty()) {
             return null;
@@ -163,7 +160,7 @@ class Database extends SQL
      *
      * @return array<Log>
      *
-     * @throws AuthorizationException|\Exception
+     * @throws AuthorizationException|Exception
      */
     public function getByUser(
         string $userId,
@@ -189,13 +186,13 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn (\Utopia\Database\Document $doc): \Utopia\Audit\Log => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn (Document $doc): Log => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
      * Count audit logs by user ID.
      *
-     * @throws AuthorizationException|\Exception
+     * @throws AuthorizationException|Exception
      */
     public function countByUser(
         string $userId,
@@ -246,7 +243,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn (\Utopia\Database\Document $doc): \Utopia\Audit\Log => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn (Document $doc): Log => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -306,7 +303,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn (\Utopia\Database\Document $doc): \Utopia\Audit\Log => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn (Document $doc): Log => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -370,7 +367,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn (\Utopia\Database\Document $doc): \Utopia\Audit\Log => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn (Document $doc): Log => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -403,7 +400,7 @@ class Database extends SQL
     /**
      * Delete logs older than the specified datetime.
      *
-     * @throws AuthorizationException|\Exception
+     * @throws AuthorizationException|Exception
      */
     public function cleanup(\DateTime $datetime): bool
     {
@@ -464,9 +461,9 @@ class Database extends SQL
      * Translates Audit Query objects to Database Query objects.
      *
      * @param  array<\Utopia\Audit\Query>  $queries
-     * @return array<\Utopia\Audit\Log>
+     * @return array<Log>
      *
-     * @throws AuthorizationException|\Exception
+     * @throws AuthorizationException|Exception
      */
     public function find(array $queries = []): array
     {
@@ -474,7 +471,7 @@ class Database extends SQL
 
         foreach ($queries as $query) {
             if (! ($query instanceof \Utopia\Audit\Query)) {
-                throw new \Exception('Invalid query type. Expected Utopia\\Audit\\Query');
+                throw new Exception('Invalid query type. Expected Utopia\\Audit\\Query');
             }
 
             // Convert Audit Query to Database Query
@@ -487,7 +484,7 @@ class Database extends SQL
             queries: $dbQueries,
         ));
 
-        return array_map(fn (\Utopia\Database\Document $doc): \Utopia\Audit\Log => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn (Document $doc): Log => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -499,7 +496,7 @@ class Database extends SQL
      * @param  array<\Utopia\Audit\Query>  $queries
      * @param  int|null  $max  Optional upper bound (inclusive) for the count
      *
-     * @throws AuthorizationException|\Exception
+     * @throws AuthorizationException|Exception
      */
     public function count(array $queries = [], ?int $max = null): int
     {
@@ -507,7 +504,7 @@ class Database extends SQL
 
         foreach ($queries as $query) {
             if (! ($query instanceof \Utopia\Audit\Query)) {
-                throw new \Exception('Invalid query type. Expected Utopia\\Audit\\Query');
+                throw new Exception('Invalid query type. Expected Utopia\\Audit\\Query');
             }
 
             // Skip limit, offset, and cursor queries — they don't apply to count
