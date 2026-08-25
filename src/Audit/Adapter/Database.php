@@ -10,6 +10,7 @@ use Utopia\Database\Exception\Authorization as AuthorizationException;
 use Utopia\Database\Exception\Duplicate as DuplicateException;
 use Utopia\Database\Exception\Timeout;
 use Utopia\Database\Query;
+use Utopia\Query\Method;
 
 /**
  * Database Adapter for Audit
@@ -499,16 +500,16 @@ class Database extends SQL
 
             // Skip limit, offset, and cursor queries — they don't apply to count
             $method = $query->getMethod();
-            if ($method === \Utopia\Audit\Query::TYPE_LIMIT) {
+            if ($method === Method::Limit) {
                 continue;
             }
-            if ($method === \Utopia\Audit\Query::TYPE_OFFSET) {
+            if ($method === Method::Offset) {
                 continue;
             }
-            if ($method === \Utopia\Audit\Query::TYPE_CURSOR_AFTER) {
+            if ($method === Method::CursorAfter) {
                 continue;
             }
-            if ($method === \Utopia\Audit\Query::TYPE_CURSOR_BEFORE) {
+            if ($method === Method::CursorBefore) {
                 continue;
             }
 

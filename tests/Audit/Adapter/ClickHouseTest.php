@@ -1009,7 +1009,7 @@ final class ClickHouseTest extends TestCase
         // Contains is a substring match (like utopia-php/database), not an
         // exact IN match — 'dat' matches only the 'update' logs
         $logs = $this->audit->find([
-            Query::contains('event', ['dat']),
+            Query::containsString('event', ['dat']),
         ]);
         $this->assertCount(2, $logs);
         foreach ($logs as $log) {
@@ -1018,7 +1018,7 @@ final class ClickHouseTest extends TestCase
 
         // Multiple needles OR together: 'dat' (update) + 'ins' (insert)
         $logs = $this->audit->find([
-            Query::contains('event', ['dat', 'ins']),
+            Query::containsString('event', ['dat', 'ins']),
         ]);
         $this->assertCount(3, $logs);
     }
@@ -1028,12 +1028,12 @@ final class ClickHouseTest extends TestCase
         // '%' and '_' in needles are literals, not LIKE wildcards —
         // no fixture event contains a literal '%'
         $logs = $this->audit->find([
-            Query::contains('event', ['%']),
+            Query::containsString('event', ['%']),
         ]);
         $this->assertCount(0, $logs);
 
         $logs = $this->audit->find([
-            Query::contains('event', ['u_date']),
+            Query::containsString('event', ['u_date']),
         ]);
         $this->assertCount(0, $logs);
     }
@@ -1135,7 +1135,7 @@ final class ClickHouseTest extends TestCase
         $this->expectExceptionMessage('Contains queries require at least one value.');
 
         $this->audit->find([
-            Query::contains('event', []),
+            Query::containsString('event', []),
         ]);
     }
 
@@ -1327,8 +1327,9 @@ final class ClickHouseTest extends TestCase
             $url = "{$scheme}://{$host}:{$port}/?database=" . rawurlencode($database)
                 . '&user=' . rawurlencode($username)
                 . '&password=' . rawurlencode($password);
+            /** @var array<string, string> $params */
             foreach ($params as $key => $value) {
-                $url .= '&param_' . rawurlencode((string) $key) . '=' . rawurlencode((string) $value);
+                $url .= '&param_' . rawurlencode($key) . '=' . rawurlencode($value);
             }
             $ctx = stream_context_create(['http' => [
                 'method' => 'POST',
