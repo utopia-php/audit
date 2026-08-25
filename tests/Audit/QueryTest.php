@@ -39,7 +39,7 @@ final class QueryTest extends TestCase
         $this->assertSame(['2023-01-01', '2024-01-01'], $query->getValues());
 
         // Test contains
-        $query = Query::contains('event', ['create', 'update', 'delete']);
+        $query = Query::containsString('event', ['create', 'update', 'delete']);
         $this->assertSame(Query::TYPE_CONTAINS, $query->getMethod()->value);
         $this->assertSame('event', $query->getAttribute());
         $this->assertSame(['create', 'update', 'delete'], $query->getValues());

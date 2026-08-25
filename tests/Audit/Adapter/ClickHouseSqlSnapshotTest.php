@@ -253,7 +253,7 @@ final class ClickHouseSqlSnapshotTest extends TestCase
         $statement = $this->newAuditBuilder()
             ->from('default.audits')
             ->selectRaw('`id`, `event`, `time`')
-            ->filter([Query::contains('event', ['dat'])])
+            ->filter([Query::containsString('event', ['dat'])])
             ->build();
 
         $this->assertSame(
@@ -269,7 +269,7 @@ final class ClickHouseSqlSnapshotTest extends TestCase
         $statement = $this->newAuditBuilder()
             ->from('default.audits')
             ->selectRaw('`id`')
-            ->filter([Query::contains('event', ['dat', 'ins'])])
+            ->filter([Query::containsString('event', ['dat', 'ins'])])
             ->build();
 
         $this->assertSame(
