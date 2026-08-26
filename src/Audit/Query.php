@@ -73,7 +73,7 @@ class Query extends BaseQuery
 
     /**
      * Construct a query with a string method name (legacy `TYPE_*` constants)
-     * or a `Method` enum case (new query-lib API).
+     * or a `Method` enum case (new 0.3.x API).
      *
      * @param  array<mixed>  $values
      */
@@ -127,19 +127,5 @@ class Query extends BaseQuery
     public static function between(string $attribute, mixed $start, mixed $end): static
     {
         return new static(Method::Between, $attribute, [$start, $end]);
-    }
-
-    /**
-     * Filter by contains condition.
-     *
-     * @param  mixed  $value  Single value or array of values
-     */
-    #[\Override]
-    public static function contains(string $attribute, mixed $value): static
-    {
-        /** @var array<mixed> $values */
-        $values = \is_array($value) ? $value : [$value];
-
-        return new static(Method::Contains, $attribute, $values);
     }
 }

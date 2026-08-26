@@ -9,6 +9,9 @@ use PHPUnit\Framework\TestCase;
 use Utopia\Audit\Adapter\ClickHouse;
 use Utopia\Audit\Audit;
 use Utopia\Audit\Query;
+use Utopia\Database\Attribute;
+use Utopia\Database\Index;
+use Utopia\Query\Schema\ColumnType;
 use Utopia\Tests\Audit\AuditBase;
 
 /**
@@ -70,7 +73,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test constructor validates host
      */
-    public function test_constructor_validates_host(): void
+    public function testConstructorValidatesHost(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('ClickHouse host is not a valid hostname or IP address');
@@ -85,7 +88,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test constructor validates port range
      */
-    public function test_constructor_validates_port_too_low(): void
+    public function testConstructorValidatesPortTooLow(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('ClickHouse port must be between 1 and 65535');
@@ -101,7 +104,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test constructor validates port range upper bound
      */
-    public function test_constructor_validates_port_too_high(): void
+    public function testConstructorValidatesPortTooHigh(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('ClickHouse port must be between 1 and 65535');
@@ -117,7 +120,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test constructor with valid parameters
      */
-    public function test_constructor_with_valid_parameters(): void
+    public function testConstructorWithValidParameters(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -134,7 +137,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test getName returns correct adapter name
      */
-    public function test_get_name(): void
+    public function testGetName(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -148,7 +151,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setDatabase validates empty identifier
      */
-    public function test_set_database_validates_empty(): void
+    public function testSetDatabaseValidatesEmpty(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Database cannot be empty');
@@ -165,7 +168,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setDatabase validates identifier length
      */
-    public function test_set_database_validates_length(): void
+    public function testSetDatabaseValidatesLength(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Database cannot exceed 255 characters');
@@ -182,7 +185,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setDatabase validates identifier format
      */
-    public function test_set_database_validates_format(): void
+    public function testSetDatabaseValidatesFormat(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Database must start with a letter or underscore');
@@ -199,7 +202,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setDatabase rejects SQL keywords
      */
-    public function test_set_database_rejects_keywords(): void
+    public function testSetDatabaseRejectsKeywords(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Database cannot be a reserved SQL keyword');
@@ -216,7 +219,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setDatabase with valid identifier
      */
-    public function test_set_database_with_valid_identifier(): void
+    public function testSetDatabaseWithValidIdentifier(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -231,7 +234,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setTable validates empty identifier
      */
-    public function test_set_table_validates_empty(): void
+    public function testSetTableValidatesEmpty(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Table cannot be empty');
@@ -248,7 +251,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setTable validates identifier length
      */
-    public function test_set_table_validates_length(): void
+    public function testSetTableValidatesLength(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Table cannot exceed 255 characters');
@@ -265,7 +268,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setTable validates identifier format
      */
-    public function test_set_table_validates_format(): void
+    public function testSetTableValidatesFormat(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Table must start with a letter or underscore');
@@ -282,7 +285,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setTable rejects SQL keywords
      */
-    public function test_set_table_rejects_keywords(): void
+    public function testSetTableRejectsKeywords(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Table cannot be a reserved SQL keyword');
@@ -299,7 +302,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setTable with valid identifier
      */
-    public function test_set_table_with_valid_identifier(): void
+    public function testSetTableWithValidIdentifier(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -315,7 +318,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setNamespace allows empty string
      */
-    public function test_set_namespace_allows_empty(): void
+    public function testSetNamespaceAllowsEmpty(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -331,7 +334,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setNamespace validates identifier format
      */
-    public function test_set_namespace_validates_format(): void
+    public function testSetNamespaceValidatesFormat(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Namespace must start with a letter or underscore');
@@ -348,7 +351,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setNamespace with valid identifier
      */
-    public function test_set_namespace_with_valid_identifier(): void
+    public function testSetNamespaceWithValidIdentifier(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -364,7 +367,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setSecure method
      */
-    public function test_set_secure(): void
+    public function testSetSecure(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -381,7 +384,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setRetention stores the value and getRetention returns it
      */
-    public function test_set_retention(): void
+    public function testSetRetention(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -399,7 +402,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setRetention accepts null to disable retention
      */
-    public function test_set_retention_accepts_null(): void
+    public function testSetRetentionAcceptsNull(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -415,7 +418,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setRetention rejects zero days
      */
-    public function test_set_retention_rejects_zero(): void
+    public function testSetRetentionRejectsZero(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Retention must be a positive number of days');
@@ -432,7 +435,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test setRetention rejects negative days
      */
-    public function test_set_retention_rejects_negative(): void
+    public function testSetRetentionRejectsNegative(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Retention must be a positive number of days');
@@ -449,7 +452,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test shared tables configuration
      */
-    public function test_shared_tables_configuration(): void
+    public function testSharedTablesConfiguration(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -479,7 +482,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test batch operations with special characters
      */
-    public function test_batch_operations_with_special_characters(): void
+    public function testBatchOperationsWithSpecialCharacters(): void
     {
         // Test batch with special characters in data
         $batchEvents = [
@@ -506,7 +509,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test that ClickHouse adapter has all required attributes
      */
-    public function test_click_house_adapter_attributes(): void
+    public function testClickHouseAdapterAttributes(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -515,7 +518,7 @@ final class ClickHouseTest extends TestCase
         );
 
         $attributes = $adapter->getAttributes();
-        $attributeIds = array_map(fn ($attr): string => $attr->key, $attributes);
+        $attributeIds = array_map(fn (Attribute $attr): string => $attr->key, $attributes);
 
         // Verify all expected attributes exist
         $expectedAttributes = [
@@ -576,7 +579,7 @@ final class ClickHouseTest extends TestCase
      * name/code/type dimensions use LowCardinality(Nullable(String)), while
      * high-cardinality version/model strings stay plain Nullable(String).
      */
-    public function test_user_agent_column_types(): void
+    public function testUserAgentColumnTypes(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -616,7 +619,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test that premium geo attributes are all optional String columns.
      */
-    public function test_premium_geo_attributes_are_optional_strings(): void
+    public function testPremiumGeoAttributesAreOptionalStrings(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -644,7 +647,7 @@ final class ClickHouseTest extends TestCase
 
         foreach ($geoColumns as $column) {
             $this->assertArrayHasKey($column, $byId, "Premium geo attribute '{$column}' not found");
-            $this->assertSame(\Utopia\Query\Schema\ColumnType::String, $byId[$column]->type, "'{$column}' should be a string");
+            $this->assertSame(ColumnType::String, $byId[$column]->type, "'{$column}' should be a string");
             $this->assertFalse($byId[$column]->required, "'{$column}' should be optional");
             $this->assertFalse($byId[$column]->array, "'{$column}' should not be an array");
         }
@@ -655,7 +658,7 @@ final class ClickHouseTest extends TestCase
      * low-cardinality dimensions use LowCardinality(Nullable(String)), while
      * high-cardinality ones stay plain Nullable(String).
      */
-    public function test_premium_geo_column_types(): void
+    public function testPremiumGeoColumnTypes(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -697,9 +700,9 @@ final class ClickHouseTest extends TestCase
      * proves the columns are actually created, written and selected (not just
      * present in the schema definition).
      */
-    public function test_premium_geo_round_trip(): void
+    public function testPremiumGeoRoundTrip(): void
     {
-        $actorId = 'geo-actor-'.uniqid('', true);
+        $actorId = 'geo-actor-' . uniqid('', true);
         $geo = [
             'city' => 'Mountain View',
             'continentCode' => 'NA',
@@ -738,9 +741,9 @@ final class ClickHouseTest extends TestCase
      * User-agent OS / client / device values must round-trip through a real
      * write/read cycle, proving the columns are created, written and selected.
      */
-    public function test_user_agent_round_trip(): void
+    public function testUserAgentRoundTrip(): void
     {
-        $actorId = 'ua-actor-'.uniqid('', true);
+        $actorId = 'ua-actor-' . uniqid('', true);
         $ua = [
             'osCode' => 'IOS',
             'osName' => 'iOS',
@@ -796,7 +799,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test that ClickHouse adapter has all required indexes
      */
-    public function test_click_house_adapter_indexes(): void
+    public function testClickHouseAdapterIndexes(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -805,7 +808,7 @@ final class ClickHouseTest extends TestCase
         );
 
         $indexes = $adapter->getIndexes();
-        $indexIds = array_map(fn ($idx): string => $idx->key, $indexes);
+        $indexIds = array_map(fn (Index $idx): string => $idx->key, $indexes);
 
         // Verify all ClickHouse-specific indexes exist
         $expectedClickHouseIndexes = [
@@ -833,7 +836,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Test parsing of complex resource paths into resourceType/resourceId/resourceParent
      */
-    public function test_parse_resource_complex_path(): void
+    public function testParseResourceComplexPath(): void
     {
         $actorId = 'parseActor';
         $userAgent = 'UnitTestAgent/1.0';
@@ -862,7 +865,7 @@ final class ClickHouseTest extends TestCase
     /**
      * Directly test the protected parseResource method via reflection.
      */
-    public function test_parse_resource_method(): void
+    public function testParseResourceMethod(): void
     {
         $adapter = new ClickHouse(
             host: 'clickhouse',
@@ -909,7 +912,7 @@ final class ClickHouseTest extends TestCase
         $this->assertEquals('', $parsedOdd['resourceParent']);
     }
 
-    public function test_cursor_after_paginates_logs(): void
+    public function testCursorAfterPaginatesLogs(): void
     {
         $page1 = $this->audit->find([
             Query::orderAsc('id'),
@@ -931,7 +934,7 @@ final class ClickHouseTest extends TestCase
         }
     }
 
-    public function test_cursor_before_reverses_pagination(): void
+    public function testCursorBeforeReversesPagination(): void
     {
         $all = $this->audit->find([
             Query::orderAsc('id'),
@@ -951,7 +954,7 @@ final class ClickHouseTest extends TestCase
         $this->assertEquals($all[\count($all) - 2]->getId(), $before[1]->getId());
     }
 
-    public function test_cursor_accepts_associative_array(): void
+    public function testCursorAcceptsAssociativeArray(): void
     {
         $all = $this->audit->find([
             Query::orderAsc('id'),
@@ -970,7 +973,7 @@ final class ClickHouseTest extends TestCase
         $this->assertEquals($all[1]->getId(), $page[0]->getId());
     }
 
-    public function test_count_with_max_bound(): void
+    public function testCountWithMaxBound(): void
     {
         $unbounded = $this->audit->count();
         $this->assertGreaterThanOrEqual(4, $unbounded);
@@ -982,7 +985,7 @@ final class ClickHouseTest extends TestCase
         $this->assertSame($unbounded, $boundedAboveTotal);
     }
 
-    public function test_count_by_user_with_max_bound(): void
+    public function testCountByUserWithMaxBound(): void
     {
         $unbounded = $this->audit->countLogsByUser('userId');
         $this->assertSame(3, $unbounded);
@@ -991,7 +994,7 @@ final class ClickHouseTest extends TestCase
         $this->assertSame(1, $bounded);
     }
 
-    public function test_not_equal_query(): void
+    public function testNotEqualQuery(): void
     {
         // Fixture: 3x event=update/delete for actor, plus 1x event=insert for null actor
         $logs = $this->audit->find([
@@ -1004,12 +1007,12 @@ final class ClickHouseTest extends TestCase
         }
     }
 
-    public function test_contains_substring_query(): void
+    public function testContainsSubstringQuery(): void
     {
         // Contains is a substring match (like utopia-php/database), not an
         // exact IN match — 'dat' matches only the 'update' logs
         $logs = $this->audit->find([
-            Query::contains('event', ['dat']),
+            Query::containsString('event', ['dat']),
         ]);
         $this->assertCount(2, $logs);
         foreach ($logs as $log) {
@@ -1018,27 +1021,27 @@ final class ClickHouseTest extends TestCase
 
         // Multiple needles OR together: 'dat' (update) + 'ins' (insert)
         $logs = $this->audit->find([
-            Query::contains('event', ['dat', 'ins']),
+            Query::containsString('event', ['dat', 'ins']),
         ]);
         $this->assertCount(3, $logs);
     }
 
-    public function test_contains_escapes_like_wildcards(): void
+    public function testContainsEscapesLikeWildcards(): void
     {
         // '%' and '_' in needles are literals, not LIKE wildcards —
         // no fixture event contains a literal '%'
         $logs = $this->audit->find([
-            Query::contains('event', ['%']),
+            Query::containsString('event', ['%']),
         ]);
         $this->assertCount(0, $logs);
 
         $logs = $this->audit->find([
-            Query::contains('event', ['u_date']),
+            Query::containsString('event', ['u_date']),
         ]);
         $this->assertCount(0, $logs);
     }
 
-    public function test_not_contains_query(): void
+    public function testNotContainsQuery(): void
     {
         $logs = $this->audit->find([
             Query::notContains('event', ['update', 'delete']),
@@ -1058,7 +1061,7 @@ final class ClickHouseTest extends TestCase
         }
     }
 
-    public function test_lesser_equal_and_greater_equal_queries(): void
+    public function testLesserEqualAndGreaterEqualQueries(): void
     {
         $now = new \DateTime()->modify('+1 minute');
         $past = new \DateTime()->modify('-1 hour');
@@ -1079,7 +1082,7 @@ final class ClickHouseTest extends TestCase
         $this->assertGreaterThanOrEqual(4, \count($allGe));
     }
 
-    public function test_not_between_query(): void
+    public function testNotBetweenQuery(): void
     {
         $past = new \DateTime()->modify('-2 hour');
         $oldPast = new \DateTime()->modify('-3 hour');
@@ -1095,7 +1098,7 @@ final class ClickHouseTest extends TestCase
         $this->assertGreaterThanOrEqual(4, \count($logs));
     }
 
-    public function test_is_null_and_is_not_null_queries(): void
+    public function testIsNullAndIsNotNullQueries(): void
     {
         $nullActor = $this->audit->find([
             Query::isNull('actorId'),
@@ -1110,7 +1113,7 @@ final class ClickHouseTest extends TestCase
         $this->assertCount(3, $notNullActor);
     }
 
-    public function test_starts_with_and_ends_with_queries(): void
+    public function testStartsWithAndEndsWithQueries(): void
     {
         $resourcePrefix = $this->audit->find([
             Query::startsWith('resource', 'database/'),
@@ -1129,17 +1132,17 @@ final class ClickHouseTest extends TestCase
         $this->assertEquals('user/null', $endsWithNull[0]->getResource());
     }
 
-    public function test_contains_rejects_empty_values(): void
+    public function testContainsRejectsEmptyValues(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Contains queries require at least one value.');
 
         $this->audit->find([
-            Query::contains('event', []),
+            Query::containsString('event', []),
         ]);
     }
 
-    public function test_not_contains_rejects_empty_values(): void
+    public function testNotContainsRejectsEmptyValues(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('NotContains queries require at least one value.');
@@ -1149,7 +1152,7 @@ final class ClickHouseTest extends TestCase
         ]);
     }
 
-    public function test_equal_rejects_empty_values(): void
+    public function testEqualRejectsEmptyValues(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Equal queries require at least one value.');
@@ -1159,7 +1162,7 @@ final class ClickHouseTest extends TestCase
         ]);
     }
 
-    public function test_select_projects_requested_columns(): void
+    public function testSelectProjectsRequestedColumns(): void
     {
         $logs = $this->audit->find([
             Query::select(['event', 'resource']),
@@ -1181,7 +1184,7 @@ final class ClickHouseTest extends TestCase
         $this->assertArrayNotHasKey('data', $row);
     }
 
-    public function test_select_auto_includes_tenant_when_shared(): void
+    public function testSelectAutoIncludesTenantWhenShared(): void
     {
         $host = getenv('CLICKHOUSE_HOST') ?: 'localhost';
         $port = (int) (getenv('CLICKHOUSE_PORT') ?: 18123);
@@ -1214,7 +1217,7 @@ final class ClickHouseTest extends TestCase
         $this->assertArrayHasKey('tenant', $row);
     }
 
-    public function test_select_rejects_unknown_column(): void
+    public function testSelectRejectsUnknownColumn(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Invalid attribute name: bogus_column');
@@ -1224,7 +1227,7 @@ final class ClickHouseTest extends TestCase
         ]);
     }
 
-    public function test_select_rejects_empty_values(): void
+    public function testSelectRejectsEmptyValues(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Select queries require at least one value.');
@@ -1234,7 +1237,7 @@ final class ClickHouseTest extends TestCase
         ]);
     }
 
-    public function test_not_starts_with_filter(): void
+    public function testNotStartsWithFilter(): void
     {
         $logs = $this->audit->find([
             Query::notStartsWith('resource', 'database/'),
@@ -1244,7 +1247,7 @@ final class ClickHouseTest extends TestCase
         $this->assertEquals('user/null', $logs[0]->getResource());
     }
 
-    public function test_not_ends_with_filter(): void
+    public function testNotEndsWithFilter(): void
     {
         $logs = $this->audit->find([
             Query::notEndsWith('resource', '/null'),
@@ -1256,7 +1259,7 @@ final class ClickHouseTest extends TestCase
         }
     }
 
-    public function test_regex_filter(): void
+    public function testRegexFilter(): void
     {
         $logs = $this->audit->find([
             Query::regex('resource', '^database/document/\\d+$'),
@@ -1265,7 +1268,7 @@ final class ClickHouseTest extends TestCase
         $this->assertCount(3, $logs);
     }
 
-    public function test_order_random_returns_rows(): void
+    public function testOrderRandomReturnsRows(): void
     {
         $logs = $this->audit->find([
             Query::orderRandom(),
@@ -1275,7 +1278,7 @@ final class ClickHouseTest extends TestCase
         $this->assertCount(2, $logs);
     }
 
-    public function test_order_random_rejected_with_cursor(): void
+    public function testOrderRandomRejectedWithCursor(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Cursor pagination cannot be combined with orderRandom');
@@ -1286,7 +1289,7 @@ final class ClickHouseTest extends TestCase
         ]);
     }
 
-    public function test_order_random_rejected_with_column_order(): void
+    public function testOrderRandomRejectedWithColumnOrder(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('orderRandom cannot be combined with orderAsc/orderDesc');
@@ -1297,7 +1300,7 @@ final class ClickHouseTest extends TestCase
         ]);
     }
 
-    public function test_shared_table_sort_key_leads_with_tenant(): void
+    public function testSharedTableSortKeyLeadsWithTenant(): void
     {
         $host = getenv('CLICKHOUSE_HOST') ?: 'localhost';
         $username = getenv('CLICKHOUSE_USER') ?: 'default';
@@ -1306,7 +1309,7 @@ final class ClickHouseTest extends TestCase
         $secure = filter_var(getenv('CLICKHOUSE_SECURE') ?: false, FILTER_VALIDATE_BOOLEAN);
         $database = getenv('CLICKHOUSE_DATABASE') ?: 'default';
 
-        $namespace = 'projtest_'.uniqid();
+        $namespace = 'projtest_' . uniqid();
 
         $adapter = new ClickHouse(
             host: $host,
@@ -1320,15 +1323,16 @@ final class ClickHouseTest extends TestCase
         $adapter->setSharedTables(true);
         $adapter->setTenant(1);
 
-        $table = $namespace.'_audits';
+        $table = $namespace . '_audits';
 
         $http = function (string $sql, array $params = []) use ($host, $port, $username, $password, $secure, $database): string {
             $scheme = $secure ? 'https' : 'http';
-            $url = "{$scheme}://{$host}:{$port}/?database=".rawurlencode($database)
-                .'&user='.rawurlencode($username)
-                .'&password='.rawurlencode($password);
+            $url = "{$scheme}://{$host}:{$port}/?database=" . rawurlencode($database)
+                . '&user=' . rawurlencode($username)
+                . '&password=' . rawurlencode($password);
+            /** @var array<string, string> $params */
             foreach ($params as $key => $value) {
-                $url .= '&param_'.rawurlencode((string) $key).'='.rawurlencode((string) $value);
+                $url .= '&param_' . rawurlencode($key) . '=' . rawurlencode($value);
             }
             $ctx = stream_context_create(['http' => [
                 'method' => 'POST',
@@ -1355,8 +1359,8 @@ final class ClickHouseTest extends TestCase
                 "Expected sorting key to lead with 'tenant', got: {$sortingKey}",
             );
         } finally {
-            $escDb = '`'.str_replace('`', '``', $database).'`';
-            $escTbl = '`'.str_replace('`', '``', $table).'`';
+            $escDb = '`' . str_replace('`', '``', $database) . '`';
+            $escTbl = '`' . str_replace('`', '``', $table) . '`';
             $http("DROP TABLE IF EXISTS {$escDb}.{$escTbl}");
         }
     }

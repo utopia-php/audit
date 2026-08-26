@@ -12,7 +12,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query class static factory methods
      */
-    public function test_query_static_factory_methods(): void
+    public function testQueryStaticFactoryMethods(): void
     {
         // Test equal
         $query = Query::equal('userId', '123');
@@ -38,7 +38,8 @@ final class QueryTest extends TestCase
         $this->assertSame('time', $query->getAttribute());
         $this->assertSame(['2023-01-01', '2024-01-01'], $query->getValues());
 
-        $query = Query::contains('event', ['create', 'update', 'delete']);
+        // Test contains
+        $query = Query::containsString('event', ['create', 'update', 'delete']);
         $this->assertSame(Query::TYPE_CONTAINS, $query->getMethod()->value);
         $this->assertSame('event', $query->getAttribute());
         $this->assertSame(['create', 'update', 'delete'], $query->getValues());
@@ -71,7 +72,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query parse and toString methods
      */
-    public function test_query_parse_and_to_string(): void
+    public function testQueryParseAndToString(): void
     {
         // Test parsing equal query
         $json = '{"method":"equal","attribute":"userId","values":["123"]}';
@@ -103,7 +104,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query parseQueries method
      */
-    public function test_query_parse_queries(): void
+    public function testQueryParseQueries(): void
     {
         $queries = [
             '{"method":"equal","attribute":"userId","values":["123"]}',
@@ -126,7 +127,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query getValue method
      */
-    public function test_get_value(): void
+    public function testGetValue(): void
     {
         $query = Query::equal('userId', '123');
         $this->assertEquals('123', $query->getValue());
@@ -143,7 +144,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query with empty attribute
      */
-    public function test_query_with_empty_attribute(): void
+    public function testQueryWithEmptyAttribute(): void
     {
         $query = Query::limit(25);
         $this->assertSame('', $query->getAttribute());
@@ -157,7 +158,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query parse with invalid JSON
      */
-    public function test_query_parse_invalid_json(): void
+    public function testQueryParseInvalidJson(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Invalid query');
@@ -168,7 +169,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query parse with non-array value
      */
-    public function test_query_parse_non_array(): void
+    public function testQueryParseNonArray(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Invalid query. Must be an array');
@@ -179,7 +180,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query parse with invalid method type
      */
-    public function test_query_parse_invalid_method_type(): void
+    public function testQueryParseInvalidMethodType(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Invalid query method. Must be a string');
@@ -190,7 +191,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query parse with invalid attribute type
      */
-    public function test_query_parse_invalid_attribute_type(): void
+    public function testQueryParseInvalidAttributeType(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Invalid query attribute. Must be a string');
@@ -201,7 +202,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query parse with invalid values type
      */
-    public function test_query_parse_invalid_values_type(): void
+    public function testQueryParseInvalidValuesType(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Invalid query values. Must be an array');
@@ -212,7 +213,7 @@ final class QueryTest extends TestCase
     /**
      * Test Query toString with complex values
      */
-    public function test_query_to_string_with_complex_values(): void
+    public function testQueryToStringWithComplexValues(): void
     {
         $query = Query::between('time', '2023-01-01', '2024-12-31');
         $json = $query->toString();

@@ -9,7 +9,13 @@ use Utopia\Database\Attribute;
 use Utopia\Database\Database;
 use Utopia\Database\Index;
 use Utopia\Fetch\Client;
+use Utopia\Query\Builder\ClickHouse as ClickHouseBuilder;
+use Utopia\Query\Builder\ClickHouse\Format;
 use Utopia\Query\Method;
+use Utopia\Query\Query as BaseQuery;
+use Utopia\Query\Schema\ClickHouse as ClickHouseSchema;
+use Utopia\Query\Schema\ClickHouse\Engine as ClickHouseEngine;
+use Utopia\Query\Schema\ClickHouse\IndexAlgorithm;
 use Utopia\Query\Schema\ColumnType;
 use Utopia\Validator\Hostname;
 
@@ -102,12 +108,11 @@ class ClickHouse extends SQL
     private ?int $retention = null;
 
     /**
-     * @param  string  $host  ClickHouse host
-     * @param  string  $username  ClickHouse username (default: 'default')
-     * @param  string  $password  ClickHouse password (default: '')
-     * @param  int  $port  ClickHouse HTTP port (default: 8123)
-     * @param  bool  $secure  Whether to use HTTPS (default: false)
-     *
+     * @param string $host ClickHouse host
+     * @param string $username ClickHouse username (default: 'default')
+     * @param string $password ClickHouse password (default: '')
+     * @param int $port ClickHouse HTTP port (default: 8123)
+     * @param bool $secure Whether to use HTTPS (default: false)
      * @throws Exception If validation fails
      */
     public function __construct(
@@ -124,7 +129,7 @@ class ClickHouse extends SQL
         $this->port = $port;
 
         // Initialize the HTTP client for connection reuse
-        $this->client = new Client;
+        $this->client = new Client();
         $this->client->addHeader('X-ClickHouse-User', $this->username);
         $this->client->addHeader('X-ClickHouse-Key', $this->password);
         $this->client->setTimeout(30_000); // 30 seconds
@@ -168,8 +173,8 @@ class ClickHouse extends SQL
      */
     private function validateHost(string $host): void
     {
-        $validator = new Hostname;
-        if (! $validator->isValid($host)) {
+        $validator = new Hostname();
+        if (!$validator->isValid($host)) {
             throw new Exception('ClickHouse host is not a valid hostname or IP address');
         }
     }
@@ -190,8 +195,7 @@ class ClickHouse extends SQL
      * Validate identifier (database, table, namespace).
      * ClickHouse identifiers follow SQL standard rules.
      *
-     * @param  string  $type  Name of the identifier type for error messages
-     *
+     * @param string $type Name of the identifier type for error messages
      * @throws Exception
      */
     private function validateIdentifier(string $identifier, string $type = 'Identifier'): void
@@ -205,7 +209,7 @@ class ClickHouse extends SQL
         }
 
         // ClickHouse identifiers: alphanumeric, underscores, cannot start with number
-        if (! preg_match('/^[a-zA-Z_]\w*$/', $identifier)) {
+        if (!preg_match('/^[a-zA-Z_]\w*$/', $identifier)) {
             throw new Exception("{$type} must start with a letter or underscore and contain only alphanumeric characters and underscores");
         }
 
@@ -223,9 +227,8 @@ class ClickHouse extends SQL
     private function escapeIdentifier(string $identifier): string
     {
         // Backtick escaping: replace any backticks in the identifier with double backticks
-        return '`'.str_replace('`', '``', $identifier).'`';
+        return '`' . str_replace('`', '``', $identifier) . '`';
     }
-
     /**
      * Set the namespace for multi-project support.
      * Namespace is used as a prefix for table names.
@@ -238,7 +241,6 @@ class ClickHouse extends SQL
             $this->validateIdentifier($namespace, 'Namespace');
         }
         $this->namespace = $namespace;
-
         return $this;
     }
 
@@ -251,7 +253,6 @@ class ClickHouse extends SQL
     {
         $this->validateIdentifier($database, 'Database');
         $this->database = $database;
-
         return $this;
     }
 
@@ -264,7 +265,6 @@ class ClickHouse extends SQL
     {
         $this->validateIdentifier($table, 'Table');
         $this->table = $table;
-
         return $this;
     }
 
@@ -282,7 +282,6 @@ class ClickHouse extends SQL
     public function setSecure(bool $secure): self
     {
         $this->secure = $secure;
-
         return $this;
     }
 
@@ -301,7 +300,6 @@ class ClickHouse extends SQL
     public function setTenant(?int $tenant): self
     {
         $this->tenant = $tenant;
-
         return $this;
     }
 
@@ -320,7 +318,6 @@ class ClickHouse extends SQL
     public function setSharedTables(bool $sharedTables): self
     {
         $this->sharedTables = $sharedTables;
-
         return $this;
     }
 
@@ -341,7 +338,6 @@ class ClickHouse extends SQL
     public function setAsyncCleanup(bool $asyncCleanup): self
     {
         $this->asyncCleanup = $asyncCleanup;
-
         return $this;
     }
 
@@ -366,7 +362,6 @@ class ClickHouse extends SQL
             throw new Exception('Retention must be a positive number of days');
         }
         $this->retention = $days;
-
         return $this;
     }
 
@@ -491,10 +486,56 @@ class ClickHouse extends SQL
         $tableName = $this->table;
 
         if ($this->namespace !== '' && $this->namespace !== '0') {
-            return $this->namespace.'_'.$tableName;
+            return $this->namespace . '_' . $tableName;
         }
 
         return $tableName;
+    }
+
+    /**
+     * Build the column → ClickHouse type map registered on `Builder\ClickHouse`
+     * so positional `?` bindings are emitted as typed `{paramN:Type}` placeholders.
+     *
+     * Derived from `getAttributes()` so the map stays in sync with the schema —
+     * DateTime attributes get `DateTime64(3)`, everything else gets `String`.
+     * `id` is added explicitly because it lives outside `getAttributes()`, and
+     * `tenant` is added only when shared-tables mode is on. `limit`, `offset`
+     * and `max` are pseudo-columns used by the count/find SQL wrappers.
+     *
+     * @return array<string, string>
+     */
+    private function getColumnTypeMap(): array
+    {
+        $map = ['id' => 'String'];
+
+        foreach ($this->getAttributes() as $attribute) {
+            $map[$attribute->key] = $attribute->type === ColumnType::Datetime
+                ? 'DateTime64(3)'
+                : 'String';
+        }
+
+        if ($this->sharedTables) {
+            $map['tenant'] = 'UInt64';
+        }
+
+        $map['limit'] = 'UInt64';
+        $map['offset'] = 'UInt64';
+        $map['max'] = 'UInt64';
+
+        return $map;
+    }
+
+    /**
+     * Build a `Builder\ClickHouse` instance with the adapter's column type map
+     * pre-registered. Every adapter call site that produces SQL goes through
+     * here so positional `?` bindings can be rewritten to typed `{paramN:Type}`
+     * placeholders at `Statement` time.
+     */
+    private function newBuilder(): ClickHouseBuilder
+    {
+        return new ClickHouseBuilder()
+            ->useNamedBindings()
+            ->withParamTypes($this->getColumnTypeMap());
     }
 
     /**
@@ -507,22 +548,23 @@ class ClickHouse extends SQL
      *    Parameters are referenced in SQL using syntax: {paramName:Type}
      *    Example: SELECT * WHERE id = {id:String}
      *
-     * 2. **JSON body queries** (when $jsonRows is provided):
-     *    Uses JSONEachRow format for optimal INSERT performance.
-     *    SQL is sent via URL query string, JSON data as POST body.
-     *    Each row is a JSON object on a separate line.
+     * 2. **Pre-serialized body queries** (when $rawBody is provided):
+     *    Used for FORMAT-style INSERT operations (e.g. JSONEachRow).
+     *    SQL envelope is sent via URL query string and the body is sent
+     *    verbatim as the POST body. The caller (typically the typed
+     *    `Builder\ClickHouse::bulkInsert()` entry point) is responsible for
+     *    serializing rows into the format ClickHouse expects.
      *
      * ClickHouse handles all parameter escaping and type conversion internally,
      * making both approaches fully injection-safe.
      *
-     * @param  string  $sql  The SQL query to execute
-     * @param  array<string, mixed>  $params  Key-value pairs for query parameters (for SELECT/UPDATE/DELETE)
-     * @param  array<int, array<string, mixed>>|null  $jsonRows  Array of rows for JSONEachRow INSERT operations
+     * @param string $sql The SQL query to execute
+     * @param array<string, mixed> $params Key-value pairs for query parameters (for SELECT/UPDATE/DELETE)
+     * @param string|null $rawBody Pre-serialized request body for FORMAT INSERT operations
      * @return string Response body
-     *
      * @throws Exception
      */
-    private function query(string $sql, array $params = [], ?array $jsonRows = null): string
+    private function query(string $sql, array $params = [], ?string $rawBody = null): string
     {
         $scheme = $this->secure ? 'https' : 'http';
 
@@ -530,21 +572,10 @@ class ClickHouse extends SQL
         $this->client->addHeader('X-ClickHouse-Database', $this->database);
 
         try {
-            if ($jsonRows !== null) {
-                // JSON body mode for INSERT operations with JSONEachRow format
-                $url = "{$scheme}://{$this->host}:{$this->port}/?query=".urlencode($sql);
-
-                // Build JSONEachRow body - each row on a separate line
-                $jsonLines = [];
-                foreach ($jsonRows as $row) {
-                    try {
-                        $encoded = json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-                    } catch (\JsonException $e) {
-                        throw new Exception('Failed to encode row to JSON: '.$e->getMessage(), $e->getCode(), $e);
-                    }
-                    $jsonLines[] = $encoded;
-                }
-                $body = implode("\n", $jsonLines);
+            if ($rawBody !== null) {
+                // Pre-serialized body mode for FORMAT INSERT operations
+                $url = "{$scheme}://{$this->host}:{$this->port}/?query=" . urlencode($sql);
+                $body = $rawBody;
             } else {
                 // Parameterized query mode using multipart form data
                 $url = "{$scheme}://{$this->host}:{$this->port}/";
@@ -552,7 +583,7 @@ class ClickHouse extends SQL
                 // Build multipart form data body with query and parameters
                 $body = ['query' => $sql];
                 foreach ($params as $key => $value) {
-                    $body['param_'.$key] = $this->formatParamValue($value);
+                    $body['param_' . $key] = $this->formatParamValue($value);
                 }
             }
 
@@ -569,7 +600,6 @@ class ClickHouse extends SQL
             }
 
             $responseBody = $response->getBody();
-
             return \is_string($responseBody) ? $responseBody : '';
         } catch (Exception $e) {
             throw new Exception(
@@ -604,7 +634,7 @@ class ClickHouse extends SQL
             try {
                 return json_encode($value, JSON_THROW_ON_ERROR);
             } catch (\JsonException $e) {
-                throw new Exception('Failed to encode array parameter to JSON: '.$e->getMessage(), $e->getCode(), $e);
+                throw new Exception('Failed to encode array parameter to JSON: ' . $e->getMessage(), $e->getCode(), $e);
             }
         }
 
@@ -632,56 +662,71 @@ class ClickHouse extends SQL
     {
         // Create database if not exists
         $escapedDatabase = $this->escapeIdentifier($this->database);
-        $createDbSql = "CREATE DATABASE IF NOT EXISTS {$escapedDatabase}";
-        $this->query($createDbSql);
+        $this->query("CREATE DATABASE IF NOT EXISTS {$escapedDatabase}");
 
-        // Build column definitions from base adapter schema
-        // Override time column to be NOT NULL since it's used in partition key
-        $columns = [
-            'id String',
-        ];
+        $tableName = $this->getTableName();
+        $qualifiedTable = $this->database . '.' . $tableName;
+        $escapedDatabaseAndTable = $escapedDatabase . '.' . $this->escapeIdentifier($tableName);
+
+        // Build the DDL through Schema\ClickHouse so column types, LowCardinality
+        // wrappers, nullability, indexes, engine and settings all come from the
+        // typed builder rather than hand-assembled SQL fragments.
+        $schema = new ClickHouseSchema();
+        $table = $schema->table($qualifiedTable);
+        $table->string('id')->primary();
 
         foreach ($this->getAttributes() as $attribute) {
-            $id = $attribute->key;
+            /** @var string $id */
+            $id = $attribute['$id'];
 
             // Special handling for time column - must be NOT NULL for partition key
-            $columns[] = $id === 'time' ? 'time DateTime64(3)' : $this->getColumnDefinition($id);
+            if ($id === 'time') {
+                $table->datetime('time', precision: 3);
+
+                continue;
+            }
+
+            $column = $table->addColumn($id, $attribute->type === ColumnType::Datetime
+                ? ColumnType::Datetime
+                : ColumnType::String);
+            if (\in_array($id, self::LOW_CARDINALITY_COLUMNS, true)) {
+                $column->lowCardinality();
+            }
+            if (empty($attribute['required'])) {
+                $column->nullable();
+            }
         }
 
         // Add tenant column only if tables are shared across tenants
         if ($this->sharedTables) {
-            $columns[] = 'tenant Nullable(UInt64)';  // Supports 11-digit MySQL auto-increment IDs
+            // Supports 11-digit MySQL auto-increment IDs
+            $table->bigInteger('tenant')->unsigned()->nullable();
         }
 
-        // Build indexes from base adapter schema
-        $indexes = [];
         foreach ($this->getIndexes() as $index) {
-            $indexName = $index->key;
-            $attributes = $index->attributes;
-            // Escape each attribute name to prevent SQL injection
-            $escapedAttributes = array_map($this->escapeIdentifier(...), $attributes);
-            $attributeList = implode(', ', $escapedAttributes);
-            $indexes[] = "INDEX {$indexName} ({$attributeList}) TYPE bloom_filter GRANULARITY 1";
+            /** @var string $indexName */
+            $indexName = $index['$id'];
+            /** @var array<string> $attributes */
+            $attributes = $index['attributes'];
+            $table->index(
+                columns: $attributes,
+                name: $indexName,
+                algorithm: IndexAlgorithm::BloomFilter,
+                granularity: 1,
+            );
         }
 
-        $tableName = $this->getTableName();
-        $escapedDatabaseAndTable = $this->escapeIdentifier($this->database).'.'.$this->escapeIdentifier($tableName);
+        $table->engine(ClickHouseEngine::MergeTree);
+        $table->orderBy($this->sharedTables ? ['tenant', 'time', 'id'] : ['time', 'id']);
+        $table->partitionBy('toYYYYMM(time)');
 
-        $orderByExpr = $this->sharedTables ? '(tenant, time, id)' : '(time, id)';
+        $settings = ['index_granularity' => '8192'];
+        if ($this->sharedTables) {
+            $settings['allow_nullable_key'] = '1';
+        }
+        $table->settings($settings);
 
-        // Create table with MergeTree engine for optimal performance
-        $createTableSql = "
-            CREATE TABLE IF NOT EXISTS {$escapedDatabaseAndTable} (
-                ".implode(",\n                ", $columns).',
-                '.implode(",\n                ", $indexes)."
-            )
-            ENGINE = MergeTree()
-            ORDER BY {$orderByExpr}
-            PARTITION BY toYYYYMM(time)
-            SETTINGS index_granularity = 8192".($this->sharedTables ? ', allow_nullable_key = 1' : '').'
-        ';
-
-        $this->query($createTableSql);
+        $this->query($table->createIfNotExists()->query);
 
         // Apply retention as a separate, idempotent ALTER. CREATE TABLE IF NOT
         // EXISTS won't add a TTL to a table that already exists, and MODIFY TTL
@@ -691,8 +736,8 @@ class ClickHouse extends SQL
         if ($this->retention !== null) {
             $this->query(
                 "ALTER TABLE {$escapedDatabaseAndTable} "
-                ."MODIFY TTL toDateTime(time) + INTERVAL {$this->retention} DAY "
-                .'SETTINGS materialize_ttl_after_modify = 0',
+                . "MODIFY TTL toDateTime(time) + INTERVAL {$this->retention} DAY "
+                . 'SETTINGS materialize_ttl_after_modify = 0',
             );
         } else {
             // Disabling retention must actively strip any TTL a previous run
@@ -705,12 +750,13 @@ class ClickHouse extends SQL
                     "ALTER TABLE {$escapedDatabaseAndTable} REMOVE TTL",
                 );
             } catch (Exception $e) {
-                if (! str_contains($e->getMessage(), "doesn't have any table TTL expression")) {
+                if (!str_contains($e->getMessage(), "doesn't have any table TTL expression")) {
                     throw $e;
                 }
             }
         }
     }
+
 
     /**
      * Get column names from attributes.
@@ -722,16 +768,24 @@ class ClickHouse extends SQL
     {
         $columns = [];
         foreach ($this->getAttributes() as $attribute) {
-            $columnName = $attribute->key;
+            /** @var string $columnName */
+            $columnName = $attribute['$id'];
             // Exclude id and tenant as they're handled separately
             if ($columnName !== 'id' && $columnName !== 'tenant') {
                 $columns[] = $columnName;
             }
         }
-
         return $columns;
     }
 
+    /**
+     * Validate that an attribute name exists in the schema.
+     * Prevents SQL injection by ensuring only valid column names are used.
+     *
+     * @param string $attributeName The attribute name to validate
+     * @return bool True if valid
+     * @throws Exception If attribute name is invalid
+     */
     /**
      * Translate legacy user* attribute names to actor* column names.
      */
@@ -745,9 +799,6 @@ class ClickHouse extends SQL
         };
     }
 
-    /**
-     * @throws Exception If the name is not a known column
-     */
     private function validateAttributeName(string $attributeName): bool
     {
         // Special case: 'id' is always valid
@@ -762,7 +813,7 @@ class ClickHouse extends SQL
 
         // Check against defined attributes
         foreach ($this->getAttributes() as $attribute) {
-            if ($attribute->key === $attributeName) {
+            if ($attribute['$id'] === $attributeName) {
                 return true;
             }
         }
@@ -776,9 +827,8 @@ class ClickHouse extends SQL
      * ClickHouse DateTime64(3) type expects this format as timezone is handled by column metadata.
      * Works with DateTime objects, strings, and other datetime representations.
      *
-     * @param  \DateTime|string|null  $dateTime  The datetime value to format
+     * @param \DateTime|string|null $dateTime The datetime value to format
      * @return string The formatted datetime string in ClickHouse compatible format
-     *
      * @throws Exception If the datetime string cannot be parsed
      */
     private function formatDateTime(\DateTime|string|null $dateTime): string
@@ -794,7 +844,6 @@ class ClickHouse extends SQL
         try {
             // Parse the datetime string, handling ISO 8601 format with timezone
             $dt = new \DateTime($dateTime);
-
             return $dt->format('Y-m-d H:i:s.v');
         } catch (\Exception) {
             throw new Exception("Invalid datetime string: {$dateTime}");
@@ -804,15 +853,14 @@ class ClickHouse extends SQL
     /**
      * Create an audit log entry
      *
-     * @param  array<string, mixed>  $log  The log data
-     *
+     * @param array<string, mixed> $log The log data
      * @throws Exception
      */
     public function create(array $log): Log
     {
         // Generate ID if not provided
         $logId = $log['id'] ?? uniqid('', true);
-        if (! \is_string($logId)) {
+        if (!\is_string($logId)) {
             throw new Exception('Log ID must be a string');
         }
         $log['id'] = $logId;
@@ -822,7 +870,7 @@ class ClickHouse extends SQL
 
         // Retrieve the created log using getById to ensure consistency
         $createdLog = $this->getById($logId);
-        if (! $createdLog instanceof \Utopia\Audit\Log) {
+        if (!$createdLog instanceof \Utopia\Audit\Log) {
             throw new Exception("Failed to retrieve created log with ID: {$logId}");
         }
 
@@ -833,25 +881,25 @@ class ClickHouse extends SQL
      * Get a single log by its ID using JSON format for reliable parsing.
      *
      * @return Log|null The log entry or null if not found
-     *
      * @throws Exception
      */
     public function getById(string $id): ?Log
     {
         $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database).'.'.$this->escapeIdentifier($tableName);
-        $escapedId = $this->escapeIdentifier('id');
+        $qualifiedTable = $this->database . '.' . $tableName;
 
-        $sql = '
-            SELECT '.$this->getSelectColumns()."
-            FROM {$escapedTable}
-            WHERE {$escapedId} = {id:String}{$tenantFilter}
-            LIMIT 1
-            FORMAT JSON
-        ";
+        $builder = $this->newBuilder()
+            ->from($qualifiedTable)
+            ->selectRaw($this->getSelectColumns())
+            ->filter([Query::equal('id', $id)])
+            ->limit(1);
 
-        $result = $this->query($sql, ['id' => $id]);
+        $this->applyTenantFilter($builder);
+
+        $statement = $builder->build();
+        $sql = $statement->query . ' FORMAT JSON';
+
+        $result = $this->query($sql, $statement->namedBindings ?? []);
         $logs = $this->parseJsonResults($result);
 
         return $logs[0] ?? null;
@@ -860,17 +908,15 @@ class ClickHouse extends SQL
     /**
      * Find logs using Query objects.
      *
-     * @param  array<Query>  $queries
+     * @param array<Query> $queries
      * @return array<Log>
-     *
      * @throws Exception
      */
     public function find(array $queries = []): array
     {
         $tableName = $this->getTableName();
-        $escapedTable = $this->escapeIdentifier($this->database).'.'.$this->escapeIdentifier($tableName);
+        $qualifiedTable = $this->database . '.' . $tableName;
 
-        // Parse queries
         $parsed = $this->parseQueries($queries);
 
         // Random ordering can't combine with anything that asks for a
@@ -878,10 +924,10 @@ class ClickHouse extends SQL
         // mixing column-based ORDER BY with rand() would silently drop the
         // column order. Reject loudly in both cases so the caller fixes the
         // query rather than getting unexpected results.
-        if (! empty($parsed['randomOrder']) && isset($parsed['cursor'])) {
+        if ($parsed['randomOrder'] && isset($parsed['cursor'])) {
             throw new Exception('Cursor pagination cannot be combined with orderRandom');
         }
-        if (! empty($parsed['randomOrder']) && ! empty($parsed['orderBy'])) {
+        if ($parsed['randomOrder'] && $parsed['orderAttributes'] !== []) {
             throw new Exception('orderRandom cannot be combined with orderAsc/orderDesc');
         }
 
@@ -889,53 +935,46 @@ class ClickHouse extends SQL
         // fall back to the full column list.
         $selectColumns = $this->buildProjection($parsed['select'] ?? null);
 
-        $filters = $parsed['filters'];
-        $params = $parsed['params'];
-        $orderAttributes = $parsed['orderAttributes'] ?? [];
+        $builder = $this->newBuilder()
+            ->from($qualifiedTable)
+            ->selectRaw($selectColumns)
+            ->filter($parsed['filters']);
+
+        $this->applyTenantFilter($builder);
+
         $cursorDirection = $parsed['cursorDirection'] ?? null;
+        $orderAttributes = $parsed['orderAttributes'];
+        $cursorParams = [];
 
         if (isset($parsed['cursor'])) {
             $orderAttributes = $this->resolveCursorOrder($orderAttributes);
-            $cursorWhere = $this->buildCursorWhere($orderAttributes, $parsed['cursor'], $cursorDirection ?? 'after', $params);
-            $filters[] = $cursorWhere['clause'];
-            $params = $cursorWhere['params'];
+            $cursorWhere = $this->buildCursorWhere($orderAttributes, $parsed['cursor'], $cursorDirection ?? 'after', []);
+            $builder->whereRaw($cursorWhere['clause']);
+            $cursorParams = $cursorWhere['params'];
         }
 
-        // Build WHERE clause
-        $whereClause = '';
-        $tenantFilter = $this->getTenantFilter();
-        if (! empty($filters) || $tenantFilter) {
-            $conditions = $filters;
-            if ($tenantFilter !== '' && $tenantFilter !== '0') {
-                $conditions[] = ltrim($tenantFilter, ' AND');
-            }
-            $whereClause = ' WHERE '.implode(' AND ', $conditions);
-        }
-
-        // Build ORDER BY clause. orderRandom is mutually exclusive with
-        // cursor and column ordering (rejected at the top of find()); when
-        // cursor is in play, rebuild from orderAttributes (always non-empty
-        // after resolveCursorOrder, which appends an id tiebreaker),
-        // flipping directions for `cursorBefore`.
-        $orderClause = '';
-        if (! empty($parsed['randomOrder'])) {
-            $orderClause = ' ORDER BY rand()';
+        // ORDER BY. orderRandom is mutually exclusive with cursor and column
+        // ordering (rejected above); when cursor is in play, rebuild from
+        // orderAttributes (always non-empty after resolveCursorOrder, which
+        // appends an id tiebreaker), flipping directions for `cursorBefore`.
+        if ($parsed['randomOrder']) {
+            $builder->sortRandom();
         } elseif (isset($parsed['cursor'])) {
-            $orderSql = $this->buildOrderBySql($orderAttributes, flip: $cursorDirection === 'before');
-            $orderClause = ' ORDER BY '.implode(', ', $orderSql);
-        } elseif (! empty($parsed['orderBy'])) {
-            $orderClause = ' ORDER BY '.implode(', ', $parsed['orderBy']);
+            $this->applyOrderBy($builder, $orderAttributes, flip: $cursorDirection === 'before');
+        } else {
+            $this->applyOrderBy($builder, $orderAttributes);
         }
 
-        // Build LIMIT and OFFSET
-        $limitClause = isset($parsed['limit']) ? ' LIMIT {limit:UInt64}' : '';
-        $offsetClause = isset($parsed['offset']) ? ' OFFSET {offset:UInt64}' : '';
+        if (isset($parsed['limit'])) {
+            $builder->limit($parsed['limit']);
+        }
+        if (isset($parsed['offset'])) {
+            $builder->offset($parsed['offset']);
+        }
 
-        $sql = "
-            SELECT {$selectColumns}
-            FROM {$escapedTable}{$whereClause}{$orderClause}{$limitClause}{$offsetClause}
-            FORMAT JSON
-        ";
+        $statement = $builder->build();
+        $sql = $statement->query . ' FORMAT JSON';
+        $params = ($statement->namedBindings ?? []) + $cursorParams;
 
         $result = $this->query($sql, $params);
         $rows = $this->parseJsonResults($result);
@@ -959,7 +998,6 @@ class ClickHouse extends SQL
      * requesting a slim projection don't have to remember either.
      *
      * @param  list<string>|null  $select
-     *
      * @throws Exception
      */
     private function buildProjection(?array $select): string
@@ -1005,50 +1043,35 @@ class ClickHouse extends SQL
      * `LIMIT {max}` inside a subquery — ClickHouse stops scanning once the cap
      * is reached, keeping large counts cheap (e.g. for "5000+" UI badges).
      *
-     * @param  array<Query>  $queries
-     * @param  int|null  $max  Optional upper bound (inclusive) for the count
-     *
+     * @param array<Query> $queries
+     * @param int|null $max Optional upper bound (inclusive) for the count
      * @throws Exception
      */
     public function count(array $queries = [], ?int $max = null): int
     {
         $tableName = $this->getTableName();
-        $escapedTable = $this->escapeIdentifier($this->database).'.'.$this->escapeIdentifier($tableName);
+        $qualifiedTable = $this->database . '.' . $tableName;
 
-        // Parse queries - we only need filters and params, not ordering/limit/offset/cursor
+        // Parse queries - we only need filters, not ordering/limit/offset/cursor
         $parsed = $this->parseQueries($queries);
 
-        // Build WHERE clause
-        $whereClause = '';
-        $tenantFilter = $this->getTenantFilter();
-        if (! empty($parsed['filters']) || $tenantFilter) {
-            $conditions = $parsed['filters'];
-            if ($tenantFilter !== '' && $tenantFilter !== '0') {
-                $conditions[] = ltrim($tenantFilter, ' AND');
-            }
-            $whereClause = ' WHERE '.implode(' AND ', $conditions);
-        }
+        $inner = $this->newBuilder()
+            ->from($qualifiedTable)
+            ->selectRaw($max !== null ? '1' : 'COUNT(*) AS count')
+            ->filter($parsed['filters']);
 
-        // Remove limit and offset from params as they don't apply to count
-        $params = $parsed['params'];
-        unset($params['limit'], $params['offset']);
+        $this->applyTenantFilter($inner);
 
         if ($max !== null) {
-            $params['max'] = $max;
-            $sql = "
-                SELECT COUNT(*) as count
-                FROM (
-                    SELECT 1 FROM {$escapedTable}{$whereClause} LIMIT {max:UInt64}
-                ) sub
-                FORMAT TabSeparated
-            ";
-        } else {
-            $sql = "
-                SELECT COUNT(*) as count
-                FROM {$escapedTable}{$whereClause}
-                FORMAT TabSeparated
-            ";
+            $inner->limit($max);
         }
+
+        $statement = $inner->build();
+        $params = $statement->namedBindings ?? [];
+
+        $sql = $max !== null
+            ? 'SELECT COUNT(*) AS count FROM (' . $statement->query . ') sub FORMAT TabSeparated'
+            : $statement->query . ' FORMAT TabSeparated';
 
         $result = $this->query($sql, $params);
         $trimmed = trim($result);
@@ -1057,18 +1080,31 @@ class ClickHouse extends SQL
     }
 
     /**
-     * Parse Query objects into SQL components.
+     * Parse Query objects into builder-ready filters and auxiliary metadata.
+     *
+     * Returns the input filters as a list of `Utopia\Query\Query` instances —
+     * the caller hands them to `Builder\ClickHouse::filter()` which compiles
+     * them into typed `{paramN:Type}` placeholders via the column → type map
+     * registered on `newBuilder()`. Filter semantics are unchanged from the
+     * hand-written SQL this replaces:
+     *
+     * - `Equal` with multiple values compiles to `IN (...)`.
+     * - `Contains` / `NotContains` stay substring matches — the ClickHouse
+     *   builder emits `position(col, ?) > 0` / `= 0`, which is equivalent to
+     *   the previous `LIKE '%v%'` / `NOT LIKE '%v%'` form but needs no
+     *   wildcard escaping.
+     * - `Regex` compiles to ClickHouse's re2 `match(col, ?)` predicate.
+     * - `time`-column values arriving as `\DateTimeInterface` are pre-formatted
+     *   to ClickHouse's `Y-m-d H:i:s.v` literal so the HTTP layer doesn't see
+     *   raw DateTime objects in `namedBindings`.
      *
      * @param  array<Query>  $queries
-     * @return array{filters: array<string>, params: array<string, mixed>, orderBy?: array<string>, orderAttributes?: array<int, array{attribute: string, direction: string}>, randomOrder?: bool, limit?: int, offset?: int, cursor?: array<string, mixed>, cursorDirection?: string, select?: list<string>}
-     *
+     * @return array{filters: array<int, BaseQuery>, orderAttributes: array<int, array{attribute: string, direction: string}>, randomOrder: bool, limit?: int, offset?: int, cursor?: array<string, mixed>, cursorDirection?: string, select?: list<string>}
      * @throws Exception
      */
     private function parseQueries(array $queries): array
     {
         $filters = [];
-        $params = [];
-        $orderBy = [];
         $orderAttributes = [];
         $limit = null;
         $offset = null;
@@ -1076,10 +1112,9 @@ class ClickHouse extends SQL
         $cursorDirection = null;
         $select = null;
         $randomOrder = false;
-        $paramCounter = 0;
 
         foreach ($queries as $query) {
-            if (! $query instanceof Query) {
+            if (!$query instanceof Query) {
                 $type = get_debug_type($query);
                 throw new \InvalidArgumentException("Invalid query item: expected instance of Query, got {$type}");
             }
@@ -1095,208 +1130,33 @@ class ClickHouse extends SQL
             // otherwise turn `Query::contains('attr', [])` into a full-table
             // match instead of an empty result.
             if (\in_array($method, self::VALUE_REQUIRED_METHODS, true) && $values === []) {
-                throw new \Exception(ucfirst($method->value).' queries require at least one value.');
+                throw new \Exception(ucfirst($method->value) . ' queries require at least one value.');
             }
 
             switch ($method) {
                 case Method::Equal:
-                    $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $chType = $this->getParamType($attribute);
-
-                    if (\count($values) > 1) {
-                        $inParams = [];
-                        foreach ($values as $value) {
-                            $paramName = 'param_'.$paramCounter++;
-                            $inParams[] = "{{$paramName}:{$chType}}";
-                            $params[$paramName] = $this->formatTypedValue($chType, $value);
-                        }
-                        $filters[] = "{$escapedAttr} IN (".implode(', ', $inParams).')';
-                    } else {
-                        $paramName = 'param_'.$paramCounter++;
-                        $filters[] = "{$escapedAttr} = {{$paramName}:{$chType}}";
-                        $params[$paramName] = $this->formatTypedValue($chType, $values[0] ?? null);
-                    }
-                    break;
-
                 case Method::NotEqual:
-                    $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $chType = $this->getParamType($attribute);
-                    $paramName = 'param_'.$paramCounter++;
-                    $filters[] = "{$escapedAttr} != {{$paramName}:{$chType}}";
-                    $params[$paramName] = $this->formatTypedValue($chType, $values[0] ?? null);
-                    break;
-
                 case Method::LessThan:
-                    $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $chType = $this->getParamType($attribute);
-                    $paramName = 'param_'.$paramCounter++;
-                    $filters[] = "{$escapedAttr} < {{$paramName}:{$chType}}";
-                    $params[$paramName] = $this->formatTypedValue($chType, $values[0] ?? null);
-                    break;
-
                 case Method::LessThanEqual:
-                    $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $chType = $this->getParamType($attribute);
-                    $paramName = 'param_'.$paramCounter++;
-                    $filters[] = "{$escapedAttr} <= {{$paramName}:{$chType}}";
-                    $params[$paramName] = $this->formatTypedValue($chType, $values[0] ?? null);
-                    break;
-
                 case Method::GreaterThan:
-                    $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $chType = $this->getParamType($attribute);
-                    $paramName = 'param_'.$paramCounter++;
-                    $filters[] = "{$escapedAttr} > {{$paramName}:{$chType}}";
-                    $params[$paramName] = $this->formatTypedValue($chType, $values[0] ?? null);
-                    break;
-
                 case Method::GreaterThanEqual:
-                    $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $chType = $this->getParamType($attribute);
-                    $paramName = 'param_'.$paramCounter++;
-                    $filters[] = "{$escapedAttr} >= {{$paramName}:{$chType}}";
-                    $params[$paramName] = $this->formatTypedValue($chType, $values[0] ?? null);
-                    break;
-
                 case Method::Between:
-                    $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $chType = $this->getParamType($attribute);
-                    $paramName1 = 'param_'.$paramCounter++;
-                    $paramName2 = 'param_'.$paramCounter++;
-                    $filters[] = "{$escapedAttr} BETWEEN {{$paramName1}:{$chType}} AND {{$paramName2}:{$chType}}";
-                    $params[$paramName1] = $this->formatTypedValue($chType, $values[0] ?? null);
-                    $params[$paramName2] = $this->formatTypedValue($chType, $values[1] ?? null);
-                    break;
-
                 case Method::NotBetween:
-                    $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $chType = $this->getParamType($attribute);
-                    $paramName1 = 'param_'.$paramCounter++;
-                    $paramName2 = 'param_'.$paramCounter++;
-                    $filters[] = "{$escapedAttr} NOT BETWEEN {{$paramName1}:{$chType}} AND {{$paramName2}:{$chType}}";
-                    $params[$paramName1] = $this->formatTypedValue($chType, $values[0] ?? null);
-                    $params[$paramName2] = $this->formatTypedValue($chType, $values[1] ?? null);
-                    break;
-
                 case Method::Contains:
-                    // Substring match, mirroring utopia-php/database: each
-                    // value becomes `LIKE '%value%'`, OR'd together.
-                    $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $conditions = [];
-                    foreach ($values as $value) {
-                        if (! \is_string($value)) {
-                            throw new Exception("contains value must be a string for attribute '{$attribute}'");
-                        }
-                        $paramName = 'param_'.$paramCounter++;
-                        $conditions[] = "{$escapedAttr} LIKE {{$paramName}:String}";
-                        $params[$paramName] = '%'.$this->escapeLikeWildcards($value).'%';
-                    }
-                    $filters[] = '('.implode(' OR ', $conditions).')';
-                    break;
-
                 case Method::NotContains:
-                    // Negated substring match, mirroring utopia-php/database:
-                    // each value becomes `NOT LIKE '%value%'`, AND'd together.
-                    $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $conditions = [];
-                    foreach ($values as $value) {
-                        if (! \is_string($value)) {
-                            throw new Exception("notContains value must be a string for attribute '{$attribute}'");
-                        }
-                        $paramName = 'param_'.$paramCounter++;
-                        $conditions[] = "{$escapedAttr} NOT LIKE {{$paramName}:String}";
-                        $params[$paramName] = '%'.$this->escapeLikeWildcards($value).'%';
-                    }
-                    $filters[] = '('.implode(' AND ', $conditions).')';
-                    break;
-
                 case Method::IsNull:
-                    $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $filters[] = "{$escapedAttr} IS NULL";
-                    break;
-
                 case Method::IsNotNull:
-                    $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $filters[] = "{$escapedAttr} IS NOT NULL";
-                    break;
-
                 case Method::StartsWith:
-                    $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $needle = $values[0] ?? null;
-                    if (! \is_string($needle)) {
-                        throw new Exception("startsWith needle must be a string for attribute '{$attribute}'");
-                    }
-                    $paramName = 'param_'.$paramCounter++;
-                    $filters[] = "startsWith({$escapedAttr}, {{$paramName}:String})";
-                    $params[$paramName] = $needle;
-                    break;
-
                 case Method::NotStartsWith:
-                    $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $needle = $values[0] ?? null;
-                    if (! \is_string($needle)) {
-                        throw new Exception("notStartsWith needle must be a string for attribute '{$attribute}'");
-                    }
-                    $paramName = 'param_'.$paramCounter++;
-                    $filters[] = "NOT startsWith({$escapedAttr}, {{$paramName}:String})";
-                    $params[$paramName] = $needle;
-                    break;
-
                 case Method::EndsWith:
-                    $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $needle = $values[0] ?? null;
-                    if (! \is_string($needle)) {
-                        throw new Exception("endsWith needle must be a string for attribute '{$attribute}'");
-                    }
-                    $paramName = 'param_'.$paramCounter++;
-                    $filters[] = "endsWith({$escapedAttr}, {{$paramName}:String})";
-                    $params[$paramName] = $needle;
-                    break;
-
                 case Method::NotEndsWith:
-                    $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $needle = $values[0] ?? null;
-                    if (! \is_string($needle)) {
-                        throw new Exception("notEndsWith needle must be a string for attribute '{$attribute}'");
-                    }
-                    $paramName = 'param_'.$paramCounter++;
-                    $filters[] = "NOT endsWith({$escapedAttr}, {{$paramName}:String})";
-                    $params[$paramName] = $needle;
-                    break;
-
                 case Method::Regex:
                     $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $pattern = $values[0] ?? null;
-                    if (! \is_string($pattern)) {
-                        throw new Exception("regex pattern must be a string for attribute '{$attribute}'");
-                    }
-                    $paramName = 'param_'.$paramCounter++;
-                    // ClickHouse's `match(haystack, pattern)` is the re2-style
-                    // regex predicate. Pattern is bound as a parameter, never
-                    // interpolated, so it can't escape into the SQL.
-                    $filters[] = "match({$escapedAttr}, {{$paramName}:String})";
-                    $params[$paramName] = $pattern;
+                    $filters[] = new BaseQuery($method, $attribute, $this->normalizeFilterValues($attribute, $values));
                     break;
 
                 case Method::Select:
-                    if (empty($values)) {
+                    if ($values === []) {
                         // VALUE_REQUIRED_METHODS already rejects empty values
                         // earlier, but the explicit check keeps this branch safe
                         // if the guard is ever bypassed.
@@ -1307,11 +1167,11 @@ class ClickHouse extends SQL
                     // validated and escaped at SQL build time in find().
                     $select ??= [];
                     foreach ($values as $column) {
-                        if (! \is_string($column) || $column === '') {
+                        if (!\is_string($column) || $column === '') {
                             throw new Exception('select columns must be non-empty strings');
                         }
                         $this->validateAttributeName($column);
-                        if (! \in_array($column, $select, true)) {
+                        if (!\in_array($column, $select, true)) {
                             $select[] = $column;
                         }
                     }
@@ -1319,15 +1179,11 @@ class ClickHouse extends SQL
 
                 case Method::OrderDesc:
                     $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $orderBy[] = "{$escapedAttr} DESC";
                     $orderAttributes[] = ['attribute' => $attribute, 'direction' => 'DESC'];
                     break;
 
                 case Method::OrderAsc:
                     $this->validateAttributeName($attribute);
-                    $escapedAttr = $this->escapeIdentifier($attribute);
-                    $orderBy[] = "{$escapedAttr} ASC";
                     $orderAttributes[] = ['attribute' => $attribute, 'direction' => 'ASC'];
                     break;
 
@@ -1339,19 +1195,17 @@ class ClickHouse extends SQL
                     break;
 
                 case Method::Limit:
-                    if (! \is_int($values[0])) {
+                    if (!\is_int($values[0])) {
                         throw new \Exception('Invalid limit value. Expected int');
                     }
                     $limit = $values[0];
-                    $params['limit'] = $limit;
                     break;
 
                 case Method::Offset:
-                    if (! \is_int($values[0])) {
+                    if (!\is_int($values[0])) {
                         throw new \Exception('Invalid offset value. Expected int');
                     }
                     $offset = $values[0];
-                    $params['offset'] = $offset;
                     break;
 
                 case Method::CursorAfter:
@@ -1372,17 +1226,9 @@ class ClickHouse extends SQL
 
         $result = [
             'filters' => $filters,
-            'params' => $params,
+            'orderAttributes' => $orderAttributes,
+            'randomOrder' => $randomOrder,
         ];
-
-        if ($orderBy !== []) {
-            $result['orderBy'] = $orderBy;
-            $result['orderAttributes'] = $orderAttributes;
-        }
-
-        if ($randomOrder) {
-            $result['randomOrder'] = true;
-        }
 
         if ($limit !== null) {
             $result['limit'] = $limit;
@@ -1405,6 +1251,59 @@ class ClickHouse extends SQL
     }
 
     /**
+     * Normalize filter values so DateTime instances on the `time` column flow
+     * through `namedBindings` as ClickHouse-compatible strings rather than raw
+     * objects (the HTTP layer would otherwise serialise them as empty).
+     *
+     * @param  array<mixed>  $values
+     * @return array<mixed>
+     *
+     * @throws Exception
+     */
+    private function normalizeFilterValues(string $attribute, array $values): array
+    {
+        if ($this->getParamType($attribute) !== 'DateTime64(3)') {
+            return $values;
+        }
+
+        $normalized = [];
+        foreach ($values as $value) {
+            if ($value === null) {
+                $normalized[] = null;
+
+                continue;
+            }
+            /** @var \DateTime|string $value */
+            $normalized[] = $this->formatDateTime($value);
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Apply an ordered list of column directions to the builder via the
+     * canonical `sortAsc` / `sortDesc` API, optionally flipping each direction
+     * for `cursorBefore` pagination.
+     *
+     * @param  array<int, array{attribute: string, direction: string}>  $orderAttributes
+     */
+    private function applyOrderBy(ClickHouseBuilder $builder, array $orderAttributes, bool $flip = false): void
+    {
+        foreach ($orderAttributes as $entry) {
+            $direction = $entry['direction'];
+            if ($flip) {
+                $direction = $direction === 'DESC' ? 'ASC' : 'DESC';
+            }
+
+            if ($direction === 'DESC') {
+                $builder->sortDesc($entry['attribute']);
+            } else {
+                $builder->sortAsc($entry['attribute']);
+            }
+        }
+    }
+
+    /**
      * Normalize a user-supplied cursor row into a column-keyed array.
      *
      * Accepts a `Log` (or any `ArrayObject`) or a plain associative array.
@@ -1413,7 +1312,6 @@ class ClickHouse extends SQL
      * can match the SQL column.
      *
      * @return array<string, mixed>
-     *
      * @throws Exception
      */
     private function normalizeCursorRow(mixed $rawCursor): array
@@ -1427,11 +1325,11 @@ class ClickHouse extends SQL
         } else {
             throw new Exception(
                 'Invalid cursor value: expected ArrayObject (Log) or associative array, got '
-                .get_debug_type($rawCursor),
+                . get_debug_type($rawCursor),
             );
         }
 
-        if (! \array_key_exists('id', $row) && \array_key_exists('$id', $row)) {
+        if (!\array_key_exists('id', $row) && \array_key_exists('$id', $row)) {
             $row['id'] = $row['$id'];
             unset($row['$id']);
         }
@@ -1452,11 +1350,12 @@ class ClickHouse extends SQL
      */
     private function getParamType(string $attribute): string
     {
-        return match (true) {
-            $attribute === 'time' => 'DateTime64(3)',
-            $attribute === 'tenant' && $this->sharedTables => 'UInt64',
-            default => 'String',
-        };
+        // Derived from the same map the builder is given, rather than a second
+        // hardcoded list. The two used to be able to disagree: this matched only
+        // `time`, while getColumnTypeMap() types every VAR_DATETIME attribute, so
+        // a second datetime column would have been bound as String here and
+        // declared DateTime64(3) there.
+        return $this->getColumnTypeMap()[$attribute] ?? 'String';
     }
 
     /**
@@ -1466,8 +1365,7 @@ class ClickHouse extends SQL
      * else through formatParamValue(). Centralising this dispatch keeps
      * parseQueries and buildCursorWhere consistent across libraries.
      *
-     * @param  string  $chType  ClickHouse parameter type as returned by getParamType()
-     *
+     * @param string $chType ClickHouse parameter type as returned by getParamType()
      * @throws Exception
      */
     private function formatTypedValue(string $chType, mixed $value): string
@@ -1476,7 +1374,6 @@ class ClickHouse extends SQL
             if ($value === null) {
                 throw new Exception('DateTime parameter value cannot be null');
             }
-
             /** @var \DateTime|string $value */
             return $this->formatDateTime($value);
         }
@@ -1485,24 +1382,12 @@ class ClickHouse extends SQL
     }
 
     /**
-     * Escape ClickHouse LIKE-pattern wildcards in a user-supplied needle.
-     *
-     * Backslash is escaped first so already-escaped characters aren't
-     * double-escaped. Keeps `contains('event', ['100%'])` a literal
-     * substring match instead of a wildcard.
-     */
-    private function escapeLikeWildcards(string $value): string
-    {
-        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
-    }
-
-    /**
      * Resolve the effective order attributes for cursor pagination.
      *
      * Auto-appends `id` as a tiebreaker when not already present so keyset
      * pagination is deterministic on non-unique columns (e.g. time).
      *
-     * @param  array<int, array{attribute: string, direction: string}>  $orderAttributes
+     * @param array<int, array{attribute: string, direction: string}> $orderAttributes
      * @return array<int, array{attribute: string, direction: string}>
      */
     private function resolveCursorOrder(array $orderAttributes): array
@@ -1535,12 +1420,11 @@ class ClickHouse extends SQL
      * actual ORDER BY at SQL build time so the page comes back from the right
      * side, then reversing the rows post-fetch).
      *
-     * @param  array<int, array{attribute: string, direction: string}>  $orderAttributes
-     * @param  array<string, mixed>  $cursor
-     * @param  string  $cursorDirection  'after' or 'before'
-     * @param  array<string, mixed>  $params  Existing params (mutated by adding cursor binds)
+     * @param array<int, array{attribute: string, direction: string}> $orderAttributes
+     * @param array<string, mixed> $cursor
+     * @param string $cursorDirection 'after' or 'before'
+     * @param array<string, mixed> $params Existing params (mutated by adding cursor binds)
      * @return array{clause: string, params: array<string, mixed>}
-     *
      * @throws Exception
      */
     private function buildCursorWhere(array $orderAttributes, array $cursor, string $cursorDirection, array $params): array
@@ -1550,7 +1434,7 @@ class ClickHouse extends SQL
             $attr = $entry['attribute'];
             $direction = $entry['direction'];
 
-            if (! \array_key_exists($attr, $cursor)) {
+            if (!\array_key_exists($attr, $cursor)) {
                 throw new Exception("Cursor is missing required attribute '{$attr}'");
             }
 
@@ -1563,7 +1447,7 @@ class ClickHouse extends SQL
             for ($j = 0; $j < $i; $j++) {
                 $prev = $orderAttributes[$j];
                 $prevAttr = $prev['attribute'];
-                if (! \array_key_exists($prevAttr, $cursor)) {
+                if (!\array_key_exists($prevAttr, $cursor)) {
                     throw new Exception("Cursor is missing required attribute '{$prevAttr}'");
                 }
                 $prevValue = $cursor[$prevAttr];
@@ -1590,44 +1474,19 @@ class ClickHouse extends SQL
             $conditions[] = "{$escaped} {$operator} {{$paramName}:{$chType}}";
             $params[$paramName] = $this->formatTypedValue($chType, $value);
 
-            $tuples[] = '('.implode(' AND ', $conditions).')';
+            $tuples[] = '(' . implode(' AND ', $conditions) . ')';
         }
 
         return [
-            'clause' => '('.implode(' OR ', $tuples).')',
+            'clause' => '(' . implode(' OR ', $tuples) . ')',
             'params' => $params,
         ];
     }
 
     /**
-     * Build the ORDER BY SQL fragment list, optionally flipping all directions.
-     *
-     * Used when cursor direction is `before` — we run the query in reverse to
-     * grab the previous-page rows, then `array_reverse` the result.
-     *
-     * @param  array<int, array{attribute: string, direction: string}>  $orderAttributes
-     * @param  bool  $flip  Whether to flip ASC↔DESC
-     * @return array<string>
-     */
-    private function buildOrderBySql(array $orderAttributes, bool $flip = false): array
-    {
-        $sql = [];
-        foreach ($orderAttributes as $entry) {
-            $direction = $entry['direction'];
-            if ($flip) {
-                $direction = $direction === 'DESC' ? 'ASC' : 'DESC';
-            }
-            $sql[] = $this->escapeIdentifier($entry['attribute']).' '.$direction;
-        }
-
-        return $sql;
-    }
-
-    /**
      * Create multiple audit log entries in batch.
      *
-     * @param  array<array<string, mixed>>  $logs  The logs to insert
-     *
+     * @param array<array<string, mixed>> $logs The logs to insert
      * @throws Exception
      */
     public function createBatch(array $logs): bool
@@ -1637,7 +1496,7 @@ class ClickHouse extends SQL
         }
 
         $tableName = $this->getTableName();
-        $escapedDatabaseAndTable = $this->escapeIdentifier($this->database).'.'.$this->escapeIdentifier($tableName);
+        $qualifiedTable = $this->database . '.' . $tableName;
 
         // Get all attribute column names
         $schemaColumns = $this->getColumnNames();
@@ -1647,7 +1506,7 @@ class ClickHouse extends SQL
 
         foreach ($logs as $log) {
             foreach (['userId' => 'actorId', 'userType' => 'actorType', 'userInternalId' => 'actorInternalId'] as $legacy => $current) {
-                if (isset($log[$legacy]) && ! isset($log[$current])) {
+                if (isset($log[$legacy]) && !isset($log[$current])) {
                     $log[$current] = $log[$legacy];
                 }
                 unset($log[$legacy]);
@@ -1657,7 +1516,7 @@ class ClickHouse extends SQL
             $logData = $log['data'] ?? [];
 
             foreach (['userId' => 'actorId', 'userType' => 'actorType', 'userInternalId' => 'actorInternalId'] as $legacy => $current) {
-                if (\array_key_exists($legacy, $logData) && ! \array_key_exists($current, $logData)) {
+                if (\array_key_exists($legacy, $logData) && !\array_key_exists($current, $logData)) {
                     $logData[$current] = $logData[$legacy];
                 }
                 unset($logData[$legacy]);
@@ -1667,7 +1526,7 @@ class ClickHouse extends SQL
             // Separate data for non-schema attributes
             $nonSchemaData = $logData;
             $resourceValue = $log['resource'] ?? null;
-            if (! \is_string($resourceValue)) {
+            if (!\is_string($resourceValue)) {
                 $resourceValue = '';
             }
             $resource = $this->parseResource($resourceValue);
@@ -1682,10 +1541,10 @@ class ClickHouse extends SQL
                     continue;
                 }
                 // If attribute not in main log, check data array
-                if (! isset($processedLog[$columnName]) && isset($logData[$columnName])) {
+                if (!isset($processedLog[$columnName]) && isset($logData[$columnName])) {
                     $processedLog[$columnName] = $logData[$columnName];
                     unset($nonSchemaData[$columnName]);
-                } elseif (! isset($processedLog[$columnName]) && isset($resource[$columnName])) {
+                } elseif (!isset($processedLog[$columnName]) && isset($resource[$columnName])) {
                     // Check parsed resource for resourceType, resourceId, resourceParent
                     $processedLog[$columnName] = $resource[$columnName];
                 } elseif (isset($processedLog[$columnName]) && isset($logData[$columnName])) {
@@ -1714,14 +1573,14 @@ class ClickHouse extends SQL
 
                 // Get attribute metadata to determine if required
                 $attributeMetadata = $this->getAttribute($columnName);
-                $isRequiredAttribute = $attributeMetadata !== null && $attributeMetadata->required;
+                $isRequiredAttribute = $attributeMetadata !== null && isset($attributeMetadata['required']) && $attributeMetadata['required'];
 
                 if ($columnName === 'data') {
                     // Data column - encode remaining non-schema data as JSON
                     try {
                         $encodedData = json_encode($nonSchemaData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
                     } catch (\JsonException $e) {
-                        throw new Exception('Failed to encode data column to JSON: '.$e->getMessage(), $e->getCode(), $e);
+                        throw new Exception('Failed to encode data column to JSON: ' . $e->getMessage(), $e->getCode(), $e);
                     }
                     $row['data'] = $encodedData;
                 } elseif (isset($processedLog[$columnName])) {
@@ -1738,9 +1597,24 @@ class ClickHouse extends SQL
             $rows[] = $row;
         }
 
-        $insertSql = "INSERT INTO {$escapedDatabaseAndTable} FORMAT JSONEachRow";
+        $columns = ['id', 'time'];
+        foreach ($schemaColumns as $columnName) {
+            if ($columnName === 'time') {
+                continue;
+            }
+            $columns[] = $columnName;
+        }
+        if ($this->sharedTables) {
+            $columns[] = 'tenant';
+        }
 
-        $this->query($insertSql, [], $rows);
+        // Builder\ClickHouse::bulkInsert() emits the `INSERT INTO ... FORMAT
+        // JSONEachRow` envelope and serialises the rows into the request body.
+        $statement = $this->newBuilder()
+            ->into($qualifiedTable)
+            ->bulkInsert(Format::JSONEachRow, $rows, $columns);
+
+        $this->query($statement->query, [], $statement->body);
 
         return true;
     }
@@ -1749,9 +1623,8 @@ class ClickHouse extends SQL
      * Parse ClickHouse JSON format results into Log objects.
      * JSON format provides structured data with automatic type handling.
      *
-     * @param  string  $result  The JSON response from ClickHouse
+     * @param string $result The JSON response from ClickHouse
      * @return array<int, Log>
-     *
      * @throws Exception If JSON parsing fails
      */
     private function parseJsonResults(string $result): array
@@ -1763,10 +1636,10 @@ class ClickHouse extends SQL
         /** @var array<string, mixed>|null $decoded */
         $decoded = json_decode($result, true);
         if ($decoded === null && json_last_error() !== JSON_ERROR_NONE) {
-            throw new Exception('Failed to parse ClickHouse JSON response: '.json_last_error_msg());
+            throw new Exception('Failed to parse ClickHouse JSON response: ' . json_last_error_msg());
         }
 
-        if (! \is_array($decoded) || ! isset($decoded['data']) || ! \is_array($decoded['data'])) {
+        if (!\is_array($decoded) || !isset($decoded['data']) || !\is_array($decoded['data'])) {
             return [];
         }
 
@@ -1775,7 +1648,7 @@ class ClickHouse extends SQL
         $documents = [];
 
         foreach ($data as $row) {
-            if (! \is_array($row)) {
+            if (!\is_array($row)) {
                 continue;
             }
 
@@ -1799,8 +1672,8 @@ class ClickHouse extends SQL
                     // ClickHouse JSON: "2025-12-07 23:33:54.493"
                     // ISO 8601:        "2025-12-07T23:33:54.493+00:00"
                     $parsedTime = \is_string($value) ? $value : (\is_scalar($value) ? (string) $value : '');
-                    if (! str_contains($parsedTime, 'T') && $parsedTime !== '') {
-                        $parsedTime = str_replace(' ', 'T', $parsedTime).'+00:00';
+                    if (!str_contains($parsedTime, 'T') && $parsedTime !== '') {
+                        $parsedTime = str_replace(' ', 'T', $parsedTime) . '+00:00';
                     }
                     $document[$columnName] = $parsedTime;
                 } else {
@@ -1816,7 +1689,7 @@ class ClickHouse extends SQL
             }
 
             foreach (['actorId' => 'userId', 'actorType' => 'userType', 'actorInternalId' => 'userInternalId'] as $current => $legacy) {
-                if (\array_key_exists($current, $document) && ! \array_key_exists($legacy, $document)) {
+                if (\array_key_exists($current, $document) && !\array_key_exists($legacy, $document)) {
                     $document[$legacy] = $document[$current];
                 }
             }
@@ -1841,7 +1714,8 @@ class ClickHouse extends SQL
 
         // Dynamically add all attribute columns except 'data'
         foreach ($this->getAttributes() as $attribute) {
-            $id = $attribute->key;
+            $id = $attribute['$id'];
+            /** @var string $id */
             if ($id !== 'data') {
                 $columns[] = $this->escapeIdentifier($id);
             }
@@ -1862,15 +1736,13 @@ class ClickHouse extends SQL
      * Build tenant filter clause based on current tenant context.
      * Escapes column name to prevent SQL injection.
      */
-    private function getTenantFilter(): string
+    private function applyTenantFilter(ClickHouseBuilder $builder): void
     {
-        if (! $this->sharedTables || $this->tenant === null) {
-            return '';
+        if (!$this->sharedTables || $this->tenant === null) {
+            return;
         }
 
-        $escapedTenant = $this->escapeIdentifier('tenant');
-
-        return " AND {$escapedTenant} = {$this->tenant}";
+        $builder->filter([Query::equal('tenant', [$this->tenant])]);
     }
 
     /**
@@ -1879,19 +1751,20 @@ class ClickHouse extends SQL
      * Dynamically determines the ClickHouse type based on attribute metadata.
      * DateTime attributes use DateTime64(3), all others use String.
      *
-     * @param  string  $id  Attribute identifier
+     * @param string $id Attribute identifier
      * @return string ClickHouse column definition with appropriate types and nullability
-     *
      * @throws Exception
      */
     protected function getColumnDefinition(string $id): string
     {
         $attribute = $this->getAttribute($id);
 
-        if (! $attribute) {
+        if (!$attribute) {
             throw new Exception("Attribute {$id} not found");
         }
 
+        // Dynamically determine type based on attribute metadata
+        // DateTime attributes use DateTime64(3), all others use String
         $type = $attribute->type === ColumnType::Datetime
             ? 'DateTime64(3)'
             : 'String';
@@ -1906,7 +1779,7 @@ class ClickHouse extends SQL
             return "{$id} {$columnType}";
         }
 
-        $columnType = $required ? $type : 'Nullable('.$type.')';
+        $columnType = $required ? $type : 'Nullable(' . $type . ')';
 
         return "{$id} {$columnType}";
     }
@@ -2159,17 +2032,21 @@ class ClickHouse extends SQL
     public function cleanup(\DateTime $datetime): bool
     {
         $tableName = $this->getTableName();
-        $tenantFilter = $this->getTenantFilter();
-        $escapedTable = $this->escapeIdentifier($this->database).'.'.$this->escapeIdentifier($tableName);
-
+        $qualifiedTable = $this->database . '.' . $tableName;
+        $escapedTimeColumn = $this->escapeIdentifier('time');
         $datetimeString = $datetime->format('Y-m-d H:i:s.v');
 
-        $settings = $this->asyncCleanup ? ' SETTINGS lightweight_deletes_sync = 0' : '';
+        $builder = $this->newBuilder()
+            ->into($qualifiedTable)
+            ->whereRaw($escapedTimeColumn . ' < {datetime:DateTime64(3)}');
 
-        $sql = "
-            DELETE FROM {$escapedTable}
-            WHERE time < {datetime:DateTime64(3)}{$tenantFilter}{$settings}
-        ";
+        $this->applyTenantFilter($builder);
+
+        if ($this->asyncCleanup) {
+            $builder->settings(['lightweight_deletes_sync' => '0']);
+        }
+
+        $sql = $builder->delete()->query;
 
         $this->query($sql, ['datetime' => $datetimeString]);
 
