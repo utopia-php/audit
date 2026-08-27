@@ -2389,12 +2389,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/utopia-php/database.git",
-                "reference": "b0254667fa7aa2131a1d72f23a16f73924bb04e7"
+                "reference": "c6ae48dbf0104ff4b6cb8a0ac173ab0dfcd23ef7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/utopia-php/database/zipball/b0254667fa7aa2131a1d72f23a16f73924bb04e7",
-                "reference": "b0254667fa7aa2131a1d72f23a16f73924bb04e7",
+                "url": "https://api.github.com/repos/utopia-php/database/zipball/c6ae48dbf0104ff4b6cb8a0ac173ab0dfcd23ef7",
+                "reference": "c6ae48dbf0104ff4b6cb8a0ac173ab0dfcd23ef7",
                 "shasum": ""
             },
             "require": {
@@ -2480,7 +2480,7 @@
                 "source": "https://github.com/utopia-php/database/tree/feat-query-lib",
                 "issues": "https://github.com/utopia-php/database/issues"
             },
-            "time": "2026-08-26T01:17:32+00:00"
+            "time": "2026-08-27T01:20:20+00:00"
         },
         {
             "name": "utopia-php/fetch",
