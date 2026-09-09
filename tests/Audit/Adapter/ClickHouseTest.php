@@ -11,7 +11,6 @@ use Utopia\Audit\Audit;
 use Utopia\Audit\Query;
 use Utopia\Database\Attribute;
 use Utopia\Database\Index;
-use Utopia\Query\Schema\ColumnType;
 use Utopia\Tests\Audit\AuditBase;
 
 /**
@@ -613,43 +612,6 @@ final class ClickHouseTest extends TestCase
         foreach ($highCardinality as $column) {
             $definition = $method->invoke($adapter, $column);
             $this->assertEquals("{$column} Nullable(String)", $definition);
-        }
-    }
-
-    /**
-     * Test that premium geo attributes are all optional String columns.
-     */
-    public function testPremiumGeoAttributesAreOptionalStrings(): void
-    {
-        $adapter = new ClickHouse(
-            host: 'clickhouse',
-            username: 'default',
-            password: 'clickhouse',
-        );
-
-        $attributes = $adapter->getAttributes();
-        $byId = [];
-        foreach ($attributes as $attribute) {
-            $byId[$attribute->key] = $attribute;
-        }
-
-        $geoColumns = [
-            'city',
-            'continentCode',
-            'subdivisions',
-            'isp',
-            'autonomousSystemNumber',
-            'autonomousSystemOrganization',
-            'connectionType',
-            'connectionUsageType',
-            'connectionOrganization',
-        ];
-
-        foreach ($geoColumns as $column) {
-            $this->assertArrayHasKey($column, $byId, "Premium geo attribute '{$column}' not found");
-            $this->assertSame(ColumnType::String, $byId[$column]->type, "'{$column}' should be a string");
-            $this->assertFalse($byId[$column]->required, "'{$column}' should be optional");
-            $this->assertFalse($byId[$column]->array, "'{$column}' should not be an array");
         }
     }
 

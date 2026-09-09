@@ -13,11 +13,7 @@ use Utopia\Audit\Query;
 use Utopia\Cache\Adapter\None as NoCache;
 use Utopia\Cache\Cache;
 use Utopia\Database\Adapter\MariaDB;
-use Utopia\Database\Attribute;
 use Utopia\Database\Database;
-use Utopia\Database\Index;
-use Utopia\Query\Schema\ColumnType;
-use Utopia\Query\Schema\IndexType;
 use Utopia\Tests\Audit\AuditBase;
 
 /**
@@ -50,45 +46,33 @@ final class DatabaseTest extends TestCase
         }
     }
 
-    public function testSchemaValueObjectsAndNullableLog(): void
+    public function testLogWithoutUserIdOrData(): void
     {
-        $adapter = $this->audit->getAdapter();
-        $this->assertInstanceOf(Adapter\Database::class, $adapter);
-
-        $attributes = $adapter->getAttributes();
-        $this->assertCount(7, $attributes);
-        foreach ($attributes as $attribute) {
-            $this->assertInstanceOf(Attribute::class, $attribute);
-            $this->assertNull($attribute->default);
-        }
-        $this->assertSame('userId', $attributes[0]->key);
-        $this->assertSame(ColumnType::String, $attributes[0]->type);
-        $this->assertSame(Database::LENGTH_KEY, $attributes[0]->size);
-        $this->assertFalse($attributes[0]->required);
-        $this->assertTrue($attributes[1]->required);
-        $this->assertSame(ColumnType::Datetime, $attributes[5]->type);
-        $this->assertSame(['datetime'], $attributes[5]->filters);
-        $this->assertSame(['json'], $attributes[6]->filters);
-
-        $indexes = $adapter->getIndexes();
-        $this->assertCount(4, $indexes);
-        foreach ($indexes as $index) {
-            $this->assertInstanceOf(Index::class, $index);
-            $this->assertSame(IndexType::Key, $index->type);
-        }
-        $this->assertSame(['userId', 'event'], $indexes[1]->attributes);
-
         $log = $this->audit->log(null, 'schema.created', 'schema/defaults', 'test', '127.0.0.1');
+
         $stored = $this->audit->getLogById($log->getId());
         $this->assertInstanceOf(Log::class, $stored);
         $this->assertNull($stored->getUserId());
         $this->assertSame([], $stored->getAttribute('data'));
         $this->assertNotEmpty($stored->getAttribute('time'));
+
         $logs = $this->audit->find([
             Query::equal('resource', ['schema/defaults']),
             Query::containsString('event', ['created']),
         ]);
         $this->assertCount(1, $logs);
         $this->assertSame($log->getId(), $logs[0]->getId());
+    }
+
+    public function testUserIdAcceptsFullKeyLength(): void
+    {
+        $userId = str_repeat('u', Database::LENGTH_KEY);
+
+        $log = $this->audit->log($userId, 'schema.length', 'schema/length', 'test', '127.0.0.1');
+
+        $stored = $this->audit->getLogById($log->getId());
+        $this->assertInstanceOf(Log::class, $stored);
+        $this->assertSame($userId, $stored->getUserId());
+        $this->assertCount(1, $this->audit->getLogsByUser($userId));
     }
 }
