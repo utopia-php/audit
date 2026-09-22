@@ -36,12 +36,6 @@
         "ext-pdo_mysql": "*",
         "ext-swoole": "*"
     },
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/utopia-php/database.git"
-        }
-    ],
     "config": {
         "allow-plugins": {
             "php-http/discovery": true,
