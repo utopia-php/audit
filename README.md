@@ -1,9 +1,8 @@
 # Utopia Audit
 
 > [!IMPORTANT]
-> This repository is a read-only mirror of the [utopia-php monorepo](https://github.com/utopia-php/monorepo). Development happens in [`packages/audit`](https://github.com/utopia-php/monorepo/tree/main/packages/audit) — please open issues and pull requests there.
+> This repository is a read-only mirror of [`packages/audit`](https://github.com/appwrite/appwrite/tree/main/packages/audit) in [appwrite/appwrite](https://github.com/appwrite/appwrite). Development happens there — please open issues and pull requests against appwrite/appwrite.
 
-[![Build Status](https://travis-ci.org/utopia-php/audit.svg?branch=master)](https://travis-ci.com/utopia-php/audit)
 ![Total Downloads](https://img.shields.io/packagist/dt/utopia-php/audit.svg)
 [![Discord](https://img.shields.io/discord/564160730845151244)](https://appwrite.io/discord)
 
@@ -58,7 +57,7 @@ $pdo = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $
     PDO::ATTR_EMULATE_PREPARES => true,
     PDO::ATTR_STRINGIFY_FETCHES => true,
 ]);
-        
+
 $cache = new Cache(new NoCache());
 
 $database = new Database(new MySQL($pdo), $cache);
@@ -255,7 +254,7 @@ $logs = $audit->getLogsByResourceAndEvents(
 All retrieval methods support the following optional parameters:
 
 - **after** (`?\DateTime`): Get logs created after this datetime
-- **before** (`?\DateTime`): Get logs created before this datetime  
+- **before** (`?\DateTime`): Get logs created before this datetime
 - **limit** (`int`, default: 25): Maximum number of logs to return
 - **offset** (`int`, default: 0): Number of logs to skip (for pagination)
 - **ascending** (`bool`, default: false): Sort order - false for newest first, true for oldest first
