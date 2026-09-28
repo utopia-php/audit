@@ -4,7 +4,6 @@ namespace Utopia\Audit\Adapter;
 
 use Utopia\Audit\Adapter;
 use Utopia\Database\Attribute;
-use Utopia\Database\Database;
 use Utopia\Database\Index;
 
 /**
@@ -15,7 +14,7 @@ use Utopia\Database\Index;
  */
 abstract class SQL extends Adapter
 {
-    public const COLLECTION = 'audit';
+    public const string COLLECTION = 'audit';
 
     /**
      * Get the collection/table name for audit logs.

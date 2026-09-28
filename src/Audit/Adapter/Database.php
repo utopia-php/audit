@@ -4,6 +4,7 @@ namespace Utopia\Audit\Adapter;
 
 use Exception;
 use Utopia\Audit\Log;
+use Utopia\Database\Attribute;
 use Utopia\Database\Collection;
 use Utopia\Database\DateTime;
 use Utopia\Database\Document;
@@ -77,7 +78,7 @@ class Database extends SQL
     public function create(array $log): Log
     {
         $log['time'] ??= DateTime::now();
-        $document = $this->db->getAuthorization()->skip(fn (): Document => $this->db->createDocument($this->getCollectionName(), new Document($log)));
+        $document = $this->db->getAuthorization()->skip(fn(): Document => $this->db->createDocument($this->getCollectionName(), new Document($log)));
 
         return new Log($document->getArrayCopy());
     }
@@ -93,7 +94,7 @@ class Database extends SQL
     {
         $this->db->getAuthorization()->skip(function () use ($logs): void {
             $documents = array_map(function (array $log): Document {
-                $time = $log['time'] ?? new \DateTime;
+                $time = $log['time'] ?? new \DateTime();
                 if (\is_string($time)) {
                     $time = new \DateTime($time);
                 }
@@ -117,7 +118,7 @@ class Database extends SQL
      */
     public function getById(string $id): ?Log
     {
-        $document = $this->db->getAuthorization()->skip(fn (): Document => $this->db->getDocument($this->getCollectionName(), $id));
+        $document = $this->db->getAuthorization()->skip(fn(): Document => $this->db->getDocument($this->getCollectionName(), $id));
 
         if ($document->isEmpty()) {
             return null;
@@ -186,7 +187,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn (Document $doc): Log => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn(Document $doc): Log => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -202,7 +203,7 @@ class Database extends SQL
     ): int {
         $timeQueries = $this->buildTimeQueries($after, $before);
 
-        return $this->db->getAuthorization()->skip(fn (): int => $this->db->count(
+        return $this->db->getAuthorization()->skip(fn(): int => $this->db->count(
             collection: $this->getCollectionName(),
             queries: [
                 Query::equal('userId', [$userId]),
@@ -243,7 +244,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn (Document $doc): Log => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn(Document $doc): Log => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -259,7 +260,7 @@ class Database extends SQL
     ): int {
         $timeQueries = $this->buildTimeQueries($after, $before);
 
-        return $this->db->getAuthorization()->skip(fn (): int => $this->db->count(
+        return $this->db->getAuthorization()->skip(fn(): int => $this->db->count(
             collection: $this->getCollectionName(),
             queries: [
                 Query::equal('resource', [$resource]),
@@ -303,7 +304,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn (Document $doc): Log => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn(Document $doc): Log => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -322,7 +323,7 @@ class Database extends SQL
     ): int {
         $timeQueries = $this->buildTimeQueries($after, $before);
 
-        return $this->db->getAuthorization()->skip(fn (): int => $this->db->count(
+        return $this->db->getAuthorization()->skip(fn(): int => $this->db->count(
             collection: $this->getCollectionName(),
             queries: [
                 Query::equal('userId', [$userId]),
@@ -367,7 +368,7 @@ class Database extends SQL
             );
         });
 
-        return array_map(fn (Document $doc): Log => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn(Document $doc): Log => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -386,7 +387,7 @@ class Database extends SQL
     ): int {
         $timeQueries = $this->buildTimeQueries($after, $before);
 
-        return $this->db->getAuthorization()->skip(fn (): int => $this->db->count(
+        return $this->db->getAuthorization()->skip(fn(): int => $this->db->count(
             collection: $this->getCollectionName(),
             queries: [
                 Query::equal('resource', [$resource]),
@@ -441,7 +442,7 @@ class Database extends SQL
     {
         $attribute = $this->getAttribute($id);
 
-        if (! $attribute) {
+        if (! $attribute instanceof Attribute) {
             throw new Exception("Attribute {$id} not found");
         }
 
@@ -479,12 +480,12 @@ class Database extends SQL
             $dbQueries[] = Query::parseQuery($query->toArray());
         }
 
-        $documents = $this->db->getAuthorization()->skip(fn (): array => $this->db->find(
+        $documents = $this->db->getAuthorization()->skip(fn(): array => $this->db->find(
             collection: $this->getCollectionName(),
             queries: $dbQueries,
         ));
 
-        return array_map(fn (Document $doc): Log => new Log($doc->getArrayCopy()), $documents);
+        return array_map(fn(Document $doc): Log => new Log($doc->getArrayCopy()), $documents);
     }
 
     /**
@@ -528,7 +529,7 @@ class Database extends SQL
             $dbQueries[] = Query::parseQuery($queryArray);
         }
 
-        return $this->db->getAuthorization()->skip(fn (): int => $this->db->count(
+        return $this->db->getAuthorization()->skip(fn(): int => $this->db->count(
             collection: $this->getCollectionName(),
             queries: $dbQueries,
             max: $max,

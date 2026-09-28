@@ -6,7 +6,6 @@ use Exception;
 use Utopia\Audit\Log;
 use Utopia\Audit\Query;
 use Utopia\Database\Attribute;
-use Utopia\Database\Database;
 use Utopia\Database\Index;
 use Utopia\Fetch\Client;
 use Utopia\Query\Builder\ClickHouse as ClickHouseBuilder;
@@ -676,8 +675,7 @@ class ClickHouse extends SQL
         $table->string('id')->primary();
 
         foreach ($this->getAttributes() as $attribute) {
-            /** @var string $id */
-            $id = $attribute['$id'];
+            $id = $attribute->key;
 
             // Special handling for time column - must be NOT NULL for partition key
             if ($id === 'time') {
@@ -692,7 +690,7 @@ class ClickHouse extends SQL
             if (\in_array($id, self::LOW_CARDINALITY_COLUMNS, true)) {
                 $column->lowCardinality();
             }
-            if (empty($attribute['required'])) {
+            if (! $attribute->required) {
                 $column->nullable();
             }
         }
@@ -704,13 +702,9 @@ class ClickHouse extends SQL
         }
 
         foreach ($this->getIndexes() as $index) {
-            /** @var string $indexName */
-            $indexName = $index['$id'];
-            /** @var array<string> $attributes */
-            $attributes = $index['attributes'];
             $table->index(
-                columns: $attributes,
-                name: $indexName,
+                columns: $index->attributes,
+                name: $index->key,
                 algorithm: IndexAlgorithm::BloomFilter,
                 granularity: 1,
             );
@@ -768,8 +762,7 @@ class ClickHouse extends SQL
     {
         $columns = [];
         foreach ($this->getAttributes() as $attribute) {
-            /** @var string $columnName */
-            $columnName = $attribute['$id'];
+            $columnName = $attribute->key;
             // Exclude id and tenant as they're handled separately
             if ($columnName !== 'id' && $columnName !== 'tenant') {
                 $columns[] = $columnName;
@@ -813,7 +806,7 @@ class ClickHouse extends SQL
 
         // Check against defined attributes
         foreach ($this->getAttributes() as $attribute) {
-            if ($attribute['$id'] === $attributeName) {
+            if ($attribute->key === $attributeName) {
                 return true;
             }
         }
@@ -1573,7 +1566,7 @@ class ClickHouse extends SQL
 
                 // Get attribute metadata to determine if required
                 $attributeMetadata = $this->getAttribute($columnName);
-                $isRequiredAttribute = $attributeMetadata !== null && isset($attributeMetadata['required']) && $attributeMetadata['required'];
+                $isRequiredAttribute = $attributeMetadata->required ?? false;
 
                 if ($columnName === 'data') {
                     // Data column - encode remaining non-schema data as JSON
@@ -1714,8 +1707,7 @@ class ClickHouse extends SQL
 
         // Dynamically add all attribute columns except 'data'
         foreach ($this->getAttributes() as $attribute) {
-            $id = $attribute['$id'];
-            /** @var string $id */
+            $id = $attribute->key;
             if ($id !== 'data') {
                 $columns[] = $this->escapeIdentifier($id);
             }
@@ -1759,7 +1751,7 @@ class ClickHouse extends SQL
     {
         $attribute = $this->getAttribute($id);
 
-        if (!$attribute) {
+        if (! $attribute instanceof Attribute) {
             throw new Exception("Attribute {$id} not found");
         }
 
